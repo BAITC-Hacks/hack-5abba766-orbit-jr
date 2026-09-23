@@ -24,6 +24,7 @@ export function ImportPanel({
   const [result, setResult] = useState<ImportResult>();
   const [replayed, setReplayed] = useState(false);
   const [pending, setPending] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
   const lock = useRef(false);
   const request = useRef<{ key: string; body: FormData } | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -43,7 +44,7 @@ export function ImportPanel({
       if (employees) body.append("employees", employees);
       if (history) body.append("history", history);
       body.append("expected_dataset_revision", String(revision));
-      body.append("dry_run", "false");
+      body.append("dry_run", String(dryRun));
       request.current = { key: crypto.randomUUID(), body };
     }
     lock.current = true;
@@ -125,12 +126,27 @@ export function ImportPanel({
             </li>
           ))}
       </ul>
+      <label className="import-preview-toggle">
+        <input
+          type="checkbox"
+          checked={dryRun}
+          disabled={busy || pending}
+          onChange={(event) => {
+            setDryRun(event.target.checked);
+            setError(undefined);
+            setResult(undefined);
+          }}
+        />
+        Только проверить файлы, без сохранения
+      </label>
       <button className="primary" disabled={busy} onClick={() => void submit()}>
         {busy
           ? "Обработка…"
           : pending
             ? "Повторить тот же импорт"
-            : "Импортировать"}
+            : dryRun
+              ? "Проверить файлы"
+              : "Импортировать"}
       </button>
       <Failure error={error} />
       {error instanceof ApiFailure && error.code === "IMPORT_CONFLICT" && (

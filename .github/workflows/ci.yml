@@ -1,0 +1,29 @@
+name: Verify Career Quest
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: career_quest
+          POSTGRES_PASSWORD: career_quest_local
+          POSTGRES_DB: career_quest
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U career_quest -d career_quest"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run eval:ai
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest
+      - run: npm run build

@@ -52,7 +52,7 @@ export async function apiRequest<T>(
       error?.code ?? "HTTP_ERROR",
       response.status === 401
         ? path === endpoints.login
-          ? "Неверный логин или пароль. Проверьте данные и попробуйте снова."
+          ? (error?.message ?? "Неверный логин или пароль. Проверьте данные и попробуйте снова.")
           : "Сессия истекла. Войдите снова."
         : response.status === 403
           ? "Нет доступа к этому разделу."

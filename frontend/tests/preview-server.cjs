@@ -360,11 +360,14 @@ const server = http.createServer(async (req, res) => {
             },
           ],
         });
-      imported = true;
-      datasetRevision++;
+      const dryRun = /name="dry_run"\r\n\r\ntrue/.test(raw);
+      if (!dryRun) {
+        imported = true;
+        datasetRevision++;
+      }
       return send({
-        dry_run: false,
-        applied: true,
+        dry_run: dryRun,
+        applied: !dryRun,
         dataset_revision: datasetRevision,
         global_revision: revision + datasetRevision,
         counts: {

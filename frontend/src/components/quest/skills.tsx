@@ -63,7 +63,13 @@ export function Skills({
                 />
               ))}
             </div>
-            <small>Оставшийся разрыв: {s.gap ?? "цель не выбрана"}</small>
+            <small>
+              {s.gap !== null
+                ? `Оставшийся разрыв: ${s.gap}`
+                : employee.goal.target
+                  ? "Не входит в требования выбранной цели"
+                  : "Цель не выбрана"}
+            </small>
           </div>
         ))}
       </div>

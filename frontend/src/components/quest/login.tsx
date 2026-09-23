@@ -21,6 +21,8 @@ export function Login({
     if (error && !busy) passwordInput.current?.focus();
   }, [error, busy]);
   useEffect(() => () => controller.current?.abort(), []);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   return (
     <main className="login-page">
       <section className="panel">
@@ -66,6 +68,8 @@ export function Login({
               autoComplete="username"
               required
               disabled={busy}
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
             />
           </label>
           <div className="password-field">
@@ -80,6 +84,8 @@ export function Login({
               autoComplete="current-password"
               required
               disabled={busy}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
             />
             <button
               type="button"
@@ -97,6 +103,41 @@ export function Login({
           </button>
         </form>
         <Failure error={error} />
+        <details className="demo-credentials" open>
+          <summary>Аккаунты локальной демонстрации</summary>
+          <p>
+            Сотрудник: <code>employee / employee-demo-2026</code>
+          </p>
+          <p>
+            HR: <code>hr / hr-demo-2026</code>
+          </p>
+          <p className="fine-print">
+            Это значения по умолчанию для первого запуска. Если при
+            инициализации пароли изменили в .env, используйте заданные значения.
+          </p>
+          <div className="modal-actions">
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={() => {
+                setUsername("employee");
+                setPassword("employee-demo-2026");
+              }}
+            >
+              Заполнить: сотрудник
+            </button>
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={() => {
+                setUsername("hr");
+                setPassword("hr-demo-2026");
+              }}
+            >
+              Заполнить: HR
+            </button>
+          </div>
+        </details>
         <p className="fine-print">
           <a href="/demo">Открыть отдельный UI-демо</a>
         </p>

@@ -1,0 +1,13 @@
+import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+const root = fileURLToPath(new URL('../', import.meta.url));
+const frontend = fileURLToPath(new URL('../frontend/', import.meta.url));
+const require = createRequire(new URL('../frontend/package.json', import.meta.url));
+const mode = process.argv[2] === 'start' ? 'start' : 'dev';
+const bootstrap = spawnSync(process.execPath, ['--import', 'tsx', 'backend/scripts/bootstrap.ts'], { cwd: root, stdio: 'inherit', env: process.env });
+if (bootstrap.status !== 0) process.exit(bootstrap.status || 1);
+const server = spawn(process.execPath, [require.resolve('next/dist/bin/next'), mode, '--hostname', mode === 'dev' ? '127.0.0.1' : '0.0.0.0', '--port', process.env.PORT || '3000'], { cwd: frontend, stdio: 'inherit', env: process.env });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.kill(signal));
+server.on('error', error => { console.error(error.message); process.exitCode = 1; });
+server.on('exit', (code, signal) => { process.exitCode = code ?? (signal ? 0 : 1); });
