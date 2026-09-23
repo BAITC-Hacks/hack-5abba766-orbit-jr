@@ -50,6 +50,31 @@ function expectCode(fn: () => unknown, code: string): void {
 }
 
 describe('assessed baseline and causal simulation overlays', () => {
+  it.each(['toString', 'valueOf', 'hasOwnProperty'])('treats an absent %s skill as zero without reading the object prototype', skillId => {
+    const data = fixture({
+      skills: [{ skill_id: skillId, name: 'Synthetic inherited-name skill', type: 'hard', category: 'Example', description: 'Authored skill' }],
+      employees: [{ ...person, skills: {} }],
+      role_profiles: [{ role: 'Engineer', grade: 'Middle', required_skills: { [skillId]: 2 }, critical_skills: [skillId] }],
+      events: [event('course', { develops_skills: [{ skill_id: skillId, gain: 1, max_level: 5 }] })],
+    });
+    const { employee, candidates } = getCandidates(data, person.employee_id);
+    expect(employee.skills).toEqual([{ skill_id: skillId, baseline_level: 0, current_level: 0, required_level: 2, gap: 2, critical: true }]);
+    expect(employee.progress).toEqual({ coverage: 0, gap_points: 2, missing_critical_skill_ids: [skillId] });
+    expect(candidates[0].expected_skill_changes).toEqual([{ skill_id: skillId, before: 0, after: 1, gain: 1 }]);
+    expect(candidates[0].goal_coverage_delta).toBe(0.5);
+    const after = employeeView({ ...data, completions: [completion('synthetic')] }, person.employee_id);
+    expect(after.skills[0]).toMatchObject({ baseline_level: 0, current_level: 1, gap: 1 });
+  });
+
+  it('does not invent a target requirement for an inherited-name skill outside the goal', () => {
+    const data = fixture();
+    data.skills.push({ skill_id: 'toString', name: 'Synthetic skill', type: 'hard', category: 'Example', description: 'Authored skill' });
+    const view = employeeView(data, person.employee_id);
+    expect(view.skills.find(skill => skill.skill_id === 'toString')).toEqual({
+      skill_id: 'toString', baseline_level: 0, current_level: 0, required_level: null, gap: null, critical: false,
+    });
+  });
+
   it('only applies source completions strictly after review, in date/id order, once', () => {
     const data = fixture({
       history: [
@@ -285,6 +310,22 @@ describe('preparation paths and grounded ranking', () => {
 });
 
 describe('consistent views and analytics', () => {
+  it('keeps a new mandatory assignment in effective counts after an older completion', () => {
+    const data = fixture({
+      events: [event('course', { mandatory: true })],
+      history: [
+        history('completed-assignment', { date: '2026-08-01', status: 'completed', completion_pct: 100 }),
+        history('current-assignment', { date: '2026-09-15' }),
+      ],
+    });
+    expect(employeeView(data, person.employee_id).history.find(row => row.participation_id === 'current-assignment'))
+      .toMatchObject({ source_status: 'in_progress', effective_status: 'in_progress', actionable: false, superseded_by: null });
+    const { participation } = hrOverview(data);
+    expect(participation.superseded_attempts).toBe(0);
+    expect(participation.effective_by_status).toEqual(participation.actual_by_status);
+    expect(participation.by_activity[0].effective_by_status).toMatchObject({ completed: 1, in_progress: 1 });
+  });
+
   it('counts skill gaps against employees whose goals require that skill, separately per goal source', () => {
     const second = { ...person, employee_id: 'second', career_goal: null };
     const lead = { ...person, employee_id: 'lead', grade: 'Lead' as const, career_goal: null };

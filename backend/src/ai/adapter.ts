@@ -1,6 +1,45 @@
 import { RANKING_JSON_SCHEMA, SYSTEM_PROMPT, buildUserMessage } from './prompt';
+import { z } from 'zod';
 import type { AiRankingInput, FallbackReason } from '../types';
 import type { BaselineSignals } from '../domain/baseline';
+
+// A 1,400-token ranking and its envelope fit comfortably within this byte budget.
+// Bound decoded transport bytes too: a provider can ignore output-token limits.
+const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const CompletionEnvelope = z.object({
+  choices: z.array(z.object({
+    finish_reason: z.literal('stop'),
+    message: z.object({ content: z.string().trim().min(1), refusal: z.string().nullish() }),
+  })).length(1),
+});
+
+async function readProviderJson(response: Response, signal: AbortSignal): Promise<unknown> {
+  if (!response.body) throw new Error('Missing provider body');
+  const reader = response.body.getReader();
+  const cancel = () => { void reader.cancel().catch(() => undefined); };
+  signal.addEventListener('abort', cancel, { once: true });
+  let complete = false;
+  try {
+    signal.throwIfAborted();
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    let bytes = 0;
+    let text = '';
+    while (true) {
+      const chunk = await reader.read();
+      signal.throwIfAborted();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > MAX_PROVIDER_RESPONSE_BYTES) throw new Error('Provider body too large');
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    complete = true;
+    return JSON.parse(text + decoder.decode());
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    if (!complete) cancel();
+    reader.releaseLock();
+  }
+}
 
 /** One native provider transport; no hidden retries, cached key, or second AI engine. */
 export type AdapterResult =
@@ -54,14 +93,17 @@ export async function rankWithModel(input: AiRankingInput, externalSignal?: Abor
         controller.abort();
         return failed('provider_error', 'Provider returned an unsuccessful HTTP status');
       }
-      let body: { choices?: { finish_reason?: string; message?: { content?: string; refusal?: string } }[] } | null;
-      try { body = await response.json(); }
-      catch { return failed('invalid_response', 'Provider response was not JSON'); }
-      const choice = body?.choices?.[0];
-      if (choice?.message?.refusal) return failed('invalid_response', 'Provider refused completion');
-      if (choice?.finish_reason && choice.finish_reason !== 'stop') return failed('invalid_response', 'Completion did not finish normally');
-      const content = choice?.message?.content;
-      if (typeof content !== 'string' || !content.trim()) return failed('invalid_response', 'Empty completion');
+      let body: unknown;
+      try { body = await readProviderJson(response, controller.signal); }
+      catch {
+        controller.abort();
+        return failed('invalid_response', 'Provider response was not bounded UTF-8 JSON');
+      }
+      const envelope = CompletionEnvelope.safeParse(body);
+      if (!envelope.success) return failed('invalid_response', 'Invalid completion envelope');
+      const choice = envelope.data.choices[0]!;
+      if (choice.message.refusal) return failed('invalid_response', 'Provider refused completion');
+      const content = choice.message.content;
       try { return { ok: true, output: JSON.parse(content), ms: Date.now() - started }; }
       catch { return failed('invalid_response', 'Completion was not JSON'); }
     })();

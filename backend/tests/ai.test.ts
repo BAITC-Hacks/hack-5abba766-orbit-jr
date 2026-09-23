@@ -46,7 +46,7 @@ function choice(id = 'first', alternative?: string | null) {
     ...(alternative === undefined ? {} : { alternative_candidate_id: alternative }) };
 }
 
-const providerResponse = (output: unknown = { choices: [choice()] }) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(output) } }] }), { status: 200 });
+const providerResponse = (output: unknown = { choices: [choice()] }) => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }), { status: 200 });
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -126,9 +126,9 @@ describe('provider adapter without network calls', () => {
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'provider_error' });
     mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('invented')] }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
-    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: 'not json' } }] }), { status: 200 }));
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'not json' } }] }), { status: 200 }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
-    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { refusal: 'Refused', content: null } }] }), { status: 200 }));
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { refusal: 'Refused', content: null } }] }), { status: 200 }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
   });
 

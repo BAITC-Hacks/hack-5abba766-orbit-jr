@@ -35,11 +35,14 @@ function targetProfile(snapshot: DatasetSnapshot, goal: ResolvedGoal): RoleProfi
   return snapshot.role_profiles.find(profile => profile.role === goal.target!.target_role && profile.grade === goal.target!.target_grade) ?? null;
 }
 
+// Sparse skill maps may use valid IDs such as "toString"; inherited members are not levels.
+const skillLevel = (levels: SkillLevels, skillId: string): number => Object.hasOwn(levels, skillId) ? levels[skillId] : 0;
+
 /** Source skills are an assessed baseline, not a zero-point for replaying all history. */
 function applyEvent(levels: SkillLevels, event: EventView): SkillLevels {
   const result = { ...levels };
   for (const effect of event.develops_skills) {
-    const before = result[effect.skill_id] ?? 0;
+    const before = skillLevel(result, effect.skill_id);
     result[effect.skill_id] = before + Math.max(0, Math.min(effect.gain, effect.max_level - before, 5 - before));
   }
   return result;
@@ -69,7 +72,7 @@ function progressFor(levels: SkillLevels, profile: RoleProfile | null): GoalProg
   for (const [skillId, minimum] of Object.entries(profile.required_skills)) {
     if (minimum <= 0) continue;
     required += minimum;
-    const current = levels[skillId] ?? 0;
+    const current = skillLevel(levels, skillId);
     covered += Math.min(current, minimum);
     if (current < minimum && profile.critical_skills.includes(skillId)) missingCritical.push(skillId);
   }
@@ -89,8 +92,8 @@ function completedOccurrence(event: EventView, sessionDate: string | null, histo
 
 function levelChanges(before: SkillLevels, after: SkillLevels): SkillChange[] {
   return [...new Set([...Object.keys(before), ...Object.keys(after)])].sort(compareText).flatMap(skillId => {
-    const from = before[skillId] ?? 0;
-    const to = after[skillId] ?? 0;
+    const from = skillLevel(before, skillId);
+    const to = skillLevel(after, skillId);
     return from === to ? [] : [{ skill_id: skillId, before: from, after: to, gain: to - from }];
   });
 }
@@ -103,7 +106,8 @@ function employeeHistory(snapshot: DatasetSnapshot, history: ParticipationSource
     const overlay = overlays.get(row.record_id);
     const session = event.format === 'self_paced' ? null : row.date;
     const completedBy = completedOccurrence(event, session, history, completions);
-    const supersededBy = row.status === 'in_progress' && !overlay && completedBy && completedBy !== row.record_id ? completedBy : null;
+    // Mandatory assignments can recur; an earlier completion does not discharge a new assignment.
+    const supersededBy = !event.mandatory && row.status === 'in_progress' && !overlay && completedBy && completedBy !== row.record_id ? completedBy : null;
     const actionable = row.status === 'in_progress' && !overlay && !supersededBy && !event.mandatory && levelChanges(levels, applyEvent(levels, event)).length > 0;
     return {
       participation_id: row.record_id, event_id: row.event_id, event_title: event.title,
@@ -141,9 +145,9 @@ export function employeeView(snapshot: DatasetSnapshot, employeeId: string): Emp
     tenure_months: employee.tenure_months, preferred_language: employee.preferred_language,
     last_review_date: employee.last_review_date, goal, progress: progressFor(levels, profile),
     skills: [...skillIds].sort(compareText).map(skillId => {
-      const required = profile?.required_skills[skillId] ?? null;
-      const current = levels[skillId] ?? 0;
-      return { skill_id: skillId, baseline_level: employee.skills[skillId] ?? 0, current_level: current,
+      const required = profile && Object.hasOwn(profile.required_skills, skillId) ? profile.required_skills[skillId] : null;
+      const current = skillLevel(levels, skillId);
+      return { skill_id: skillId, baseline_level: skillLevel(employee.skills, skillId), current_level: current,
         required_level: required, gap: required === null ? null : Math.max(0, required - current),
         critical: profile?.critical_skills.includes(skillId) ?? false };
     }),
@@ -152,7 +156,7 @@ export function employeeView(snapshot: DatasetSnapshot, employeeId: string): Emp
 }
 
 const levelsFrom = (employee: EmployeeView): SkillLevels => Object.fromEntries(employee.skills.map(skill => [skill.skill_id, skill.current_level]));
-const meetsPrerequisites = (event: EventView, levels: SkillLevels) => Object.entries(event.prerequisites).every(([skill, minimum]) => (levels[skill] ?? 0) >= minimum);
+const meetsPrerequisites = (event: EventView, levels: SkillLevels) => Object.entries(event.prerequisites).every(([skill, minimum]) => skillLevel(levels, skill) >= minimum);
 const matchesAudience = (event: EventView, employee: EmployeeView) => event.target_roles.includes(employee.role) && event.target_grades.includes(employee.grade);
 
 type AvailableAction = { event: EventView; action: 'start' | 'continue'; participation: ParticipationSource | null; session: string | null };
@@ -186,7 +190,7 @@ function availableActions(snapshot: DatasetSnapshot, employee: EmployeeView, lev
 
 function weightedGain(before: SkillLevels, after: SkillLevels, profile: RoleProfile): number {
   return Object.entries(profile.required_skills).reduce((sum, [skill, minimum]) => {
-    const closedGap = Math.max(0, Math.min(after[skill] ?? 0, minimum) - Math.min(before[skill] ?? 0, minimum));
+    const closedGap = Math.max(0, Math.min(skillLevel(after, skill), minimum) - Math.min(skillLevel(before, skill), minimum));
     return sum + closedGap * (profile.critical_skills.includes(skill) ? 2 : 1);
   }, 0);
 }
