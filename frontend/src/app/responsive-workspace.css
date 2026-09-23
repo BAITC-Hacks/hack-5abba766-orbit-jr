@@ -35,6 +35,17 @@ html[data-theme] .catalog-grid .course-card:focus-visible { outline: 2px solid v
 html[data-theme] .catalog-grid .catalog-row-icon { display: none; }
 html[data-theme] .catalog-grid .course-body { padding: 0; }
 html[data-theme] .catalog-grid .course-body > .outline-tag { align-self: flex-start; }
+html[data-theme] .skill-row .skill-next-step { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+html[data-theme] .skill-next-step .skill-browse { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 0; color: var(--blue); font-size: 12px; font-weight: 550; }
+html[data-theme] .catalog-skill-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-block: 20px; background: var(--surface); }
+html[data-theme] .catalog-skill-context h3 { font-size: 18px; margin: 0 0 8px; }
+html[data-theme] .catalog-skill-context p { color: var(--muted); margin: 4px 0 0; font-size: 13px; line-height: 1.6; }
+html[data-theme] .catalog-skill-details { padding-block: 12px; margin-block: 8px; border-block: 1px solid var(--line); }
+html[data-theme] .catalog-skill-details p { margin-block: 6px; line-height: 1.6; }
+html[data-theme] .catalog-skill-details .catalog-skill-effect { color: var(--ink); }
+html[data-theme] .catalog-requirements { color: var(--muted); font-size: 12px; }
+html[data-theme] .catalog-requirements summary { cursor: pointer; padding-block: 6px; }
+html[data-theme] .skill-filtered-catalog .course-body > .text-button { order: 0; }
 html[data-theme] .profile-summary-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; }
 html[data-theme] :is(.profile-info-card, .profile-goal-card) { padding: 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
 html[data-theme] .profile-card-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
