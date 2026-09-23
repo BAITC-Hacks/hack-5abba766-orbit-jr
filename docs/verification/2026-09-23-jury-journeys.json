@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-09-23T11:49:30.750Z",
+  "policy": "first domain-ranked candidate; recompute after each simulated completion",
+  "scope": "Source dataset only, in-memory simulations, fixed dataset date; no DB writes or AI calls",
+  "limitation": "A stopped rollout does not prove that every possible sequence is blocked. Skill effects are simulated, not measured learning.",
+  "asOfDate": "2026-10-01",
+  "sourceSha256": "5eb73c3844ae6f9950ecc602f95606d37755777fa095155446cc7d39ba2beb11",
+  "employeeCount": 200,
+  "profilesWithGoal": 190,
+  "profilesWithInitialStep": 161,
+  "totalSteps": 517,
+  "longestJourney": 9,
+  "goalsReached": 0,
+  "terminalCounts": {
+    "NO_GOAL_RELEVANT_EVENTS": 185,
+    "GOAL_REQUIRED": 10,
+    "NO_BENEFICIAL_EVENTS": 5
+  },
+  "meanGoalCoverageBefore": 0.5941437380187783,
+  "meanGoalCoverageAfter": 0.675429360764179,
+  "criticalSkillGapsBefore": 326,
+  "criticalSkillGapsAfter": 271
+}

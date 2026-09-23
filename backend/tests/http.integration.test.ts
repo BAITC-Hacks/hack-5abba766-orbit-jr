@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -60,6 +60,21 @@ describe.skipIf(!databaseUrl)('HTTP: isolated PostgreSQL end-to-end', () => {
     expect(response.status).toBe(200);
     return response.headers.get('set-cookie')!.split(';')[0];
   };
+
+  it('avoids company snapshots for static learning, rejected routes and duplicate recommendation reads', async () => {
+    const cookie = await signIn();
+    const profile = (await (await call('/api/employees/PERSON_A', { cookie })).json()).data as EmployeeView;
+    const data = await import('../src/services/data');
+    const snapshots = vi.spyOn(data, 'readSnapshot');
+    try {
+      expect((await call('/api/learning/modules', { cookie })).status).toBe(200);
+      expect((await call('/api/unknown', { cookie })).status).toBe(404);
+      expect((await call('/api/hr/overview', { cookie })).status).toBe(403);
+      expect(snapshots).not.toHaveBeenCalled();
+      expect((await call('/api/employees/PERSON_A/recommendations', { cookie, method: 'POST', body: { expected_version: profile.version } })).status).toBe(200);
+      expect(snapshots).toHaveBeenCalledTimes(1);
+    } finally { snapshots.mockRestore(); }
+  });
 
   it('enforces sessions, origin and scope; completes once; imports atomically; logout revokes', async () => {
     expect((await call('/api/health')).status).toBe(200);

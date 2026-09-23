@@ -35,7 +35,7 @@ const version = { dataset_revision: 1, employee_revision: 2 };
 const events = [
   { event_id: 'module-event', title: 'Курс анализа', description: 'Описание учебного курса', type: 'course', format: 'self_paced', duration_hours: 2, upcoming_sessions: [], mandatory: false },
   { event_id: 'practice-event', title: 'Практикум общения', description: 'Описание командной практики', type: 'workshop', format: 'self_paced', duration_hours: 1, upcoming_sessions: [], mandatory: false },
-];
+].map(event => ({ ...event, target_roles: ['Engineer'], target_grades: ['Junior'], prerequisites: { analysis: 1 } }));
 const cards = events.map((event, index) => ({
   candidate_id: `candidate-${index}`, event_id: event.event_id, title: event.title, rank: index + 1,
   event_type: event.type, format: event.format, duration_hours: event.duration_hours,
@@ -70,7 +70,7 @@ const button = (root, label) => {
 };
 const click = async item => { await act(async () => item.props.onClick()); };
 const close = async root => { await act(async () => root.unmount()); };
-const readOnlyActions = /Изменить цель|Выбрать цель|Назначить цель|Убрать явную цель|Отметить|Продолжить уроки|Открыть уроки|Открыть (?:демомодуль|модуль)|Сдать тест/;
+const readOnlyActions = /Изменить цель|Выбрать (?:карьерную )?цель|Назначить цель|Убрать явную цель|Отметить|Смоделировать|Продолжить уроки|Открыть уроки|Открыть (?:демомодуль|модуль)|Сдать тест/;
 function assertNoMutatingActions(root) {
   assert.deepEqual(buttons(root).map(text).filter(label => readOnlyActions.test(label)), []);
   assert.equal(root.root.findAllByType('test-learning-player').length, 0);
@@ -185,6 +185,9 @@ test('HR can search catalog descriptions and inspect learning summaries without 
     await click(button(root, 'Каталог'));
     assert.match(text(root.toJSON()), /Описание учебного курса/);
     assert.match(text(root.toJSON()), /Описание командной практики/);
+    assert.match(text(root.toJSON()), /Роли: Engineer/);
+    assert.match(text(root.toJSON()), /Грейды: Junior/);
+    assert.match(text(root.toJSON()), /Анализ: уровень не ниже 1/);
     assertNoMutatingActions(root);
     const search = root.root.findByProps({ 'aria-label': 'Поиск по каталогу' });
     await act(async () => search.props.onChange({ target: { value: 'командной' } }));
@@ -256,10 +259,10 @@ test('an employee retains completion and lesson actions in recommendations and h
   const root = await scenario.mount();
   try {
     await click(button(root, 'Практикум общения'));
-    await click(button(root, 'Отметить активность выполненной'));
+    await click(button(root, 'Смоделировать выполнение'));
     assert.deepEqual(scenario.calls, [['complete', { kind: 'new_participation', event_id: 'practice-event', session_date: null }]]);
     await click(button(root, 'Моя активность'));
-    await click(button(root, 'Отметить выполненной'));
+    await click(button(root, 'Смоделировать выполнение'));
     assert.deepEqual(scenario.calls[1], ['complete', { kind: 'existing_participation', participation_id: 'participation-1' }]);
     await click(button(root, 'Продолжить уроки'));
     const player = root.root.findByType('test-learning-player');
