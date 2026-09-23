@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   Activity,
   LibraryBig,
-  RefreshCw,
+  UserRound,
   Sparkles,
 } from "lucide-react";
 import type {
@@ -23,6 +23,7 @@ import {
   formats,
   eventTypes,
   emptyReasons,
+  fallbackReasons,
   goalSources,
   activityDate,
 } from "@/lib/labels";
@@ -32,27 +33,31 @@ import { Failure, Loading } from "./feedback";
 import { Modal } from "./modal";
 import { Skills } from "./skills";
 import { History } from "./history";
+import { CatalogSelect } from "./catalog-select";
 import { RecommendationCard } from "./recommendation-card";
 import { CareerJourney } from "./career-journey";
 import { CompletionResultPanel } from "./completion-result";
 import { LearningPlayer } from "./learning-player";
+import { EmployeeProfile } from "./employee-profile";
 
 export function Employee({
   id,
   onError,
   onChanged,
   viewer = "employee",
+  initialTab = "overview",
 }: {
   id: string;
   onError: (error: unknown) => void;
   onChanged?: () => void;
   viewer?: "employee" | "hr";
+  initialTab?: "overview" | "profile";
 }) {
   const state = useEmployee(id, onError, onChanged);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
   const modules = useResource<{ modules: LearningModuleSummary[] }>(endpoints.learningModules, onError);
   const [learning, setLearning] = useState<{ moduleId: string; event: EventView; target: CompletionRequest["target"] }>();
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState<string>(initialTab);
   const [selection, setSelection] = useState<{
     card: Card;
     result: typeof state.recommendations;
@@ -145,30 +150,10 @@ export function Employee({
                 {p.last_review_date}
               </p>
             </div>
-            <button
-              className="secondary"
-              disabled={disabled}
-              onClick={() => void state.refresh()}
-            >
-              <RefreshCw size={16} aria-hidden="true" /> Обновить профиль
-            </button>
           </div>
-          {isHr && (
-            <section className="hr-actions" aria-label="Действия HR">
-              <div>
-                <span className="eyebrow">ДЕЙСТВИЯ HR</span>
-                <h2>Развитие сотрудника</h2>
-                <p>Выберите цель для {p.full_name}, изучите обучение или оцените результат симуляции.</p>
-              </div>
-              <div className="hr-action-buttons">
-                <button className="primary" disabled={disabled || !catalog.data} onClick={openGoal}><Target size={17} aria-hidden="true" />{p.goal.target ? "Изменить цель" : "Назначить цель"}</button>
-                <button className="secondary" onClick={() => setTab("catalog")}><LibraryBig size={17} aria-hidden="true" />Подобрать обучение</button>
-                <button className="secondary" onClick={() => setTab("history")}><Activity size={17} aria-hidden="true" />История сотрудника</button>
-              </div>
-            </section>
-          )}
           <nav className="subnav" aria-label="Разделы профиля">
             {[
+              ["profile", "Профиль"],
               ["overview", "Обзор"],
               ["history", isHr ? "Активность сотрудника" : "Моя активность"],
               ["catalog", "Каталог"],
@@ -180,7 +165,7 @@ export function Employee({
                 aria-current={tab === key ? "page" : undefined}
                 onClick={() => setTab(key)}
               >
-                {key === "overview" ? (
+                {key === "profile" ? <UserRound size={17} aria-hidden="true" /> : key === "overview" ? (
                   <LayoutDashboard size={17} aria-hidden="true" />
                 ) : key === "history" ? (
                   <Activity size={17} aria-hidden="true" />
@@ -191,6 +176,7 @@ export function Employee({
               </button>
             ))}
           </nav>
+          {tab === "profile" && <EmployeeProfile employee={p} names={names} onGoal={openGoal} disabled={disabled || !catalog.data} />}
           {tab === "overview" && (
             <>
               <section className="goal-summary" aria-label="Карьерная цель">
@@ -221,7 +207,7 @@ export function Employee({
                     <strong>{p.skills.length}</strong>
                     <span>навыков в профиле</span>
                   </div>
-                  <small>{isHr ? "Профессиональный капитал сотрудника" : "Ваш профессиональный капитал"}</small>
+
                 </div>
                 <div className="growth-metric gold">
                   <Target size={23} aria-hidden="true" />
@@ -235,8 +221,8 @@ export function Employee({
                   </div>
                   <small>
                     {p.goal.target
-                      ? "Фокус на требованиях цели"
-                      : "Выберите цель, чтобы увидеть разрывы"}
+                      ? "К цели"
+                      : "Цель не выбрана"}
                   </small>
                 </div>
                 <button
@@ -269,17 +255,10 @@ export function Employee({
                     <span className="eyebrow">{isHr ? "ПОДОБРАНО ДЛЯ СОТРУДНИКА" : "ПОДОБРАНО ДЛЯ ВАШЕГО РОСТА"}</span>
                     <h2>Рекомендованное обучение</h2>
                   </div>
-                  <button
-                    className="text-button"
-                    disabled={disabled || state.recLoading}
-                    onClick={state.retryRecommendations}
-                  >
-                    Обновить подборку
-                  </button>
                 </div>
                 {state.recLoading && (
                   <Loading>
-                    Подбираем рекомендации. Профиль и история уже доступны.
+                    Подбираем обучение…
                   </Loading>
                 )}
                 <Failure
@@ -296,16 +275,16 @@ export function Employee({
                       <Sparkles size={18} aria-hidden="true" />
                       <p>
                         {state.recommendations.mode === "ai"
-                          ? "AI-подборка · проверенные сервером факты"
+                          ? "AI-подборка"
                           : state.recommendations.mode === "rules_fallback"
-                            ? "Резервная подборка по правилам · без AI"
+                            ? "Подборка по правилам"
                             : emptyReasons[state.recommendations.empty_reason]}
                       </p>
                     </div>
-                    <p className="fine-print">
-                      Варианты следующего шага. Ожидаемые
-                      приросты не складываются.
-                    </p>
+
+                    {state.recommendations.mode === "rules_fallback" && (
+                      <p className="section-description">{fallbackReasons[state.recommendations.fallback_reason]}</p>
+                    )}
                     <div className="course-grid">
                       {state.recommendations.recommendations.map((card) => (
                         <RecommendationCard
@@ -340,6 +319,8 @@ export function Employee({
           )}
           {tab === "catalog" && (
             <>
+              {catalog.loading && <Loading>Загрузка каталога…</Loading>}
+              <Failure error={catalog.error} retry={catalog.reload} />
               <div className="catalog-banner">
                 <div>
                   <span className="eyebrow">БИБЛИОТЕКА ВОЗМОЖНОСТЕЙ</span>
@@ -363,27 +344,9 @@ export function Employee({
                     onChange={(e) => setQuery(e.target.value)}
                   />
                 </label>
-                <label>
-                  Тип
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                  >
-                    <option value="all">Все</option>
-                    {Object.entries(eventTypes).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <CatalogSelect value={type} onChange={setType} options={[["all", "Все типы"], ...Object.entries(eventTypes)]} />
               </div>
-              <p className="fine-print">
-                Здесь собраны все активности компании. Подходящие вам шаги —
-                в разделе «Обзор». Для некоторых курсов доступны короткие
-                учебные демомодули.
-              </p>
-              <div className="course-grid">
+              <div className="course-grid catalog-grid">
                 {catalog.data?.events
                   .filter(
                     (e) =>
@@ -401,20 +364,11 @@ export function Employee({
                         </span>
                         <h3>{e.title}</h3>
                         <details className="catalog-description"><summary>Описание программы</summary><p>{e.description}</p></details>
-                        <p>
-                          {formats[e.format]} · {e.duration_hours} ч.
-                        </p>
-                        <p>
-                          {e.upcoming_sessions.join(", ") ||
-                            (e.format === "self_paced"
-                              ? "В своём темпе"
-                              : "Нет запланированных сессий")}
-                        </p>
-                        {e.mandatory && (
-                          <p>
-                            Обязательное обучение · не персональная рекомендация
-                          </p>
-                        )}
+                        <div className="compact-meta"><span>{formats[e.format]}</span><span>{e.duration_hours} ч.</span>{e.mandatory && <span className="required-tag">Обязательное</span>}</div>
+                        {e.upcoming_sessions.length > 0 ? <details className="catalog-dates">
+                          <summary>{[...e.upcoming_sessions].sort()[0]}{e.upcoming_sessions.length > 1 && <span> +{e.upcoming_sessions.length - 1} даты</span>}</summary>
+                          <div className="compact-meta">{[...e.upcoming_sessions].sort().map(date => <span key={date}>{date}</span>)}</div>
+                        </details> : e.format !== "self_paced" && <p>Даты уточняются</p>}
                         {moduleFor(e.event_id) && <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>}
                       </div>
                     </article>
@@ -446,11 +400,11 @@ export function Employee({
           )}
           {tab === "learning" && <section className="learning-library">
             <span className="eyebrow">ОТ ПРОЧИТАННОГО К ПОНЯТНОМУ</span><h2>Учебная мастерская</h2>
-            <p>Короткие уроки, практические вопросы и сохранённый прогресс. Это демонстрационные фрагменты курсов; перед началом проверим доступность активности для вашего профиля.</p>
+            <div className="compact-meta"><span>Демомодули</span><span>Короткие уроки</span><span>Мини-тесты</span></div>
             {modules.loading && <Loading>Загрузка учебных модулей…</Loading>}
             <Failure error={modules.error} retry={modules.reload} />
             <div className="learning-library-grid">{learningModules.map(module => <article className="learning-library-card" key={module.id}>
-              <span>{module.estimated_minutes} минут · {module.lesson_count} урока · мини-тест</span><h3>{module.title}</h3><p>{module.summary}</p>
+              <span>{module.estimated_minutes} минут · {module.lesson_count} урока · мини-тест</span><h3>{module.title}</h3><details className="compact-details"><summary>О модуле</summary><p>{module.summary}</p></details>
               <button className="secondary" disabled={disabled || !catalog.data} onClick={() => openLearning(module.id, module.event_id)}>Открыть модуль →</button>
             </article>)}</div>
           </section>}
@@ -533,22 +487,9 @@ export function Employee({
                   }
                 }}
               >
-                <label className="field-label">
-                  Профессия и грейд
-                  <select
-                    required
-                    value={goalIndex}
-                    onChange={(e) => setGoalIndex(e.target.value)}
-                  >
-                    <option value="">Выберите цель</option>
-                    {catalog.data?.role_profiles.map((g, i) => (
-                      <option key={`${g.role}-${g.grade}`} value={i}>
-                        {g.role} · {g.grade}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button className="primary" disabled={disabled}>
+                <CatalogSelect label="Профессия и грейд" value={goalIndex} onChange={setGoalIndex} disabled={disabled}
+                  options={[["", "Выберите цель"], ...(catalog.data?.role_profiles.map((g, i): [string, string] => [String(i), `${g.role} · ${g.grade}`]) ?? [])]} />
+                <button className="primary" disabled={disabled || goalIndex === ""}>
                   Сохранить
                 </button>
               </form>

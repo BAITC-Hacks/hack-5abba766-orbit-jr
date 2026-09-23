@@ -11,7 +11,7 @@ import { Brand } from "./quest/visuals";
 export default function QuestApp({
   initialView = "overview",
 }: {
-  initialView?: "overview" | "hr";
+  initialView?: "overview" | "hr" | "profile";
 }) {
   const [session, setSession] = useState<SessionView | null>();
   const [error, setError] = useState<unknown>();
@@ -78,6 +78,7 @@ export default function QuestApp({
         Перейти к содержимому
       </a>
       <Navigation
+        profileActive={initialView === "profile"}
         session={session}
         busy={busy}
         logout={async () => {
@@ -103,6 +104,7 @@ export default function QuestApp({
           <Hr onError={onError} />
         ) : session.employee_id ? (
           <Employee
+            initialTab={initialView === "profile" ? "profile" : "overview"}
             key={`${session.account_id}-${session.employee_id}`}
             id={session.employee_id}
             onError={onError}

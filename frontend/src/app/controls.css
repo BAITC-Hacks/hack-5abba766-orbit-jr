@@ -1,0 +1,68 @@
+/* Shared spacing and controls, loaded after the workspace themes. */
+html[data-theme] {
+  --scroll-thumb: color-mix(in srgb, var(--muted) 48%, var(--surface));
+  scrollbar-color: var(--scroll-thumb) var(--surface);
+  scrollbar-width: thin;
+}
+html[data-theme] * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+html[data-theme] ::-webkit-scrollbar { width: 8px; height: 8px; }
+html[data-theme] ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border: 2px solid var(--surface); border-radius: 8px; }
+html[data-theme] ::-webkit-scrollbar-track { background: transparent; }
+html[data-theme] dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  overscroll-behavior: contain;
+}
+html[data-theme] .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+  border: 0;
+  border-radius: inherit;
+}
+html[data-theme] .modal-content > h2 { margin: 0; padding-right: 48px; font-size: 24px; line-height: 1.35; letter-spacing: -.5px; }
+html[data-theme] .modal-content > :is(p, ul, h3, .text-button) { margin: 0; }
+html[data-theme] .modal-content form { display: flex; flex-direction: column; align-items: stretch; gap: 24px; }
+html[data-theme] .modal-content :is(.primary, .secondary, .text-button) { align-self: flex-start; min-height: 44px; padding: 12px 18px; line-height: 1.4; white-space: normal; }
+html[data-theme] .modal-content > .text-button { padding: 10px 0; }
+html[data-theme] .modal-content > .fine-print { padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.65; }
+html[data-theme] .modal-content .field-label { margin: 0; display: grid; gap: 10px; }
+html[data-theme] dialog > .close { top: 20px; right: 20px; width: 36px; height: 36px; z-index: 2; border-radius: 10px; color: var(--muted); background: var(--surface-raised); }
+html[data-theme] .modal-content li + li { margin-top: 10px; }
+html[data-theme] .modal-content .skill-outcomes { padding: 16px; border-radius: 12px; background: var(--surface-raised); }
+html[data-theme] .catalog-select { min-width: 0; width: 100%; }
+html[data-theme] .catalog-select-label { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+html[data-theme] .catalog-select > button { min-height: 46px; padding: 12px 14px; line-height: 1.5; border-radius: 10px; }
+html[data-theme] .catalog-select > button > span { min-width: 0; overflow-wrap: anywhere; }
+html[data-theme] .catalog-select svg { flex-shrink: 0; }
+html[data-theme] .catalog-select > button:disabled { opacity: .55; cursor: not-allowed; }
+html[data-theme] .catalog-select ul { max-height: min(280px, 40dvh); overscroll-behavior: contain; scrollbar-gutter: stable; }
+html[data-theme] .catalog-select li { min-height: 44px; line-height: 1.5; overflow-wrap: anywhere; }
+/* In a scrolling dialog, an inline list stays inside the top layer and cannot be clipped. */
+html[data-theme] dialog .catalog-select ul { position: relative; margin-top: 8px; }
+html[data-theme] dialog .catalog-select li + li { margin-top: 2px; }
+html[data-theme] :is(.toolbar, .section-heading) > .catalog-select { width: min(100%, 280px); }
+html[data-theme] .toolbar { gap: 16px; margin: 20px 0 24px; flex-wrap: wrap; }
+html[data-theme] .toolbar > label { display: grid; gap: 10px; min-width: 0; }
+html[data-theme] .toolbar input { min-height: 46px; padding: 12px 14px; border-radius: 10px; }
+html[data-theme] .section-heading { gap: 20px; flex-wrap: wrap; }
+html[data-theme] .hr-surface > .catalog-select { max-width: 360px; margin: 20px 0; }
+html[data-theme] :is(button, input, textarea, summary, a):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+html[data-theme] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--blue); }
+html[data-theme] .table-scroll { scrollbar-gutter: stable; overscroll-behavior-x: contain; padding-bottom: 8px; }
+@media (max-width: 680px) {
+  html[data-theme] .modal-content { padding: 24px 20px; gap: 20px; }
+  html[data-theme] .modal-content > h2 { font-size: 21px; }
+  html[data-theme] dialog > .close { top: 16px; right: 16px; }
+  html[data-theme] .modal-content form > .primary { width: 100%; justify-content: center; }
+  html[data-theme] .toolbar > :is(label, .catalog-select), html[data-theme] .section-heading > .catalog-select { width: 100%; flex-basis: 100%; }
+}
+@media (forced-colors: active) {
+  html[data-theme] .catalog-select li.active { outline: 1px solid Highlight; }
+}

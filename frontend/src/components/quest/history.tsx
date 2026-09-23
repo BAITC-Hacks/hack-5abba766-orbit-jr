@@ -109,8 +109,8 @@ export function History({
               <CalendarDays size={16} aria-hidden="true" />
               <span>
                 {row.completion_origin === "simulation"
-                  ? "Дата демопрохождения"
-                  : row.scheduled_session_date ? "Дата занятия" : "Дата записи"} ·{" "}
+                  ? "Демопрохождение"
+                  : row.scheduled_session_date ? "Занятие" : "Запись"} ·{" "}
                 {(row.completion_origin === "simulation"
                   ? row.recorded_at?.slice(0, 10)
                   : row.scheduled_session_date ?? row.source_date) ?? "Не указана"}
@@ -127,16 +127,10 @@ export function History({
                 aria-label={"Прогресс: " + row.event_title}
               />
             </div>
-            {row.completion_origin === "simulation" && (
-              <p className="activity-note">
-                Результат демопрохождения · не подтверждает посещение
-              </p>
-            )}
-            {row.superseded_by && (
-              <p className="activity-note">
-                Результат уже учтён в другом участии.
-              </p>
-            )}
+            <div className="compact-meta">
+              {row.completion_origin === "simulation" && <span title="Не подтверждает посещение">Деморезультат</span>}
+              {row.superseded_by && <span>Учтено в другом участии</span>}
+            </div>
             <div className="activity-card-footer">
               {row.actionable ? (
                 <button
@@ -156,15 +150,10 @@ export function History({
                     : "Отметить выполненной"}{" "}
                   <ArrowRight size={16} aria-hidden="true" />
                 </button>
-              ) : (
-                <span>
-                  {row.effective_status === "completed"
-                    ? "Участие завершено"
-                    : "Нет доступных действий"}
-                </span>
-              )}
+              ) : null}
               <details className="activity-details">
                 <summary>Детали</summary>
+                {row.completion_origin === "simulation" && <p>Деморезультат не подтверждает посещение.</p>}
                 <p>Источник: {row.source_status ? "Загруженная история" : "Демонстрационный сценарий"}</p>
                 {row.source_status && <p>Исходный статус: {statuses[row.source_status]}</p>}
                 {row.applied_as_of && <p>Учтено в расчёте на {row.applied_as_of}</p>}

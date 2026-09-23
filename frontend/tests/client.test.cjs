@@ -451,7 +451,7 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
   };
   for (const [mode, expected] of [
     ["ai", "AI-подборка"],
-    ["rules_fallback", "Резервная подборка по правилам"],
+    ["rules_fallback", "Подборка по правилам"],
     ["no_candidates", "Выберите направление развития"],
   ]) {
     let root;
@@ -734,7 +734,7 @@ test("a skill outside an active goal is not labeled as missing career goal", asy
   });
   try {
     const text = JSON.stringify(root.toJSON());
-    assert.match(text, /Не входит в требования выбранной цели/);
+    assert.match(text, /Вне цели/);
     assert.doesNotMatch(text, /[Цц]ель не выбрана/);
   } finally {
     await unmount(root);
@@ -903,8 +903,8 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
     assert.equal(bar.props.max, 5);
     await act(async () =>
       root.root
-        .findByType("select")
-        .props.onChange({ target: { value: "GOAL_REACHED" } }),
+        .findByProps({ label: "Причина" })
+        .props.onChange("GOAL_REACHED"),
     );
     assert.doesNotMatch(JSON.stringify(root.toJSON()), /No course/);
     await act(async () =>
@@ -939,10 +939,10 @@ test("HR goal action names the employee and writes only to the selected profile"
   try {
     await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", onError })); });
     assert.equal(root.root.findByType("h1").children.join(""), profile.full_name);
-    const actions = root.root.findByProps({ "aria-label": "Действия HR" });
-    await act(async () => actions.findAllByType("button")[0].props.onClick());
+    const goalButton = root.root.findAllByType("button").find(button => button.children.includes("Выбрать цель"));
+    await act(async () => goalButton.props.onClick());
     assert.equal(root.root.findByType("dialog").findByType("strong").children.join(""), profile.full_name);
-    await act(async () => root.root.findByType("select").props.onChange({ target: { value: "0" } }));
+    await act(async () => root.root.findByProps({ label: "Профессия и грейд" }).props.onChange("0"));
     await act(async () => root.root.findByType("form").props.onSubmit({ preventDefault() {} }));
     assert.deepEqual(writes, [{ url: "/api/employees/hr-selected/goal", body: {
       expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Senior" },
