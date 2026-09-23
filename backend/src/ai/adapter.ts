@@ -6,6 +6,9 @@ import type { BaselineSignals } from '../domain/baseline';
 // A 1,400-token ranking and its envelope fit comfortably within this byte budget.
 // Bound decoded transport bytes too: a provider can ignore output-token limits.
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_DELAY_MS = 250;
+const MIN_RETRY_BUDGET_MS = 2000;
 const CompletionEnvelope = z.object({
   choices: z.array(z.object({
     finish_reason: z.literal('stop'),
@@ -41,7 +44,30 @@ async function readProviderJson(response: Response, signal: AbortSignal): Promis
   }
 }
 
-/** One native provider transport; no hidden retries, cached key, or second AI engine. */
+function retryDelayMs(response: Response): number {
+  const value = response.headers.get('retry-after')?.trim();
+  if (!value) return RETRY_DELAY_MS;
+  const delay = /^\d+(\.\d+)?$/.test(value) ? Number(value) * 1000 : Date.parse(value) - Date.now();
+  return Number.isNaN(delay) ? RETRY_DELAY_MS : Math.max(RETRY_DELAY_MS, delay);
+}
+
+function waitForRetry(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) { reject(new Error('Request stopped')); return; }
+    const cancel = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', cancel);
+      reject(new Error('Request stopped'));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', cancel);
+      resolve();
+    }, ms);
+    signal.addEventListener('abort', cancel, { once: true });
+  });
+}
+
+/** One provider with at most one transient-failure retry inside the total deadline. */
 export type AdapterResult =
   | { ok: true; output: unknown; ms: number }
   | { ok: false; reason: FallbackReason; detail: string; ms: number | null };
@@ -75,37 +101,67 @@ export async function rankWithModel(input: AiRankingInput, externalSignal?: Abor
   externalSignal?.addEventListener('abort', onCallerAbort, { once: true });
   const timer = setTimeout(() => stop('deadline'), timeoutMs);
   const failed = (reason: FallbackReason, detail: string): AdapterResult => ({ ok: false, reason, detail, ms: Date.now() - started });
+  const retry = async (attempt: number, delay: number): Promise<boolean> => {
+    // A retry must respect Retry-After and still leave time for a useful answer.
+    // Never reset the deadline or continue work after a caller has left.
+    if (attempt !== 0 || controller.signal.aborted || timeoutMs - (Date.now() - started) < delay + MIN_RETRY_BUDGET_MS) return false;
+    await waitForRetry(delay, controller.signal);
+    controller.signal.throwIfAborted();
+    return true;
+  };
   try {
     const model = getModel();
+    const payload = JSON.stringify({ model, store: false, max_completion_tokens: 1400,
+      // Ranking verified candidates does not need xhigh reasoning. Keep enough
+      // of the eight-second budget for the answer and a transient-failure retry.
+      ...(['gpt-6-luna', 'gpt-6-sol'].includes(model) ? { reasoning_effort: 'low' } : {}),
+      ...(/^(gpt-4o|gpt-4\.1)(-|$)/.test(model) ? { temperature: 0 } : {}),
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(input, signals) }],
+      response_format: { type: 'json_schema', json_schema: RANKING_JSON_SCHEMA },
+    });
     const request = (async (): Promise<AdapterResult> => {
-      const response = await fetch(process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions', {
-        method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ model, store: false, max_completion_tokens: 1400,
-          ...(['gpt-6-sol', 'gpt-6-luna'].includes(model) ? { reasoning_effort: 'low' } : {}),
-          ...(/^(gpt-4o|gpt-4\.1)(-|$)/.test(model) ? { temperature: 0 } : {}),
-          messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(input, signals) }],
-          response_format: { type: 'json_schema', json_schema: RANKING_JSON_SCHEMA },
-        }),
-      });
-      if (!response.ok) {
-        // An error body may stream indefinitely. Release its transport before
-        // returning fallback and clearing the deadline, without consuming it.
-        controller.abort();
-        return failed('provider_error', 'Provider returned an unsuccessful HTTP status');
+      for (let attempt = 0; attempt < 2; attempt++) {
+        controller.signal.throwIfAborted();
+        // Closing an error response must not cancel the overall retry budget.
+        const transport = new AbortController();
+        const abortTransport = () => transport.abort();
+        controller.signal.addEventListener('abort', abortTransport, { once: true });
+        try {
+          let response: Response;
+          try {
+            response = await fetch(process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions', {
+              method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+              signal: transport.signal, body: payload,
+            });
+          } catch {
+            if (await retry(attempt, RETRY_DELAY_MS)) continue;
+            return failed('provider_error', 'Provider request failed');
+          }
+          if (!response.ok) {
+            const delay = retryDelayMs(response);
+            // Do not consume an error body: it may stream indefinitely.
+            transport.abort();
+            if (RETRYABLE_STATUSES.has(response.status) && await retry(attempt, delay)) continue;
+            return failed('provider_error', 'Provider returned an unsuccessful HTTP status');
+          }
+          let body: unknown;
+          try { body = await readProviderJson(response, transport.signal); }
+          catch {
+            transport.abort();
+            return failed('invalid_response', 'Provider response was not bounded UTF-8 JSON');
+          }
+          const envelope = CompletionEnvelope.safeParse(body);
+          if (!envelope.success) return failed('invalid_response', 'Invalid completion envelope');
+          const choice = envelope.data.choices[0]!;
+          if (choice.message.refusal) return failed('invalid_response', 'Provider refused completion');
+          const content = choice.message.content;
+          try { return { ok: true, output: JSON.parse(content), ms: Date.now() - started }; }
+          catch { return failed('invalid_response', 'Completion was not JSON'); }
+        } finally {
+          controller.signal.removeEventListener('abort', abortTransport);
+        }
       }
-      let body: unknown;
-      try { body = await readProviderJson(response, controller.signal); }
-      catch {
-        controller.abort();
-        return failed('invalid_response', 'Provider response was not bounded UTF-8 JSON');
-      }
-      const envelope = CompletionEnvelope.safeParse(body);
-      if (!envelope.success) return failed('invalid_response', 'Invalid completion envelope');
-      const choice = envelope.data.choices[0]!;
-      if (choice.message.refusal) return failed('invalid_response', 'Provider refused completion');
-      const content = choice.message.content;
-      try { return { ok: true, output: JSON.parse(content), ms: Date.now() - started }; }
-      catch { return failed('invalid_response', 'Completion was not JSON'); }
+      return failed('provider_error', 'Provider attempts exhausted');
     })();
     // The race also bounds a stalled body reader or a transport that ignores abort,
     // and observes late rejections after the response has already returned.

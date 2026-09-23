@@ -1,0 +1,824 @@
+{
+  "run": "live",
+  "model": "gpt-6-luna",
+  "suite": "all",
+  "suitesIncluded": [
+    "regression",
+    "challenge",
+    "acceptance",
+    "domain"
+  ],
+  "repetitions": 1,
+  "authoredCaseCount": 23,
+  "caseRunCount": 23,
+  "smoke": false,
+  "timestamp": "2026-09-23T11:57:21.795Z",
+  "providerBudgetMs": 8000,
+  "promptSha256": "15dfb025b39fa22e58269a08cf41c230d7af723ab39899a5246d8bb396bb0154",
+  "schemaSha256": "4b5a4c836ecaddcff974edf8245f8e428197e3b096426005ee65cb5db2a85d6b",
+  "casesSha256": "f4a4a126870e462098d13846b622faf5f59f12164d9611ff4a7cbb89041546fe",
+  "dataset": "authored synthetic cases; not official or hidden judge profiles",
+  "independenceScope": "paired counterfactuals, permutations and repeated runs are correlated checks, not independent expert holdout samples",
+  "qualityScope": "top-ranked choice and decisive evidence; returned-order prefixes only where expectedCandidateOrder is authored; every card is checked for contract, snapshot grounding and citations",
+  "comparisonScope": "agreement with authored rules; baseline agreement does not establish an AI benefit",
+  "coverage": "includes validated source profiles and history through the actual domain candidate pipeline",
+  "recommendationLatencyScope": "live: recommendation call including baseline preparation and provider validation; baseline_only: deterministic baseline card generation; excludes source validation, domain candidate generation, HTTP, database and browser latency",
+  "emptyCheckScope": "deterministic domain empty states, run once and excluded from ranking scores and latency samples",
+  "emptyChecks": [
+    {
+      "caseId": "domain-missing-goal",
+      "expectedEmptyReason": "GOAL_REQUIRED",
+      "actualEmptyReason": "GOAL_REQUIRED",
+      "pass": true
+    },
+    {
+      "caseId": "domain-no-goal-coverage",
+      "expectedEmptyReason": "NO_GOAL_RELEVANT_EVENTS",
+      "actualEmptyReason": "NO_GOAL_RELEVANT_EVENTS",
+      "pass": true
+    }
+  ],
+  "summary": {
+    "totalCases": 23,
+    "acceptedAiCases": 23,
+    "invalidAiCases": 0,
+    "fallbackCases": 0,
+    "noCandidatesCases": 0,
+    "aiAcceptanceRate": 1,
+    "fallbackRate": 0,
+    "aiExpectedChoicePassRate": 1,
+    "aiBaselineAgreementRate": 1,
+    "baselineExpectedChoicePassRate": 1,
+    "aiEndToEndPassRate": 1,
+    "aiDecisiveEvidencePassRate": 1,
+    "aiCandidateOrderPassRate": 1
+  },
+  "recommendationLatencyMs": {
+    "p50": 2421.865249999999,
+    "p95": 3372.037459,
+    "max": 3611.121041999999
+  },
+  "cases": [
+    {
+      "caseId": "critical-over-lowest",
+      "mode": "ai",
+      "topCandidateId": "close-critical-gap",
+      "baselineTopCandidateId": "close-critical-gap",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 3223.6725420000002,
+      "payloadBytes": 3662,
+      "selectedChoices": [
+        {
+          "candidate_id": "close-critical-gap",
+          "reason_fact_ids": [
+            "close-critical-gap/grade",
+            "close-critical-gap/gap",
+            "close-critical-gap/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "history-breaks-tie",
+      "mode": "ai",
+      "topCandidateId": "new-format",
+      "baselineTopCandidateId": "new-format",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 3372.037459,
+      "payloadBytes": 3057,
+      "selectedChoices": [
+        {
+          "candidate_id": "new-format",
+          "reason_fact_ids": [
+            "new-format/grade",
+            "new-format/gap",
+            "new-format/target",
+            "new-format/history"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "ignore-off-goal-gain",
+      "mode": "ai",
+      "topCandidateId": "focused-goal-gain",
+      "baselineTopCandidateId": "focused-goal-gain",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2363.6214170000003,
+      "payloadBytes": 3363,
+      "selectedChoices": [
+        {
+          "candidate_id": "focused-goal-gain",
+          "reason_fact_ids": [
+            "focused-goal-gain/grade",
+            "focused-goal-gain/gap",
+            "focused-goal-gain/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "cap-gain-at-requirement",
+      "mode": "ai",
+      "topCandidateId": "fill-larger-gap",
+      "baselineTopCandidateId": "fill-larger-gap",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2367.9750409999997,
+      "payloadBytes": 3195,
+      "selectedChoices": [
+        {
+          "candidate_id": "fill-larger-gap",
+          "reason_fact_ids": [
+            "fill-larger-gap/grade",
+            "fill-larger-gap/gap",
+            "fill-larger-gap/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "prerequisite-with-evidence",
+      "mode": "ai",
+      "topCandidateId": "prepare-design-lab",
+      "baselineTopCandidateId": "prepare-design-lab",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 1546.5366250000006,
+      "payloadBytes": 3555,
+      "selectedChoices": [
+        {
+          "candidate_id": "prepare-design-lab",
+          "reason_fact_ids": [
+            "prepare-design-lab/grade",
+            "prepare-design-lab/gap",
+            "prepare-design-lab/target",
+            "prepare-design-lab/unlock"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "continue-preserves-identity",
+      "mode": "ai",
+      "topCandidateId": "continue-existing-attempt",
+      "baselineTopCandidateId": "continue-existing-attempt",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2965.803167,
+      "payloadBytes": 3290,
+      "selectedChoices": [
+        {
+          "candidate_id": "continue-existing-attempt",
+          "reason_fact_ids": [
+            "continue-existing-attempt/grade",
+            "continue-existing-attempt/gap",
+            "continue-existing-attempt/target",
+            "continue-existing-attempt/history"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "arbitrary-new-identifiers",
+      "mode": "ai",
+      "topCandidateId": "opaque:7cf0/新",
+      "baselineTopCandidateId": "opaque:7cf0/新",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "regression",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 3193.482,
+      "payloadBytes": 3183,
+      "selectedChoices": [
+        {
+          "candidate_id": "opaque:7cf0/新",
+          "reason_fact_ids": [
+            "opaque:7cf0/新/grade",
+            "opaque:7cf0/新/gap",
+            "opaque:7cf0/新/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-opaque-identifiers",
+      "mode": "ai",
+      "topCandidateId": "pick:01/0-7",
+      "baselineTopCandidateId": "pick:01/0-7",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 3,
+      "recommendationLatencyMs": 2421.865249999999,
+      "payloadBytes": 4191,
+      "selectedChoices": [
+        {
+          "candidate_id": "pick:01/0-7",
+          "reason_fact_ids": [
+            "pick:01/0-7/grade",
+            "pick:01/0-7/gap",
+            "pick:01/0-7/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-opaque-identifiers-reordered",
+      "mode": "ai",
+      "topCandidateId": "pick:01/0-7",
+      "baselineTopCandidateId": "pick:01/0-7",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 3,
+      "recommendationLatencyMs": 3340.360708999997,
+      "payloadBytes": 4191,
+      "selectedChoices": [
+        {
+          "candidate_id": "pick:01/0-7",
+          "reason_fact_ids": [
+            "pick:01/0-7/grade",
+            "pick:01/0-7/gap",
+            "pick:01/0-7/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-history-control",
+      "mode": "ai",
+      "topCandidateId": "choice:8b/1",
+      "baselineTopCandidateId": "choice:8b/1",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2344.650084000001,
+      "payloadBytes": 2989,
+      "selectedChoices": [
+        {
+          "candidate_id": "choice:8b/1",
+          "reason_fact_ids": [
+            "choice:8b/1/grade",
+            "choice:8b/1/gap",
+            "choice:8b/1/target",
+            "choice:8b/1/effort"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-history-only-change",
+      "mode": "ai",
+      "topCandidateId": "choice:8b/l",
+      "baselineTopCandidateId": "choice:8b/l",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2504.2442499999997,
+      "payloadBytes": 3023,
+      "selectedChoices": [
+        {
+          "candidate_id": "choice:8b/l",
+          "reason_fact_ids": [
+            "choice:8b/l/grade",
+            "choice:8b/l/gap",
+            "choice:8b/l/target",
+            "choice:8b/l/history"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-untrusted-instructions",
+      "mode": "ai",
+      "topCandidateId": "entry:control/l",
+      "baselineTopCandidateId": "entry:control/l",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 1468.250874999998,
+      "payloadBytes": 3625,
+      "selectedChoices": [
+        {
+          "candidate_id": "entry:control/l",
+          "reason_fact_ids": [
+            "entry:control/l/grade",
+            "entry:control/l/gap",
+            "entry:control/l/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-unlock-citation",
+      "mode": "ai",
+      "topCandidateId": "step:41/b",
+      "baselineTopCandidateId": "step:41/b",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2192.9974999999977,
+      "payloadBytes": 3566,
+      "selectedChoices": [
+        {
+          "candidate_id": "step:41/b",
+          "reason_fact_ids": [
+            "step:41/b/grade",
+            "step:41/b/history",
+            "step:41/b/target",
+            "step:41/b/unlock"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-forty-candidates",
+      "mode": "ai",
+      "topCandidateId": "catalog:28/x",
+      "baselineTopCandidateId": "catalog:28/x",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 40,
+      "recommendationLatencyMs": 1699.7341250000027,
+      "payloadBytes": 58001,
+      "selectedChoices": [
+        {
+          "candidate_id": "catalog:28/x",
+          "reason_fact_ids": [
+            "catalog:28/x/grade",
+            "catalog:28/x/gap",
+            "catalog:28/x/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "challenge-direct-with-conditional-unlock",
+      "mode": "ai",
+      "topCandidateId": "step:mixed/b",
+      "baselineTopCandidateId": "step:mixed/b",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "challenge",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2223.293291999995,
+      "payloadBytes": 3420,
+      "selectedChoices": [
+        {
+          "candidate_id": "step:mixed/b",
+          "reason_fact_ids": [
+            "step:mixed/b/grade",
+            "step:mixed/b/gap",
+            "step:mixed/b/target",
+            "step:mixed/b/unlock"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "acceptance-critical-weight-without-closure",
+      "mode": "ai",
+      "topCandidateId": "option:f6/b",
+      "baselineTopCandidateId": "option:f6/b",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "acceptance",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 3007.085124999998,
+      "payloadBytes": 3304,
+      "selectedChoices": [
+        {
+          "candidate_id": "option:f6/b",
+          "reason_fact_ids": [
+            "option:f6/b/grade",
+            "option:f6/b/gap",
+            "option:f6/b/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "acceptance-multiple-cards",
+      "mode": "ai",
+      "topCandidateId": "option:9c/b",
+      "baselineTopCandidateId": "option:9c/b",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": true,
+      "suite": "acceptance",
+      "repeatIndex": 1,
+      "candidateCount": 4,
+      "recommendationLatencyMs": 3611.121041999999,
+      "payloadBytes": 5797,
+      "selectedChoices": [
+        {
+          "candidate_id": "option:9c/b",
+          "reason_fact_ids": [
+            "option:9c/b/grade",
+            "option:9c/b/gap",
+            "option:9c/b/target"
+          ]
+        },
+        {
+          "candidate_id": "option:9c/d",
+          "reason_fact_ids": [
+            "option:9c/d/grade",
+            "option:9c/d/gap",
+            "option:9c/d/target"
+          ]
+        },
+        {
+          "candidate_id": "option:9c/c",
+          "reason_fact_ids": [
+            "option:9c/c/grade",
+            "option:9c/c/gap",
+            "option:9c/c/target"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "domain-critical-gap",
+      "mode": "ai",
+      "topCandidateId": "close-critical:start:self-paced",
+      "baselineTopCandidateId": "close-critical:start:self-paced",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "domain",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 1721.7003750000003,
+      "payloadBytes": 6863,
+      "selectedChoices": [
+        {
+          "candidate_id": "close-critical:start:self-paced",
+          "reason_fact_ids": [
+            "close-critical:start:self-paced:grade",
+            "close-critical:start:self-paced:skill_gap",
+            "close-critical:start:self-paced:target_requirement"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "domain-imported-identifiers",
+      "mode": "ai",
+      "topCandidateId": "judge%3Aevent%2F%E6%96%B0-901:start:self-paced",
+      "baselineTopCandidateId": "judge%3Aevent%2F%E6%96%B0-901:start:self-paced",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "domain",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2887.200625000005,
+      "payloadBytes": 6735,
+      "selectedChoices": [
+        {
+          "candidate_id": "judge%3Aevent%2F%E6%96%B0-901:start:self-paced",
+          "reason_fact_ids": [
+            "judge%3Aevent%2F%E6%96%B0-901:start:self-paced:grade",
+            "judge%3Aevent%2F%E6%96%B0-901:start:self-paced:skill_gap",
+            "judge%3Aevent%2F%E6%96%B0-901:start:self-paced:target_requirement"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "domain-similar-format-history",
+      "mode": "ai",
+      "topCandidateId": "new-self-paced-format:start:self-paced",
+      "baselineTopCandidateId": "new-self-paced-format:start:self-paced",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "domain",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2644.066083999998,
+      "payloadBytes": 6613,
+      "selectedChoices": [
+        {
+          "candidate_id": "new-self-paced-format:start:self-paced",
+          "reason_fact_ids": [
+            "new-self-paced-format:start:self-paced:grade",
+            "new-self-paced-format:start:self-paced:skill_gap",
+            "new-self-paced-format:start:self-paced:target_requirement",
+            "new-self-paced-format:start:self-paced:history"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "domain-prerequisite-benefit",
+      "mode": "ai",
+      "topCandidateId": "prepare-tooling:start:self-paced",
+      "baselineTopCandidateId": "prepare-tooling:start:self-paced",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": true,
+      "expectedCandidateOrderPass": null,
+      "suite": "domain",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 3136.584499999997,
+      "payloadBytes": 7768,
+      "selectedChoices": [
+        {
+          "candidate_id": "prepare-tooling:start:self-paced",
+          "reason_fact_ids": [
+            "prepare-tooling:start:self-paced:grade",
+            "prepare-tooling:start:self-paced:history",
+            "prepare-tooling:start:self-paced:unlock:future-design-lab"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "domain-role-switch-eligibility",
+      "mode": "ai",
+      "topCandidateId": "current-role-bridge:start:self-paced",
+      "baselineTopCandidateId": "current-role-bridge:start:self-paced",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "domain",
+      "repeatIndex": 1,
+      "candidateCount": 1,
+      "recommendationLatencyMs": 1900.0115420000002,
+      "payloadBytes": 3514,
+      "selectedChoices": [
+        {
+          "candidate_id": "current-role-bridge:start:self-paced",
+          "reason_fact_ids": [
+            "current-role-bridge:start:self-paced:grade",
+            "current-role-bridge:start:self-paced:skill_gap",
+            "current-role-bridge:start:self-paced:target_requirement"
+          ]
+        }
+      ]
+    },
+    {
+      "caseId": "domain-continue-identity",
+      "mode": "ai",
+      "topCandidateId": "old-enrollment:continue:authored%2Fhistory-4",
+      "baselineTopCandidateId": "old-enrollment:continue:authored%2Fhistory-4",
+      "baselineExpectedChoicePass": true,
+      "acceptedAi": true,
+      "aiExpectedChoicePass": true,
+      "aiBaselineAgreement": true,
+      "fallback": false,
+      "fallbackReason": null,
+      "validCitations": true,
+      "validSnapshotVersion": true,
+      "validResultContract": true,
+      "requiredTopEvidencePass": null,
+      "expectedCandidateOrderPass": null,
+      "suite": "domain",
+      "repeatIndex": 1,
+      "candidateCount": 2,
+      "recommendationLatencyMs": 2137.7776250000024,
+      "payloadBytes": 6634,
+      "selectedChoices": [
+        {
+          "candidate_id": "old-enrollment:continue:authored%2Fhistory-4",
+          "reason_fact_ids": [
+            "old-enrollment:continue:authored%2Fhistory-4:grade",
+            "old-enrollment:continue:authored%2Fhistory-4:skill_gap",
+            "old-enrollment:continue:authored%2Fhistory-4:history",
+            "old-enrollment:continue:authored%2Fhistory-4:target_requirement"
+          ]
+        }
+      ]
+    }
+  ]
+}

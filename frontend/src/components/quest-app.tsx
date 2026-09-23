@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { SessionView } from "../../../contracts/backend";
 import { apiRequest, ApiFailure, endpoints } from "@/lib/api";
 import { Login } from "./quest/login";
@@ -11,34 +12,67 @@ import { Brand } from "./quest/visuals";
 export default function QuestApp({
   initialView = "overview",
 }: {
-  initialView?: "overview" | "hr";
+  initialView?: "overview" | "hr" | "profile";
 }) {
   const [session, setSession] = useState<SessionView | null>();
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const sessionRequest = useRef<AbortController | null>(null);
   const onError = useCallback((error: unknown) => {
     if (error instanceof ApiFailure && error.status === 401) {
+      sessionRequest.current?.abort();
       setSession(null);
       setError(error);
+      setBusy(false);
     }
   }, []);
   useEffect(() => {
-    const controller = new AbortController();
-    setError(undefined);
-    setSession(undefined);
-    apiRequest<SessionView>(endpoints.session, { signal: controller.signal })
-      .then((result) => {
-        if (!controller.signal.aborted) setSession(result.data);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          if (error instanceof ApiFailure && error.status === 401) {
-            setSession(null);
-          } else setError(error);
-        }
+    const checkSession = () => {
+      sessionRequest.current?.abort();
+      const controller = new AbortController();
+      sessionRequest.current = controller;
+      setError(undefined);
+      setSession(undefined);
+      setBusy(false);
+      apiRequest<SessionView>(endpoints.session, { signal: controller.signal })
+        .then((result) => {
+          if (!controller.signal.aborted) setSession(result.data);
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) {
+            if (error instanceof ApiFailure && error.status === 401) {
+              setSession(null);
+            } else setError(error);
+          }
+        });
+    };
+    checkSession();
+    if (typeof window === "undefined")
+      return () => sessionRequest.current?.abort();
+
+    // Back/Forward can restore the entire React tree without mounting it again.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) checkSession();
+    };
+    const onPageHide = () => {
+      sessionRequest.current?.abort();
+      // Remove account data before the browser freezes this document in bfcache.
+      flushSync(() => {
+        setSession(undefined);
+        setError(undefined);
+        setBusy(false);
       });
-    return () => controller.abort();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("popstate", checkSession);
+    return () => {
+      sessionRequest.current?.abort();
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("popstate", checkSession);
+    };
   }, [attempt]);
   if (session === undefined)
     return (
@@ -66,6 +100,7 @@ export default function QuestApp({
         <Login
           notice={error}
           onLogin={(value) => {
+            sessionRequest.current?.abort();
             setError(undefined);
             setSession(value);
           }}
@@ -78,20 +113,29 @@ export default function QuestApp({
         Перейти к содержимому
       </a>
       <Navigation
+        profileActive={initialView === "profile"}
         session={session}
         busy={busy}
         logout={async () => {
           if (busy) return;
+          sessionRequest.current?.abort();
+          const controller = new AbortController();
+          sessionRequest.current = controller;
           setBusy(true);
           setError(undefined);
           try {
-            await apiRequest(endpoints.logout, { method: "POST" });
-            setSession(null);
+            await apiRequest(endpoints.logout, {
+              method: "POST",
+              signal: controller.signal,
+            });
+            if (!controller.signal.aborted) setSession(null);
           } catch (error) {
-            setError(error);
-            onError(error);
+            if (!controller.signal.aborted) {
+              setError(error);
+              onError(error);
+            }
           } finally {
-            setBusy(false);
+            if (!controller.signal.aborted) setBusy(false);
           }
         }}
       />
@@ -103,6 +147,7 @@ export default function QuestApp({
           <Hr onError={onError} />
         ) : session.employee_id ? (
           <Employee
+            initialTab={initialView === "profile" ? "profile" : "overview"}
             key={`${session.account_id}-${session.employee_id}`}
             id={session.employee_id}
             onError={onError}

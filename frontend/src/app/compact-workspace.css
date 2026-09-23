@@ -1,0 +1,115 @@
+/* Compact content: shared structure, theme-aware surfaces, no fixed card heights. */
+html[data-theme] .compact-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+html[data-theme] .compact-meta > span { padding: 4px 8px; border-radius: 6px; background: var(--surface-raised); color: var(--muted); font-size: 11px; line-height: 1.4; }
+html[data-theme] .compact-meta .required-tag { color: var(--blue); }
+.compact-details { font-size: 12px; color: var(--muted); }
+.compact-details summary { cursor: pointer; padding: 6px 0; }
+.compact-details p { line-height: 1.6; }
+html[data-theme] .activity-section .activity-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 12px; }
+html[data-theme] .activity-section .activity-card { padding: 18px; border-radius: 12px; gap: 8px; }
+html[data-theme] .activity-section .activity-card-top { margin-bottom: 4px; gap: 8px; }
+html[data-theme] .activity-section .activity-icon { width: 32px; height: 32px; border-radius: 8px; }
+html[data-theme] .activity-section .activity-icon svg { width: 18px; }
+html[data-theme] .activity-section .activity-card h3 { margin: 0; min-height: 2.8em; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+html[data-theme] .activity-section .activity-date { margin: 0; font-size: 11px; }
+html[data-theme] .activity-section .activity-progress { margin: 4px 0; }
+html[data-theme] .activity-section .activity-card-footer { align-items: stretch; padding-top: 10px; border-top: 1px solid var(--line); gap: 8px; }
+html[data-theme] .activity-section .activity-card-footer > button { justify-content: center; width: 100%; }
+html[data-theme] .activity-section .activity-details { width: 100%; text-align: left; }
+html[data-theme] .activity-section .compact-meta:empty { display: none; }
+html[data-theme] .catalog-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+html[data-theme] .catalog-grid .course-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface) !important; }
+html[data-theme] .catalog-grid .course-body { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+html[data-theme] .catalog-grid .course-body h3 { min-height: 2.8em; font-size: 14px; overflow-wrap: anywhere; }
+html[data-theme] .catalog-grid .course-body > .outline-tag { color: var(--blue); }
+html[data-theme] .catalog-grid .course-body .compact-meta { margin: 0; order: 1; }
+html[data-theme] .catalog-grid .course-body > p { order: 2; }
+html[data-theme] .catalog-grid .catalog-description { order: 3; padding-top: 10px; border-top: 1px solid var(--line); }
+html[data-theme] .catalog-grid .course-body .text-button { order: 4; align-self: flex-start; padding: 4px 0; white-space: normal; }
+html[data-theme] .catalog-select { position: relative; min-width: 210px; color: var(--ink); }
+.catalog-select-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+html[data-theme] .catalog-select > button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; text-align: left; }
+html[data-theme] .catalog-select > button[aria-expanded="true"] { border-color: var(--blue); }
+html[data-theme] .catalog-select > button[aria-expanded="true"] > svg { transform: rotate(180deg); }
+html[data-theme] .catalog-select ul { position: absolute; top: 100%; right: 0; left: 0; z-index: 30; max-height: 280px; overflow-y: auto; margin: 6px 0 0; padding: 5px; list-style: none; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 30px #0002; }
+html[data-theme] .catalog-select li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+html[data-theme] .catalog-select li.active { background: var(--surface-raised); }
+html[data-theme] .catalog-select li[aria-selected="true"] { color: var(--blue); }
+html[data-theme] .catalog-select > button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+html[data-theme] .toolbar { align-items: end; }
+html[data-theme] .learning-library-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+html[data-theme] .learning-library-card { padding: 18px; border-radius: 12px; }
+html[data-theme] .learning-library-card h3 { font-size: 15px; }
+html[data-theme] .cq-journey { margin: 20px 0; padding: 20px; }
+html[data-theme] .cq-journey-heading { margin-bottom: 18px; }
+html[data-theme] .cq-journey h2 { font-size: 20px; margin: 6px 0; }
+html[data-theme] .cq-journey-stage { padding: 18px 14px 14px; }
+html[data-theme] .cq-next-options > li > p { display: inline-block; padding: 3px 7px; border-radius: 5px; background: color-mix(in srgb, var(--blue) 10%, transparent); color: var(--blue); }
+html[data-theme] .section-description:empty { display: none; }
+@media (max-width: 1150px) {
+  html[data-theme] .activity-section .activity-grid, html[data-theme] .catalog-grid, html[data-theme] .learning-library-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  html[data-theme] .activity-section .activity-grid, html[data-theme] .catalog-grid, html[data-theme] .learning-library-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme] .catalog-select { width: 100%; min-width: 0; }
+  html[data-theme] .cq-journey { padding: 14px; }
+  html[data-theme] .activity-section .activity-card h3, html[data-theme] .catalog-grid .course-body h3 { min-height: 0; }
+}
+.catalog-dates { order: 2; font-size: 12px; color: var(--muted); } .catalog-dates summary { cursor: pointer; } .catalog-dates summary span { color: var(--blue); margin-left: 6px; }
+html[data-theme] .cq-journey { background: var(--surface); border-color: var(--line); border-radius: 14px; color: var(--ink); }
+html[data-theme] .cq-journey-stage { background: transparent; border-color: var(--line); border-radius: 10px; }
+html[data-theme] .cq-journey-next { background: color-mix(in srgb, var(--blue) 6%, var(--surface)); border-color: color-mix(in srgb, var(--blue) 35%, var(--line)); }
+html[data-theme] .cq-journey :is(.cq-stage-role, .cq-next-options button, .cq-gap-list b) { color: var(--ink); }
+html[data-theme] .cq-journey :is(.cq-kicker, .cq-critical-count, .cq-gap-list small) { color: var(--blue); }
+html[data-theme] .cq-journey :is(.cq-stage-label, .cq-inline-note, .cq-target-note, .cq-current-coverage > span, .cq-progress-explanation, .cq-journey-stage p) { color: var(--muted); }
+html[data-theme] .cq-goal-source { background: var(--surface-raised); color: var(--muted); border-color: var(--line); padding: 5px 9px; border-radius: 6px; }
+html[data-theme] .cq-gap-list li { padding: 8px 0; border-color: var(--line); }
+html[data-theme] .cq-next-options li + li { border-color: var(--line); }
+html[data-theme] .cq-current-coverage { margin: 14px 0 8px; }
+html[data-theme] .cq-progress-explanation { margin-top: 12px; }
+html[data-theme] .cq-stage-marker { width: 26px; height: 26px; margin-bottom: 10px; background: var(--surface-raised); color: var(--blue); border-color: var(--line); }
+html[data-theme] .cq-journey-stage:not(:last-child)::after { background: var(--line); }
+html[data-theme] .cq-next-options > li > p { color: var(--blue); }
+/* Dense overview and HR diagnostics: one heading per group, data in aligned cells. */
+html[data-theme] .employee-workspace { display: block; }
+html[data-theme] .employee-workspace .skills-panel { display: block; padding: 24px 0 0; margin: 28px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+html[data-theme] .skills-intro { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+html[data-theme] .skills-intro .skill-filter { margin: 0; }
+html[data-theme] .cq-skill-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px; }
+html[data-theme] .cq-skill-group h3 { grid-column: 1 / -1; margin: 0 0 8px; }
+html[data-theme] .cq-skill-group .skill-row { min-width: 0; padding: 12px 0; margin: 0; }
+html[data-theme] .skill-row > div:first-child { gap: 12px; }
+html[data-theme] .skill-row > div:first-child > span { min-width: 0; overflow-wrap: anywhere; }
+html[data-theme] .skill-row b { flex-shrink: 0; }
+html[data-theme] .cq-other-skills[open] { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
+html[data-theme] .cq-other-skills summary { grid-column: 1 / -1; }
+html[data-theme] .recommendations-section .course-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+html[data-theme] .recommendations-section .visual-recommendation { grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface) !important; }
+html[data-theme] .visual-recommendation .activity-art { height: 64px; }
+html[data-theme] .visual-recommendation .art-tile { width: 28px; height: 32px; border-radius: 7px; }
+html[data-theme] .visual-recommendation .art-halo { width: 44px; height: 44px; }
+html[data-theme] .visual-recommendation .learning-row-body { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+html[data-theme] .visual-recommendation .learning-row-action { grid-column: 2; grid-row: auto; justify-self: start; padding: 6px 0 0; }
+html[data-theme] .catalog-gaps-panel { margin: 24px 0; line-height: 1.5; }
+html[data-theme] .catalog-gaps-panel > h2 { margin-bottom: 16px; font-size: 20px; }
+html[data-theme] .catalog-gap-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0; align-items: start; }
+html[data-theme] .catalog-gap-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); min-width: 0; }
+html[data-theme] .catalog-gap-card h3 { margin: 8px 0 16px; font-size: 15px; overflow-wrap: anywhere; }
+html[data-theme] .gap-reason { color: var(--blue); font-size: 11px; }
+html[data-theme] .gap-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
+html[data-theme] .gap-metrics > div { display: flex; flex-direction: column-reverse; gap: 4px; }
+html[data-theme] .gap-metrics dt { color: var(--muted); font-size: 11px; }
+html[data-theme] .gap-metrics dd { margin: 0; font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+html[data-theme] .catalog-gap-card details { padding-top: 8px; font-size: 12px; color: var(--muted); }
+html[data-theme] .catalog-gap-card summary { cursor: pointer; }
+html[data-theme] .catalog-gap-card details p { margin: 10px 0; line-height: 1.6; }
+html[data-theme] .learning-heading h1 { font-size: clamp(24px, 3vw, 34px); margin: 0 0 10px; }
+html[data-theme] .learning-topbar { margin-bottom: 24px; }
+html[data-theme] .learning-meta { margin: 16px 0 8px; }
+@media (max-width: 1150px) {
+  html[data-theme] .cq-skill-group, html[data-theme] .cq-other-skills[open], html[data-theme] .catalog-gap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  html[data-theme] .cq-skill-group, html[data-theme] .cq-other-skills[open], html[data-theme] .catalog-gap-grid, html[data-theme] .recommendations-section .course-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme] .skills-intro { flex-wrap: wrap; }
+}

@@ -451,7 +451,7 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
   };
   for (const [mode, expected] of [
     ["ai", "AI-подборка"],
-    ["rules_fallback", "Резервная подборка по правилам"],
+    ["rules_fallback", "Подборка по правилам"],
     ["no_candidates", "Выберите направление развития"],
   ]) {
     let root;
@@ -775,7 +775,7 @@ test("a skill outside an active goal is not labeled as missing career goal", asy
   });
   try {
     const text = JSON.stringify(root.toJSON());
-    assert.match(text, /Не входит в требования выбранной цели/);
+    assert.match(text, /Вне цели/);
     assert.doesNotMatch(text, /[Цц]ель не выбрана/);
   } finally {
     await unmount(root);
@@ -944,8 +944,8 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
     assert.equal(bar.props.max, 5);
     await act(async () =>
       root.root
-        .findByType("select")
-        .props.onChange({ target: { value: "GOAL_REACHED" } }),
+        .findByProps({ label: "Причина" })
+        .props.onChange("GOAL_REACHED"),
     );
     assert.doesNotMatch(JSON.stringify(root.toJSON()), /No course/);
     await act(async () =>
@@ -957,37 +957,71 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
   }
 });
 
-test("HR goal action follows grade order and writes the selected goal to the named employee", async () => {
+test("HR read-only profile names the selected employee and only reads their data", async () => {
   const previousDocument = global.document;
-  global.document = { activeElement: null, querySelector: () => null };
+  global.document = { activeElement: null, documentElement: { style: { overflow: "" } }, querySelector: () => null };
   const profile = {
     ...employee(1, "hr-selected"), full_name: "Анна Петровна Иванова",
     department: "Разработка", role: "Engineer", grade: "Junior",
     goal: { source: "missing", target: null }, progress: null,
     tenure_months: 6, last_review_date: "2026-09-01", has_simulated_progress: false,
   };
-  const writes = [];
+  const requests = [];
   let root;
   global.fetch = async (url, options) => {
-    if (options.method === "PUT") {
-      writes.push({ url, body: JSON.parse(options.body) });
-      return reply({ employee: profile, changed: true, version: profile.version });
-    }
+    requests.push({ url, method: options.method ?? "GET" });
     return reply(url === "/api/catalog"
       ? { skills: [], events: [], grades: ["Junior", "Middle", "Senior", "Lead"],
           role_profiles: ["Senior", "Junior", "Lead", "Middle"].map(grade => ({ role: "Engineer", grade })) }
       : url.endsWith("/recommendations") ? rec() : profile);
   };
   try {
-    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", onError })); });
+    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", readOnly: true, onError })); });
     assert.equal(root.root.findByType("h1").children.join(""), profile.full_name);
-    const actions = root.root.findByProps({ "aria-label": "Действия HR" });
-    await act(async () => actions.findAllByType("button")[0].props.onClick());
-    assert.equal(root.root.findByType("dialog").findByType("strong").children.join(""), profile.full_name);
-    assert.deepEqual(root.root.findByType("select").findAllByType("option").map(option => option.props.value), ["", 1, 3, 0, 2]);
-    await act(async () => root.root.findByType("select").props.onChange({ target: { value: "3" } }));
+    assert.equal(root.root.findAllByType("dialog").length, 0);
+    const renderedButtons = root.root.findAllByType("button").map(node => node.children.filter(child => typeof child === "string").join(""));
+    assert.equal(renderedButtons.some(label => /Выбрать цель|Назначить цель|Изменить цель|Убрать явную цель/.test(label)), false);
+    assert.ok(requests.some(request => request.url === "/api/employees/hr-selected"));
+    assert.ok(requests.some(request => request.url === "/api/employees/hr-selected/recommendations"));
+    assert.ok(requests.every(request => request.method === "GET" || (
+      request.method === "POST" && request.url === "/api/employees/hr-selected/recommendations"
+    )));
+  } finally {
+    if (root) await unmount(root);
+    global.document = previousDocument;
+  }
+});
+
+test("employee goal options follow grade order without changing the submitted target", async () => {
+  const previousDocument = global.document;
+  global.document = { activeElement: null, documentElement: { style: { overflow: "" } }, querySelector: () => null };
+  const profile = {
+    ...employee(), full_name: "Synthetic Employee", department: "Test", role: "Engineer", grade: "Junior",
+    goal: { source: "missing", target: null }, progress: null,
+    tenure_months: 6, last_review_date: "2026-09-01", has_simulated_progress: false,
+  };
+  const writes = [];
+  const { CatalogSelect } = load("src/components/quest/catalog-select.tsx");
+  let root;
+  global.fetch = async (url, options) => {
+    if (options.method === "PUT") {
+      writes.push({ url, body: JSON.parse(options.body) });
+      return reply({ employee: profile, changed: true, version: profile.version });
+    }
+    return reply(url === api.endpoints.catalog
+      ? { skills: [], events: [], grades: ["Junior", "Middle", "Senior", "Lead"],
+          role_profiles: ["Senior", "Junior", "Lead", "Middle"].map(grade => ({ role: "Engineer", grade })) }
+      : url === api.endpoints.learningModules ? { modules: [] }
+      : url.endsWith("/recommendations") ? rec() : profile);
+  };
+  try {
+    await act(async () => { root = create(React.createElement(Employee, { id: profile.employee_id, onError })); });
+    await act(async () => root.root.findAllByType("button").find(button => button.children.includes("Выбрать цель")).props.onClick());
+    const selector = root.root.findByType(CatalogSelect);
+    assert.deepEqual(selector.props.options.map(([value]) => value), ["", "1", "3", "0", "2"]);
+    await act(async () => selector.props.onChange("3"));
     await act(async () => root.root.findByType("form").props.onSubmit({ preventDefault() {} }));
-    assert.deepEqual(writes, [{ url: "/api/employees/hr-selected/goal", body: {
+    assert.deepEqual(writes, [{ url: "/api/employees/test-employee/goal", body: {
       expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Middle" },
     } }]);
   } finally {

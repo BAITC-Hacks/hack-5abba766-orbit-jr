@@ -14,6 +14,7 @@ export function RecommendationCard({
   select,
   eventNames = {},
   actionLabel = "Подробнее",
+  readOnly = false,
 }: {
   card: Card;
   employee: EmployeeView;
@@ -21,9 +22,10 @@ export function RecommendationCard({
   select: () => void;
   eventNames?: Record<string, string>;
   actionLabel?: string;
+  readOnly?: boolean;
 }) {
   const explanationGroups: { label: string; categories: FactCategory[] }[] = [
-    { label: "Почему подходит вам", categories: ["grade", "eligibility", "effort"] },
+    { label: readOnly ? "Почему подходит сотруднику" : "Почему подходит вам", categories: ["grade", "eligibility", "effort"] },
     { label: "Как приближает к цели", categories: ["skill_gap", "target_requirement"] },
     { label: "Что учтено из истории", categories: ["history"] },
   ];
@@ -49,7 +51,7 @@ export function RecommendationCard({
           <summary>Что даст обучение</summary>
           {card.relevance === "prerequisite" && (
             <p>
-              Подготовка к: {card.unlocks_event_ids.map(id => eventNames[id] ?? id).join(", ")}. Доступ зависит от условий участия после завершения.
+              {card.unlocks_event_ids.length > 0 && <>Подготовка к: {card.unlocks_event_ids.map(id => eventNames[id] ?? id).join(", ")}. </>}Доступ зависит от условий участия после завершения.
             </p>
           )}
           {!!card.expected_skill_changes.length && (
@@ -68,7 +70,7 @@ export function RecommendationCard({
           })}
         </details>
       </div>
-      <button className="text-button learning-row-action" onClick={select}>
+      <button type="button" className="text-button learning-row-action" aria-label={`${actionLabel}: ${card.title}`} onClick={select}>
         {actionLabel} <ArrowUpRight size={17} aria-hidden="true" />
       </button>
     </article>

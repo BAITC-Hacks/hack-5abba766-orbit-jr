@@ -1,4 +1,5 @@
 "use client";
+import { CatalogSelect } from "./catalog-select";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
@@ -55,6 +56,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
   const settledQ = useDebouncedValue(q);
   const settledDepartment = useDebouncedValue(department);
   const filtersPending = q !== settledQ || department !== settledDepartment;
+  const hasFilters = !!(q.trim() || department.trim() || role);
   const overview = useResource<Overview>(endpoints.hr, onError);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
   const directory = useResource<EmployeeDirectory>(
@@ -106,10 +108,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <h1 ref={heading} tabIndex={-1}>
               Развитие команды
             </h1>
-            <p>
-              Находите потребности в обучении и помогайте сотрудникам сделать
-              следующий шаг.
-            </p>
+
           </div>
           <span className="workspace-label">
             <Users size={16} aria-hidden="true" />
@@ -140,6 +139,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               data={overview.data}
               open={openProfile}
               showPeople={() => setSection("people")}
+              showImport={() => setSection("import")}
               names={Object.fromEntries(
                 catalog.data?.skills.map((s) => [s.skill_id, s.name]) ?? [],
               )}
@@ -150,20 +150,18 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
           hidden={section !== "people"}
           className="hr-view people-workspace"
           aria-labelledby="directory-title"
+          aria-busy={directory.loading || filtersPending}
         >
           <div className="section-heading">
             <div>
               <h2 id="directory-title">Сотрудники</h2>
-              <p className="section-description">
-                Откройте профиль, чтобы посмотреть навыки, выбрать цель и план
-                развития.
-              </p>
             </div>
           </div>
           <div className="toolbar directory-filters">
             <label>
               Поиск по имени
               <input
+                type="search"
                 value={q}
                 placeholder="Например, Анна"
                 onChange={(e) => {
@@ -183,25 +181,8 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                 }}
               />
             </label>
-            <label>
-              Роль
-              <select
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setOffset(0);
-                }}
-              >
-                <option value="">Все роли</option>
-                {Array.from(
-                  new Set(catalog.data?.role_profiles.map((p) => p.role)),
-                )
-                  .sort()
-                  .map((r) => (
-                    <option key={r}>{r}</option>
-                  ))}
-              </select>
-            </label>
+            <CatalogSelect label="Роль" value={role} onChange={(value) => { setRole(value); setOffset(0); }}
+              options={[["", "Все роли"], ...Array.from(new Set(catalog.data?.role_profiles.map((p) => p.role))).sort().map((r): [string, string] => [r, r])]} />
             {(q || department || role) && (
               <button className="secondary" onClick={clearFilters}>
                 Сбросить
@@ -217,7 +198,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <>
               <p className="directory-count" role="status">
                 Найдено сотрудников: <strong>{directory.data.total}</strong>
-                {directory.data.total > 0 && (
+                {directory.data.items.length > 0 && (
                   <>
                     {" "}
                     · показаны {offset + 1}–
@@ -258,17 +239,25 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               {!directory.data.items.length && (
                 <div className="empty-state">
                   <Search size={32} aria-hidden="true" />
-                  <h3>Сотрудники не найдены</h3>
-                  <p>Измените имя, отдел или роль и попробуйте снова.</p>
-                  {(q || department || role) && (
+                  <h3>{directory.data.total > 0 ? "На этой странице нет сотрудников" : hasFilters ? "Сотрудники не найдены" : "В команде пока нет сотрудников"}</h3>
+                  <p>{directory.data.total > 0 ? "Список изменился. Вернитесь к первой странице." : hasFilters ? "Измените имя, отдел или роль и попробуйте снова." : "Добавьте профили через импорт, чтобы видеть команду и планировать обучение."}</p>
+                  {directory.data.total > 0 ? (
+                    <button className="secondary" onClick={() => setOffset(0)}>
+                      На первую страницу
+                    </button>
+                  ) : hasFilters ? (
                     <button className="secondary" onClick={clearFilters}>
                       Сбросить фильтры
+                    </button>
+                  ) : (
+                    <button className="secondary" onClick={() => setSection("import")}>
+                      Перейти к импорту
                     </button>
                   )}
                 </div>
               )}
               {directory.data.total > 24 && (
-                <div className="directory-pagination">
+                <nav className="directory-pagination" aria-label="Страницы сотрудников">
                   <button
                     className="secondary"
                     disabled={!offset || directory.loading || filtersPending}
@@ -291,7 +280,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                   >
                     Далее
                   </button>
-                </div>
+                </nav>
               )}
             </>
           )}
@@ -347,12 +336,13 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               Вернуться {section === "people" ? "к сотрудникам" : "к обзору"}
             </button>
             <p>
-              Вы просматриваете профиль как HR. Изменение цели и симуляция
-              сохраняются для этого сотрудника.
+              Просмотр HR. Цель и обучение выбирает сотрудник.
             </p>
           </div>
           <Employee
             viewer="hr"
+            readOnly
+            initialTab="profile"
             key={selected + "-" + revision}
             id={selected}
             onError={onError}

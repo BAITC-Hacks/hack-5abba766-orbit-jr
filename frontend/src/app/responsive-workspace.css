@@ -1,0 +1,100 @@
+/* Shared layout constraints: content wraps; only tables and code scroll. */
+html[data-theme] [hidden] { display: none !important; }
+html[data-theme] :is(main, section, article, form, fieldset, .course-body, .learning-row-body, .profile-identity, .hr-view) { min-width: 0; }
+html[data-theme] :is(h1, h2, h3, p, dd, .feedback, .employee-card-body, .fact-list, .verified-facts) { overflow-wrap: anywhere; }
+html[data-theme] :is(button, .primary, .secondary) { max-width: 100%; }
+html[data-theme] :is(.primary, .secondary, .text-button) { white-space: normal; gap: 8px; }
+html[data-theme] :is(button, a) > svg { flex-shrink: 0; }
+html[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) { max-width: 100%; min-width: 0; }
+html[data-theme] input:is([type="checkbox"], [type="radio"]) { min-height: 0; width: 16px; height: 16px; flex: 0 0 16px; }
+html[data-theme] .account-avatar { display: grid; place-items: center; text-decoration: none; }
+html[data-theme] .account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme] .connected-main { padding-top: 8px; }
+html[data-theme] .page-top { margin-bottom: 12px; }
+html[data-theme] .section-heading { margin-bottom: 20px; }
+html[data-theme] .table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; }
+html[data-theme] .modal-content :is(.modal-meta, .modal-actions, .skill-outcomes p) { display: flex; flex-wrap: wrap; gap: 12px; }
+html[data-theme] .modal-content .outcome { gap: 16px; flex-wrap: wrap; }
+html[data-theme] .learning-library-grid { margin-top: 20px; }
+html[data-theme] .learning-topbar, html[data-theme] .learning-meta { flex-wrap: wrap; }
+html[data-theme] .learning-layout > * { min-width: 0; }
+html[data-theme] .learning-demo-label { background: var(--surface-raised); color: var(--muted); border-color: var(--line); }
+html[data-theme] .activity-card-footer { flex-wrap: wrap; }
+html[data-theme] .catalog-grid .course-card { display: block; }
+html[data-theme] .catalog-grid .catalog-row-icon { display: none; }
+html[data-theme] .catalog-grid .course-body { padding: 0; }
+html[data-theme] .catalog-grid .course-body > .outline-tag { align-self: flex-start; }
+html[data-theme] .profile-summary-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; }
+html[data-theme] :is(.profile-info-card, .profile-goal-card) { padding: 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+html[data-theme] .profile-card-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+html[data-theme] .profile-card-heading svg { flex-shrink: 0; color: var(--blue); }
+html[data-theme] .profile-card-heading h2 { margin: 0; font-size: 18px; line-height: 1.4; }
+html[data-theme] .profile-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 0; }
+html[data-theme] .profile-facts dt { margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+html[data-theme] .profile-facts dd { margin: 0; line-height: 1.6; font-weight: 550; }
+html[data-theme] .profile-goal-source { color: var(--blue); font-size: 12px; }
+html[data-theme] .profile-goal-card h3 { margin: 12px 0; font-size: clamp(20px, 2vw, 28px); line-height: 1.3; }
+html[data-theme] .profile-goal-card p { color: var(--muted); line-height: 1.7; margin: 0 0 24px; }
+html[data-theme] .profile-coverage { margin: 24px 0; }
+html[data-theme] .profile-coverage > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+html[data-theme] .profile-coverage span { color: var(--muted); font-size: 12px; }
+html[data-theme] .profile-coverage strong { font-size: 26px; }
+html[data-theme] .profile-coverage progress { width: 100%; height: 6px; margin-top: 12px; display: block; }
+html[data-theme] .profile-statistics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding: 24px 0; margin: 24px 0; border-block: 1px solid var(--line); }
+html[data-theme] .profile-statistics > div { display: flex; flex-direction: column-reverse; gap: 8px; }
+html[data-theme] .profile-statistics dt { color: var(--muted); font-size: 12px; }
+html[data-theme] .profile-statistics dd { margin: 0; font-size: 28px; font-weight: 650; }
+html[data-theme] .employee-profile-page > .skills-panel { display: block; padding: 0; border: 0; margin: 0; }
+html[data-theme] .demo-main { width: 100%; margin-left: 0; max-width: 1280px; margin-inline: auto; }
+html[data-theme] .demo-main > .subnav { position: static; width: auto; max-width: 100%; flex-direction: row; }
+html[data-theme] .demo-strip { padding-inline: 20px; flex-wrap: wrap; line-height: 1.6; }
+@media (min-width: 761px) {
+  html[data-theme] .connected-main > .subnav { max-height: calc(100dvh - 340px); overflow-y: auto; }
+  html[data-theme] .connected-main > .subnav button { white-space: normal; text-align: left; }
+  html[data-theme] .demo-main > .subnav { max-height: none; }
+}
+@media (max-width: 1100px) {
+  html[data-theme] .profile-summary-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme] .learning-layout { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme] .learning-sidebar { position: static; }
+}
+/* Fixed rail tabs otherwise collapse or overlap the account controls in landscape. */
+@media (min-width: 761px) and (max-height: 600px) {
+  html[data-theme] .connected-main > .subnav,
+  html[data-theme] .hr-sections { position: static; width: 100%; max-width: 100%; max-height: none; flex-direction: row; flex-wrap: wrap; overflow: visible; margin-block: 16px; }
+  html[data-theme] .connected-main > .subnav button,
+  html[data-theme] .hr-sections button { min-height: 44px; white-space: normal; }
+}
+@media (max-width: 760px) {
+  html[data-theme] .global-nav:not(.connected-nav) .nav-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 16px; height: auto; width: 100%; }
+  html[data-theme] .global-nav:not(.connected-nav) .nav-inner > nav { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 12px; height: auto; }
+  html[data-theme] .global-nav:not(.connected-nav) .avatar { grid-column: 2; grid-row: 1; }
+  html[data-theme] .global-nav:not(.connected-nav) .halyk-wordmark { font-size: 18px; }
+  html[data-theme] .global-nav:not(.connected-nav) .halyk-mark { width: 30px; height: 30px; }
+  html[data-theme] .connected-main { padding-top: 16px; }
+  html[data-theme] .connected-main .subnav { width: 100%; flex-wrap: wrap; overflow: visible; gap: 4px; }
+  html[data-theme] .connected-main .subnav button { flex: 1 1 auto; min-height: 44px; white-space: normal; }
+  html[data-theme] .connected-nav :is(.account-avatar, .nav-logout) { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  html[data-theme] .hr-sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  html[data-theme] .hr-sections button { flex-direction: column; white-space: normal; padding: 10px 6px; min-height: 64px; }
+  html[data-theme] .hr-sections button strong { line-height: 1.5; }
+  html[data-theme] .page-top { padding-top: 12px; }
+  html[data-theme] .goal-summary-progress { grid-column: auto; grid-row: auto; min-width: 0; }
+  html[data-theme] .app-footer { flex-wrap: wrap; gap: 16px; margin-top: 32px; }
+  html[data-theme] .history-row { flex-wrap: wrap; gap: 12px; }
+  html[data-theme] .history-row > div { min-width: 0; flex: 1 1 180px; }
+  html[data-theme] :is(.profile-info-card, .profile-goal-card) { padding: 20px; }
+  html[data-theme] .profile-statistics { gap: 14px; }
+  html[data-theme] .profile-statistics dd { font-size: 24px; }
+  html[data-theme] .learning-library { padding: 18px; margin-top: 24px; }
+  html[data-theme] .login-form-side { min-width: 0; }
+  html[data-theme] .login-form-content { width: 100%; }
+}
+@media (max-width: 400px) {
+  html[data-theme] .profile-facts { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  html[data-theme] .profile-identity { padding-left: 0; }
+  html[data-theme] .profile-avatar { position: static; margin-bottom: 16px; }
+  html[data-theme] .profile-statistics { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme] .profile-statistics > div { flex-direction: row; align-items: center; justify-content: space-between; }
+  html[data-theme] .learning-navigation { grid-template-columns: minmax(0, 1fr); }
+}

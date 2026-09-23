@@ -1,20 +1,24 @@
 "use client";
+import { CatalogSelect } from "./catalog-select";
 import { GoalDonut } from "./growth-insights";
 import { useState } from "react";
 import { ArrowUpRight, Target, Users, Sparkles } from "lucide-react";
 import type { HrOverview as Overview } from "../../../../contracts/backend";
 import { emptyReasons, goalSources, statuses } from "@/lib/labels";
 import { CatalogGaps } from "./catalog-gaps";
+const hrEmptyReasons = { ...emptyReasons, GOAL_REQUIRED: "Цель пока не выбрана." };
 export function HrOverview({
   data,
   open,
   names = {},
   showPeople,
+  showImport,
 }: {
   data: Overview;
   open: (id: string) => void;
   names?: Record<string, string>;
   showPeople?: () => void;
+  showImport?: () => void;
 }) {
   const [reason, setReason] = useState("all");
   const [expanded, setExpanded] = useState(false);
@@ -52,9 +56,9 @@ export function HrOverview({
           </span>
           <p>Сотрудники</p>
           <strong>{data.employee_count}</strong>
-          <button className="text-button" onClick={showPeople}>
+          {showPeople && <button className="text-button" onClick={showPeople}>
             Перейти к команде <ArrowUpRight size={15} aria-hidden="true" />
-          </button>
+          </button>}
         </div>
         <div>
           <span className="metric-icon">
@@ -62,7 +66,7 @@ export function HrOverview({
           </span>
           <p>Без карьерной цели</p>
           <strong>{missing}</strong>
-          <span>Помогите выбрать направление развития</span>
+
         </div>
         <div>
           <span className="metric-icon">
@@ -70,7 +74,7 @@ export function HrOverview({
           </span>
           <p>Смоделировано завершений</p>
           <strong>{data.participation.simulated_completions}</strong>
-          <span>Сценарии развития, без подтверждения посещения</span>
+          <span>Без подтверждения посещения</span>
         </div>
       </section>
       <div className="hr-overview-grid">
@@ -78,10 +82,9 @@ export function HrOverview({
           <span className="eyebrow">ПЛАНИРОВАНИЕ ОБУЧЕНИЯ</span>
           <h2>Какие навыки развивать</h2>
           <p className="section-description">
-            Навыки, которых не хватает до карьерных целей. Сначала — те, где
-            разрыв есть у большего числа людей.
+            По числу сотрудников с разрывом до цели.
           </p>
-          <div className="gap-list">
+          <div className="gap-list" id="hr-skill-gaps">
             {gaps.slice(0, expanded ? undefined : 5).map((g) => (
               <div className="gap-item" key={g.id}>
                 <div>
@@ -95,7 +98,7 @@ export function HrOverview({
                   value={g.people}
                   aria-label={"Сотрудники с разрывом: " + (names[g.id] ?? g.id)}
                 />
-                <small>Из сотрудников, которым этот навык нужен для цели</small>
+
               </div>
             ))}
           </div>
@@ -105,6 +108,8 @@ export function HrOverview({
           {gaps.length > 5 && (
             <button
               className="text-button"
+              aria-expanded={expanded}
+              aria-controls="hr-skill-gaps"
               onClick={() => setExpanded((v) => !v)}
             >
               {expanded ? "Свернуть" : "Все навыки (" + gaps.length + ")"}
@@ -143,15 +148,12 @@ export function HrOverview({
         <section className="hr-surface">
           <span className="eyebrow">НАПРАВЛЕНИЯ РОСТА</span>
           <h2>Карьерные цели</h2>
-          <p className="section-description">
-            Откуда взялась цель каждого сотрудника.
-          </p>
+
           <GoalDonut data={data} />
           <div className="hr-tip">
             <Target size={22} aria-hidden="true" />
             <p>
-              Откройте профиль сотрудника, чтобы уточнить цель и посмотреть
-              подходящие активности.
+Цель и обучение — в профиле сотрудника.
             </p>
           </div>
         </section>
@@ -162,33 +164,15 @@ export function HrOverview({
           <div>
             <span className="eyebrow">РАБОТА С ТРАЕКТОРИЯМИ</span>
             <h2>Сотрудники без рекомендации</h2>
-            <p className="section-description">
-              Причины разные: от отсутствия цели до её достижения. Откройте
-              профиль, чтобы разобраться.
-            </p>
+
           </div>
-          <span className="count-badge">{data.no_next_step.length} чел.</span>
+          <span className="count-badge" role="status">{reason === "all" ? `${available.length} чел.` : `${available.length} из ${data.no_next_step.length} чел.`}</span>
         </div>
         {!!data.no_next_step.length && (
-          <label className="field-label reason-filter">
-            Причина
-            <select
-              value={reason}
-              onChange={(e) => {
-                setReason(e.target.value);
-                setAllPeople(false);
-              }}
-            >
-              <option value="all">Все причины</option>
-              {Object.entries(emptyReasons).map(([key, label]) => (
-                <option value={key} key={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <CatalogSelect label="Причина" value={reason} onChange={(value) => { setReason(value); setAllPeople(false); }}
+            options={[["all", "Все причины"], ...Object.entries(hrEmptyReasons).filter(([key]) => key === reason || data.no_next_step.some((person) => person.reason === key))]} />
         )}
-        <div className="attention-list">
+        <div className="attention-list" id="hr-attention-list">
           {available.slice(0, allPeople ? undefined : 8).map((p) => (
             <button
               className="attention-row"
@@ -199,7 +183,7 @@ export function HrOverview({
                 <strong>{p.full_name}</strong>
                 <small>{goalSources[p.goal_source]}</small>
               </span>
-              <span>{emptyReasons[p.reason]}</span>
+              <span>{hrEmptyReasons[p.reason]}</span>
               <ArrowUpRight size={19} aria-hidden="true" />
             </button>
           ))}
@@ -207,6 +191,8 @@ export function HrOverview({
         {available.length > 8 && (
           <button
             className="secondary attention-expand"
+            aria-expanded={allPeople}
+            aria-controls="hr-attention-list"
             onClick={() => setAllPeople((v) => !v)}
           >
             {allPeople
@@ -223,13 +209,22 @@ export function HrOverview({
                 : "В команде пока нет сотрудников. Добавьте их через импорт."}
           </p>
         )}
+        {!available.length && reason !== "all" && (
+          <button className="secondary" onClick={() => { setReason("all"); setAllPeople(false); }}>
+            Показать все причины
+          </button>
+        )}
+        {!data.employee_count && showImport && (
+          <button className="secondary" onClick={showImport}>
+            Перейти к импорту
+          </button>
+        )}
       </section>
       <section className="hr-surface">
         <span className="eyebrow">ИСТОРИЯ ОБУЧЕНИЯ</span>
         <h2>Участие в активностях</h2>
         <p className="section-description">
-          Исходная история показана отдельно от моделирования. Числа относятся к
-          участиям, а не к уникальным сотрудникам.
+Количество участий · исходная история.
         </p>
         <div className="participation-grid">
           {Object.entries(statuses).map(([key, label]) => (
@@ -287,6 +282,9 @@ export function HrOverview({
         </details>
         <details className="analytics-details">
           <summary>Статистика по каждой активности</summary>
+          {!data.participation.by_activity.length && (
+            <p className="empty-state">История участия пока пуста. Данные появятся после импорта истории обучения.</p>
+          )}
           {data.participation.by_activity.map((a) => (
             <details className="activity-breakdown" key={a.event_id}>
               <summary>{a.title}</summary>
