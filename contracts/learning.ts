@@ -22,7 +22,9 @@ export type LearningAttempt = {
   employee_version: DomainVersion;
   /** Exact public content of this attempt, retained when authored content is versioned. */
   module: LearningModuleView;
-  /** Original completion result; a later profile fetch may have a newer version. */
+  /** Original completion result; a later profile fetch may have a newer version.
+   * When status is passed and this is null, this occurrence was completed elsewhere:
+   * the quiz is saved without awarding its effect again. */
   completion: CompletionResult | null;
   previous_progress: GoalProgress | null;
 };

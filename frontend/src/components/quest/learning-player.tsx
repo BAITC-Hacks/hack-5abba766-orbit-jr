@@ -77,10 +77,11 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
           <div className="learning-success-mark"><CheckCircle2 size={45} /></div>
           <span className="eyebrow">ЕЩЁ ОДИН ШАГ СДЕЛАН</span><h2>Знания проверены.<br />Теперь виден результат.</h2>
           <p>Все ответы верны. Уроки и результат проверки сохранены.</p>
+          {!completion && <p role="status">Эта активность уже завершена вне демомодуля. Её эффект ранее учтён в профиле; повторного начисления навыков нет.</p>}
           {completion && <div className="learning-gains">{completion.skill_changes.map(change => <div key={change.skill_id}><span>{names[change.skill_id] ?? "Навык активности"}</span><strong>{change.before} <ArrowRight size={16} /> {change.after}</strong></div>)}</div>}
           {completion?.employee.progress && previousProgress && <p className="learning-coverage">Соответствие цели: <strong>{Math.round(previousProgress.coverage * 100)}% → {Math.round(completion.employee.progress.coverage * 100)}%</strong></p>}
           <button className="primary" onClick={returnToProfile}>Посмотреть мой следующий шаг <ArrowRight size={17} /></button>
-          <p className="learning-save-note">Показан результат этого демопрохождения. Актуальный профиль и рекомендации обновятся при возвращении.</p>
+          <p className="learning-save-note">{completion ? "Показан результат этого демопрохождения. " : "Проверка знаний сохранена. "}Актуальный профиль и рекомендации обновятся при возвращении.</p>
         </section> : lesson ? <article className="learning-lesson">
           <span className="eyebrow">УРОК {index + 1} ИЗ {course.lesson_count}</span><h2>{lessonTitle(lesson.title)}</h2>
           {lesson.blocks.map((block, i) => <Block block={block} key={`${lesson.id}:${i}`} />)}

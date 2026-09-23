@@ -23,6 +23,7 @@ import {
   formats,
   eventTypes,
   emptyReasons,
+  emptyGuidance,
   goalSources,
   activityDate,
 } from "@/lib/labels";
@@ -103,7 +104,7 @@ export function Employee({
     else setSelected(card);
   }
   if (learning && p) return <LearningPlayer key={`${id}:${learning.moduleId}`} employee={p} moduleId={learning.moduleId} event={learning.event} target={learning.target} names={names} onError={onError}
-    onClose={() => setLearning(undefined)} onCompleted={(result, previousProgress) => {
+    onClose={() => { setLearning(undefined); void state.refresh(); }} onCompleted={(result, previousProgress) => {
       setLearning(undefined);
       setTab("overview");
       void state.acceptLearningCompletion(result, previousProgress);
@@ -302,10 +303,21 @@ export function Employee({
                             : emptyReasons[state.recommendations.empty_reason]}
                       </p>
                     </div>
-                    <p className="fine-print">
+                    {state.recommendations.mode === "no_candidates" ? (
+                      <div className="empty-state">
+                        <p>{emptyGuidance[state.recommendations.empty_reason]}</p>
+                        <button className="secondary" disabled={disabled || !catalog.data}
+                          onClick={() => state.recommendations?.mode === "no_candidates" &&
+                            ["GOAL_REQUIRED", "GOAL_REACHED"].includes(state.recommendations.empty_reason)
+                            ? openGoal() : setTab("catalog")}>
+                          {["GOAL_REQUIRED", "GOAL_REACHED"].includes(state.recommendations.empty_reason)
+                            ? "Выбрать карьерную цель" : "Проверить каталог обучения"}
+                        </button>
+                      </div>
+                    ) : <p className="fine-print">
                       Варианты следующего шага. Ожидаемые
                       приросты не складываются.
-                    </p>
+                    </p>}
                     <div className="course-grid">
                       {state.recommendations.recommendations.map((card) => (
                         <RecommendationCard
@@ -513,7 +525,7 @@ export function Employee({
                     setSelected(undefined);
                   }}
                 >
-                  Отметить активность выполненной
+                  Смоделировать выполнение
                 </button>
               </Modal>
             )}

@@ -189,12 +189,64 @@ describe.skipIf(!connectionString)('persistent learning and atomic grading', () 
     expect((await learning.getLearningAttempt(employee, 'E0001', attempt.id)).quiz_attempts).toBe(0);
   });
 
-  it('does not double-award when the event was simulated outside learning first', async () => {
+  it('saves a passed quiz after external simulation and replays it without another award', async () => {
     const attempt = await ready();
     const simulated = await data.completeActivity(employee, 'E0001', { simulation: true, expected_version: initialVersion, target: startRequest.target }, 'external-simulation');
-    await expect(learning.submitQuiz(employee, 'E0001', attempt.id, { expected_version: simulated.result.version, answers }, 'after-external-simulation')).rejects.toMatchObject({ code: 'ALREADY_COMPLETED' });
+    const request = { expected_version: simulated.result.version, answers };
+    const before = await data.readSnapshot();
+    const results = await Promise.all([
+      learning.submitQuiz(employee, 'E0001', attempt.id, request, 'after-external-simulation'),
+      learning.submitQuiz(employee, 'E0001', attempt.id, request, 'concurrent-external-simulation'),
+    ]);
+    expect(results.filter(result => !result.replayed)).toHaveLength(1);
+    expect(results.every(result => result.result.attempt.status === 'passed' && result.result.completion === null)).toBe(true);
+    expect(results[0].result.attempt).toMatchObject({ quiz_attempts: 1, last_score: 100 });
+    expect(await learning.submitQuiz(employee, 'E0001', attempt.id, request, 'after-external-simulation')).toEqual({ result: results[0].result, replayed: true });
     expect((await data.readSnapshot()).completions).toHaveLength(1);
-    expect((await learning.getLearningAttempt(employee, 'E0001', attempt.id)).status).toBe('ready_for_quiz');
+    expect(await data.readSnapshot()).toEqual(before);
+    expect(await bootstrap.bootstrapDatabase('/source/not/needed/after/seed')).toEqual({ seeded: false });
+    const resumed = await learning.startLearning(employee, 'E0001', startRequest);
+    expect(resumed).toMatchObject({ status: 'passed', completion: null, quiz_attempts: 1 });
+    expect(resumed.passed_at).not.toBeNull();
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM action_receipts WHERE operation='completion'")).rows[0].n).toBe(1);
+  });
+
+  it('saves a passed quiz after imported completion while preserving the imported effect', async () => {
+    const attempt = await ready();
+    await data.importData(hr, { dry_run: false, expected_dataset_revision: 1, history: [{
+      record_id: 'R_IMPORTED_COMPLETE', employee_id: 'E0001', event_id: course.event_id, date: '2026-09-20',
+      due_date: null, status: 'completed', completion_pct: 100, score: 100, feedback_rating: null, assigned_by: 'self',
+    }] }, 'import-completed-course');
+    const before = await data.readSnapshot();
+    const current = { dataset_revision: before.dataset_revision, employee_revision: before.employee_revisions.E0001 };
+    const result = await learning.submitQuiz(employee, 'E0001', attempt.id, { expected_version: current, answers }, 'after-import-completion');
+    expect(result.result.attempt).toMatchObject({ status: 'passed', completion: null, last_score: 100, quiz_attempts: 1 });
+    expect(result.result.completion).toBeNull();
+    expect(await data.readSnapshot()).toEqual(before);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM action_receipts WHERE operation='completion'")).rows[0].n).toBe(0);
+    expect((await learning.getLearningAttempt(employee, 'E0001', attempt.id)).status).toBe('passed');
+  });
+
+  it('keeps a wrong quiz unpassed after external completion', async () => {
+    const attempt = await ready();
+    const simulated = await data.completeActivity(employee, 'E0001', { simulation: true, expected_version: initialVersion, target: startRequest.target }, 'external-before-wrong');
+    const question = course.questions[0];
+    const wrong = question.options.find(option => option.id !== question.correct_option_id)!.id;
+    const result = await learning.submitQuiz(employee, 'E0001', attempt.id, {
+      expected_version: simulated.result.version, answers: { ...answers, [question.id]: wrong },
+    }, 'wrong-after-external');
+    expect(result.result.attempt).toMatchObject({ status: 'ready_for_quiz', last_score: 67, passed_at: null });
+    expect((await data.readSnapshot()).completions).toHaveLength(1);
+  });
+
+  it('does not mark an ineligible quiz as passed without evidence of the same completion', async () => {
+    const attempt = await ready();
+    // Simulate an independent assessment update: the course now has no gain.
+    await db.pool.query("UPDATE employees SET source=jsonb_set(source,'{skills,SK_PYTHON}','5'::jsonb) WHERE employee_id='E0001'");
+    await expect(learning.submitQuiz(employee, 'E0001', attempt.id, { expected_version: initialVersion, answers }, 'no-benefit-no-completion'))
+      .rejects.toMatchObject({ code: 'INELIGIBLE_EVENT' });
+    expect(await learning.getLearningAttempt(employee, 'E0001', attempt.id)).toMatchObject({ status: 'ready_for_quiz', quiz_attempts: 0, passed_at: null });
+    expect((await data.readSnapshot()).completions).toHaveLength(0);
   });
 
   it('reconciles a new learning target with participation imported while the lessons were open', async () => {
@@ -238,11 +290,23 @@ describe.skipIf(!connectionString)('persistent learning and atomic grading', () 
     await data.completeActivity(employee, 'E0001', { simulation: true, expected_version: { ...initialVersion, employee_revision: 2 }, target: startRequest.target }, 'before-migration');
     const before = await data.readSnapshot();
     await db.pool.query('DROP TABLE learning_attempts');
-    await db.pool.query("DELETE FROM schema_migrations WHERE version='002_learning'");
+    await db.pool.query("DELETE FROM schema_migrations WHERE version IN ('002_learning','003_learning_external_completion')");
     await db.migrate();
     expect(await data.readSnapshot()).toEqual(before);
     expect(await auth.session(new Request('http://localhost:3000', { headers: { cookie: `cq_session=${loggedIn.token}` } }))).toMatchObject({ account_id: employee.account_id });
-    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '002_learning' });
+    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '003_learning_external_completion' });
+  });
+
+  it('migrates an existing passed attempt without altering its result or learning progress', async () => {
+    const attempt = await ready();
+    await learning.submitQuiz(employee, 'E0001', attempt.id, { expected_version: initialVersion, answers }, 'pass-before-migration');
+    const before = await learning.getLearningAttempt(employee, 'E0001', attempt.id);
+    // Restore the old constraint to exercise the real upgrade on populated state.
+    await db.pool.query('ALTER TABLE learning_attempts DROP CONSTRAINT learning_attempts_passed_check');
+    await db.pool.query("ALTER TABLE learning_attempts ADD CONSTRAINT learning_attempts_check CHECK ((status='passed')=(completion_result IS NOT NULL AND passed_at IS NOT NULL))");
+    await db.pool.query("DELETE FROM schema_migrations WHERE version='003_learning_external_completion'");
+    await db.migrate();
+    expect(await learning.getLearningAttempt(employee, 'E0001', attempt.id)).toEqual(before);
   });
 
   it('HTTP exposes protected modules and grades an entire lesson journey with no client score', async () => {

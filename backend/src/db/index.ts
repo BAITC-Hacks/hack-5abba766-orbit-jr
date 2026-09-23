@@ -24,10 +24,11 @@ export function closePools(): Promise<void> {
   return closing ??= Promise.all([pool.end(), recommendationLockPool.end()]).then(() => undefined);
 }
 export const db = drizzle(pool, { schema });
-export const SCHEMA_VERSION = '002_learning';
+export const SCHEMA_VERSION = '003_learning_external_completion';
 const MIGRATIONS = [
   { version: '001_initial', read: () => readFile(new URL('./migrations/001_initial.sql', import.meta.url), 'utf8') },
   { version: '002_learning', read: () => readFile(new URL('./migrations/002_learning.sql', import.meta.url), 'utf8') },
+  { version: '003_learning_external_completion', read: () => readFile(new URL('./migrations/003_learning_external_completion.sql', import.meta.url), 'utf8') },
 ] as const;
 
 export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>, options: { readOnly?: boolean; bootstrap?: boolean } = {}): Promise<T> {

@@ -116,8 +116,10 @@ export async function handleRequest(request: Request): Promise<Response> {
       asOf = await readDatasetDate();
       return success(actor);
     }
-    const snapshot = await readSnapshot(); asOf = snapshot.as_of_date;
-    if (path === '/api/catalog' && method === 'GET') return success(catalogView(snapshot));
+    asOf = await readDatasetDate();
+    // Service operations load their own transactional snapshot. Only read the
+    // company projection for routes that actually consume it here.
+    if (path === '/api/catalog' && method === 'GET') return success(catalogView(await readSnapshot()));
 
     if (path === '/api/learning/modules' && method === 'GET') return success(listLearningModules());
     const moduleMatch = /^\/api\/learning\/modules\/([^/]+)$/.exec(path);
@@ -150,10 +152,11 @@ export async function handleRequest(request: Request): Promise<Response> {
     if (path === '/api/employees' && method === 'GET') {
       requireHr(actor);
       const query = z.object({ q: z.string().max(200).optional(), department: z.string().max(200).optional(), role: z.string().max(200).optional(), grade: grades.optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(50) }).strict().parse(Object.fromEntries(url.searchParams));
+      const snapshot = await readSnapshot();
       const rows = snapshot.employees.filter(e => (!query.q || `${e.full_name} ${e.employee_id}`.toLowerCase().includes(query.q.toLowerCase())) && (!query.department || e.department === query.department) && (!query.role || e.role === query.role) && (!query.grade || e.grade === query.grade)).sort((a, b) => a.employee_id.localeCompare(b.employee_id));
       return success({ total: rows.length, items: rows.slice(query.offset, query.offset + query.limit).map(({ employee_id, full_name, department, role, grade }) => ({ employee_id, full_name, department, role, grade })) });
     }
-    if (path === '/api/hr/overview' && method === 'GET') { requireHr(actor); return success(hrOverview(snapshot)); }
+    if (path === '/api/hr/overview' && method === 'GET') { requireHr(actor); return success(hrOverview(await readSnapshot())); }
     if (path === '/api/import' && method === 'POST') {
       requireHr(actor); const command = await importCommand(request, asOf);
       const result = await importData(actor, command, command.dry_run ? undefined : idempotencyKey(request));
@@ -164,7 +167,7 @@ export async function handleRequest(request: Request): Promise<Response> {
       let id: string;
       try { id = idSchema.parse(decodeURIComponent(match[1])); } catch { throw new AppError('VALIDATION_ERROR', 'Некорректный идентификатор сотрудника.'); }
       requireEmployee(actor, id);
-      if (!match[2] && method === 'GET') return success(employeeView(snapshot, id));
+      if (!match[2] && method === 'GET') return success(employeeView(await readSnapshot(), id));
       if (match[2] === 'goal' && method === 'PUT') return success(await updateGoal(actor, id, goalSchema.parse(await jsonBody(request))));
       if (match[2] === 'recommendations' && method === 'POST') return success(await recommendations(id, recSchema.parse(await jsonBody(request)), request.signal));
       if (match[2] === 'completions' && method === 'POST') {

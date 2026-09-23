@@ -153,7 +153,7 @@ export function History({
                 >
                   {learn && moduleEventIds.includes(row.event_id)
                     ? "Продолжить уроки"
-                    : "Отметить выполненной"}{" "}
+                    : "Смоделировать выполнение"}{" "}
                   <ArrowRight size={16} aria-hidden="true" />
                 </button>
               ) : (
