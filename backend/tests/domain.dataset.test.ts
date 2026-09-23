@@ -1,34 +1,22 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parse } from 'csv-parse/sync';
 import { describe, expect, it } from 'vitest';
 import { assertCompletionAllowed, employeeView, getCandidates, hrOverview, skillChanges } from '../src/domain';
-import type { DatasetSnapshot, EventView, ParticipationSource } from '../src/types';
+import { loadDataset } from '../src/validation/load-dataset';
 
 // Local opt-in regression audit. The official dataset is never committed or replaced by fixtures.
 const source = fileURLToPath(new URL('../../data/source/', import.meta.url));
-const available = ['employees.json', 'events.json', 'skills.json', 'activity_history.csv'].every(file => existsSync(source + file));
+const files = ['employees.json', 'events.json', 'skills.json', 'activity_history.csv'];
+const missing = files.filter(file => !existsSync(source + file));
+if (missing.length > 0 && missing.length < files.length) {
+  throw new Error(`Official dataset is incomplete. Missing in data/source: ${missing.join(', ')}`);
+}
+const available = missing.length === 0;
 const official = describe.skipIf(!available);
 
-function readDataset(): DatasetSnapshot {
-  const employees = JSON.parse(readFileSync(source + 'employees.json', 'utf8'));
-  const skills = JSON.parse(readFileSync(source + 'skills.json', 'utf8'));
-  const events = JSON.parse(readFileSync(source + 'events.json', 'utf8')).events as EventView[];
-  const rows = parse(readFileSync(source + 'activity_history.csv', 'utf8'), { columns: true, bom: true }) as Record<string, string>[];
-  return {
-    as_of_date: employees.meta.as_of_date, dataset_revision: 1, global_revision: 1,
-    employees: employees.employees, employee_revisions: {}, skills: skills.skills,
-    role_profiles: skills.role_profiles, proficiency_scale: skills.proficiency_scale,
-    events: events.map(event => ({ ...event, repeatable: event.event_id === 'EV_036' })),
-    history: rows.map(row => ({ ...row, due_date: row.due_date || null, completion_pct: Number(row.completion_pct),
-      score: row.score === '' ? null : Number(row.score), feedback_rating: row.feedback_rating === '' ? null : Number(row.feedback_rating) })) as ParticipationSource[],
-    completions: [], goals: {},
-  };
-}
-
 official('official local dataset domain audit', () => {
-  it('every suggested alternative produces exactly its advertised independent effect', () => {
-    const snapshot = readDataset();
+  it('every suggested alternative produces exactly its advertised independent effect', async () => {
+    const snapshot = await loadDataset(source);
     let checked = 0;
     for (const sourceEmployee of snapshot.employees) {
       const employeeId = sourceEmployee.employee_id;
@@ -61,8 +49,8 @@ official('official local dataset domain audit', () => {
     expect(hr.participation.effective_by_status).toEqual(hr.participation.actual_by_status);
   });
 
-  it('handles the known baseline, previous-grade, and duplicate-attempt cases', () => {
-    const snapshot = readDataset();
+  it('handles the known baseline, previous-grade, and duplicate-attempt cases', async () => {
+    const snapshot = await loadDataset(source);
     expect(employeeView(snapshot, 'E0001').skills.find(skill => skill.skill_id === 'SK_APP_SECURITY'))
       .toMatchObject({ baseline_level: 0, current_level: 1 });
     expect(getCandidates(snapshot, 'E0181').candidates.find(candidate => candidate.event_id === 'EV_022'))
