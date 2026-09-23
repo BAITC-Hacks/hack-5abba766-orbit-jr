@@ -1,0 +1,566 @@
+{
+  "model": "gpt-6-luna",
+  "syntheticOnly": true,
+  "scope": "Reproduction and targeted prompt checks, not an independent holdout",
+  "rows": [
+    {
+      "phase": "baseline",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 1,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        },
+        "ms": 2098
+      },
+      "checked": {
+        "ok": false,
+        "detail": "step:41/b covers 2 required fact categories, needs 3"
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "domain-similar-format-history",
+      "repeat": 1,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:target_requirement",
+                "new-self-paced-format:start:self-paced:history"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 3496
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:target_requirement",
+                "new-self-paced-format:start:self-paced:history"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 2,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/unlock",
+                "step:41/b/history"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        },
+        "ms": 1957
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/unlock",
+                "step:41/b/history"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "domain-similar-format-history",
+      "repeat": 2,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:target_requirement",
+                "new-self-paced-format:start:self-paced:history"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 3500
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:target_requirement",
+                "new-self-paced-format:start:self-paced:history"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 3,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/history",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": null
+            }
+          ]
+        },
+        "ms": 2447
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/history",
+                "step:41/b/unlock"
+              ]
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "domain-similar-format-history",
+      "repeat": 3,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 1873
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 4,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        },
+        "ms": 4151
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "baseline",
+      "caseId": "domain-similar-format-history",
+      "repeat": 4,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 4211
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "candidate",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 1,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/history",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        },
+        "ms": 2692
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/history",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "candidate",
+      "caseId": "domain-similar-format-history",
+      "repeat": 1,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 3144
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "candidate",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 2,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/history",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        },
+        "ms": 2842
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/gap",
+                "step:41/b/history",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "candidate",
+      "caseId": "domain-similar-format-history",
+      "repeat": 2,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 3226
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:history",
+                "new-self-paced-format:start:self-paced:target_requirement"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "candidate",
+      "caseId": "challenge-unlock-citation",
+      "repeat": 3,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/history",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        },
+        "ms": 2121
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "step:41/b",
+              "reason_fact_ids": [
+                "step:41/b/grade",
+                "step:41/b/history",
+                "step:41/b/target",
+                "step:41/b/unlock"
+              ],
+              "alternative_candidate_id": "step:41/a"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    },
+    {
+      "phase": "candidate",
+      "caseId": "domain-similar-format-history",
+      "repeat": 3,
+      "adapter": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:target_requirement",
+                "new-self-paced-format:start:self-paced:history"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        },
+        "ms": 3327
+      },
+      "checked": {
+        "ok": true,
+        "output": {
+          "choices": [
+            {
+              "candidate_id": "new-self-paced-format:start:self-paced",
+              "reason_fact_ids": [
+                "new-self-paced-format:start:self-paced:grade",
+                "new-self-paced-format:start:self-paced:skill_gap",
+                "new-self-paced-format:start:self-paced:target_requirement",
+                "new-self-paced-format:start:self-paced:history"
+              ],
+              "alternative_candidate_id": "new-scheduled-format:start:2026-10-12"
+            }
+          ]
+        }
+      },
+      "missingDecisive": []
+    }
+  ]
+}

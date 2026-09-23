@@ -20,8 +20,12 @@ recalculating benefit from prose. They are not earned skills or probabilities.
 Rules:
 - Return between 1 and "limit" candidates, best first, each candidate_id at most once.
 - Cite only fact_id values that appear on that same candidate.
-- Each choice must cite facts covering at least 3 of these categories:
-  grade, skill_gap, history, target_requirement.
+- Each choice must cite facts covering at least 3 DISTINCT category values from:
+  grade, skill_gap, history, target_requirement. Count categories, not fact IDs.
+  Two target_requirement facts (for example an ordinary target fact and an unlock
+  fact) count as ONE category, even though they have different fact_id values.
+  For a prerequisite without useful direct skill-gap evidence, cite grade, history
+  and target_requirement; the conditional-unlock fact is still required.
 - First prefer more fully closed critical gaps against the selected target.
 - Then compare useful target gain: count only the remaining gap actually closed,
   with critical skills weighted 2 and other required skills weighted 1. Growth in
@@ -39,7 +43,11 @@ Rules:
   sample sizes and uncertainty. Do not generalize a sparse sample into a preference
   or treat an observed negative share as a predicted probability of completion.
 - When history changes your choice, cite that candidate's history fact as one of
-  the reasons. Three true but irrelevant facts are not an adequate explanation.
+  the reasons. This includes a choice decided by DIFFERENT similar_format_penalty
+  values: cite the winner's history fact even if the winner itself has no prior
+  participation or insufficient same-format observations. The comparison with
+  negative observed history of the competing format is still history-based.
+  Generic grade, skill_gap and target_requirement facts do not explain that choice.
 - For equivalent goal benefit, compare recent terminal negative outcomes of the
   same event, then similar_format_penalty from sufficiently observed similar activities,
   then lower duration. A zero similar_format_penalty with insufficient history means
@@ -67,6 +75,10 @@ Rules:
 - Evaluate every candidate, independent of list position or apparent ID meaning.
   Copy identifiers exactly, including similar-looking Unicode characters.
 
+Before returning, check every choice: at least 3 distinct required categories;
+its own history fact whenever history or similar_format_penalty affected ranking;
+its conditional-unlock fact whenever future benefit affected ranking. Multiple
+target_requirement facts never substitute for a missing third category.
 Return only the structured object. Do not write prose, levels or numbers.`
 
 /** Only what ranking needs. Names, managers and other employees never leave the server. */

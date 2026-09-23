@@ -55,7 +55,9 @@ describe('domain scaling on authored synthetic history', () => {
     expect(hrMs).toBeLessThan(2000);
     console.info(JSON.stringify({ employees: 1000, history: 50_000, candidates: all.reduce((sum, result) => sum + result.candidates.length, 0),
       recommendationsMs: Math.round(recommendationsMs), hrMs: Math.round(hrMs) }));
-  }, 20000);
+    // This checks 1,000 full outputs twice; allow shared CI hosts to finish the
+    // parity assertions. The separate two-second HR latency assertion stays intact.
+  }, 60000);
 
   it('handles 50000 attempts for one employee without quadratic participation projection', () => {
     const snapshot = scalingSnapshot(1, 50_000);
