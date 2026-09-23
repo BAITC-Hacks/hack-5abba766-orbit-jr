@@ -1,7 +1,7 @@
 import type { AiRankingInput, EmptyReason, RecommendationResult } from '../types'
 import { baselineCards, type BaselineSignals } from '../domain/baseline'
 import { rankWithModel } from './adapter'
-import { validateRanking } from './response-validator'
+import { validateProviderRanking } from './response-validator'
 
 export type RecommendationOptions = {
   /** Supply the real history/unlock signals; do not silently omit them in production. */
@@ -44,7 +44,7 @@ export async function recommend(
   const fallback = baselineCards(input, options.signals)
   const attempt = await rankWithModel(input, options.signal, options.signals)
   if (attempt.ok) {
-    const checked = validateRanking(attempt.output, input)
+    const checked = validateProviderRanking(attempt.output, input)
     if (checked.ok) {
       return {
         version, mode: 'ai', fallback_reason: null,

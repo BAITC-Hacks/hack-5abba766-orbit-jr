@@ -107,6 +107,11 @@ describe('semantic ranking validation', () => {
 });
 
 describe('provider adapter without network calls', () => {
+  it('drops redundant provider comparisons while retaining the model order', async () => {
+    mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('second', 'first'), choice('first', 'fourth')] }));
+    await expect(rankCandidates(input())).resolves.toEqual({ choices: [choice('second'), choice('first', 'fourth')] });
+  });
+
   it('returns a validated provider ranking using only provided factual choices', async () => {
     await expect(rankCandidates(input())).resolves.toEqual({ choices: [choice()] });
     expect(mocks.fetch).toHaveBeenCalledOnce();
