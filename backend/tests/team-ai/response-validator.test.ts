@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateRanking } from '../../src/ai/response-validator'
+import { validateProviderRanking, validateRanking } from '../../src/ai/response-validator'
 import { candidate, fact, input } from './fixtures'
 
 const base = input([
@@ -154,5 +154,42 @@ describe('strict model boundary', () => {
   it('rejects model prose and undeclared top-level fields', () => {
     expect(validateRanking({ choices: [choice({ explanation: 'invented claim' })] }, base)).toMatchObject({ ok: false })
     expect(validateRanking({ choices: [choice()], confidence: 1 }, base)).toMatchObject({ ok: false })
+  })
+})
+
+describe('optional provider comparisons', () => {
+  it('keeps a multi-card ranking and its unselected comparison without mutating the response', () => {
+    const state = input(['C1', 'C2', 'C3', 'C4'].map((candidate_id) => candidate({ candidate_id })))
+    const raw = { choices: ['C1', 'C2', 'C3'].map((candidate_id, index) => choice({
+      candidate_id,
+      reason_fact_ids: [`${candidate_id}-gap`, `${candidate_id}-req`, `${candidate_id}-grade`],
+      alternative_candidate_id: ['C2', 'C3', 'C4'][index],
+    })) }
+    const before = structuredClone(raw)
+    const result = validateProviderRanking(raw, state)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.cards.map((card) => card.candidate_id)).toEqual(['C1', 'C2', 'C3'])
+    expect(result.cards.map((card) => card.alternative_candidate_id)).toEqual([null, null, 'C4'])
+    expect(result.cards.map((card) => card.alternative?.candidate_id ?? null)).toEqual([null, null, 'C4'])
+    expect(result.cards.map((card) => card.reason_fact_ids)).toEqual(raw.choices.map((item) => item.reason_fact_ids))
+    expect(validateRanking(result.output, state).ok).toBe(true)
+    expect(raw).toEqual(before)
+  })
+
+  it('drops a self-comparison without replacing it with another candidate', () => {
+    const result = validateProviderRanking({ choices: [choice({ alternative_candidate_id: 'C1' })] }, base)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.cards[0]).toMatchObject({ alternative_candidate_id: null, alternative: null })
+  })
+
+  it.each([
+    ['unknown comparison', { choices: [choice({ alternative_candidate_id: 'UNKNOWN' })] }],
+    ['unknown choice', { choices: [choice({ candidate_id: 'UNKNOWN', alternative_candidate_id: 'UNKNOWN' })] }],
+    ['foreign evidence', { choices: [choice({ alternative_candidate_id: 'C1', reason_fact_ids: ['C2-gap', 'C1-req', 'C1-grade'] })] }],
+    ['duplicate choice', { choices: [choice({ alternative_candidate_id: 'C1' }), choice()] }],
+    ['extra model fields', { choices: [choice({ alternative_candidate_id: 'C1', explanation: 'Unsupported prose' })] }],
+  ])('still rejects %s', (_label, raw) => {
+    expect(validateProviderRanking(raw, base).ok).toBe(false)
   })
 })
