@@ -12,11 +12,13 @@ export function HrOverview({
   open,
   names = {},
   showPeople,
+  showImport,
 }: {
   data: Overview;
   open: (id: string) => void;
   names?: Record<string, string>;
   showPeople?: () => void;
+  showImport?: () => void;
 }) {
   const [reason, setReason] = useState("all");
   const [expanded, setExpanded] = useState(false);
@@ -54,9 +56,9 @@ export function HrOverview({
           </span>
           <p>Сотрудники</p>
           <strong>{data.employee_count}</strong>
-          <button className="text-button" onClick={showPeople}>
+          {showPeople && <button className="text-button" onClick={showPeople}>
             Перейти к команде <ArrowUpRight size={15} aria-hidden="true" />
-          </button>
+          </button>}
         </div>
         <div>
           <span className="metric-icon">
@@ -82,7 +84,7 @@ export function HrOverview({
           <p className="section-description">
             По числу сотрудников с разрывом до цели.
           </p>
-          <div className="gap-list">
+          <div className="gap-list" id="hr-skill-gaps">
             {gaps.slice(0, expanded ? undefined : 5).map((g) => (
               <div className="gap-item" key={g.id}>
                 <div>
@@ -106,6 +108,8 @@ export function HrOverview({
           {gaps.length > 5 && (
             <button
               className="text-button"
+              aria-expanded={expanded}
+              aria-controls="hr-skill-gaps"
               onClick={() => setExpanded((v) => !v)}
             >
               {expanded ? "Свернуть" : "Все навыки (" + gaps.length + ")"}
@@ -162,13 +166,13 @@ export function HrOverview({
             <h2>Сотрудники без рекомендации</h2>
 
           </div>
-          <span className="count-badge">{data.no_next_step.length} чел.</span>
+          <span className="count-badge" role="status">{reason === "all" ? `${available.length} чел.` : `${available.length} из ${data.no_next_step.length} чел.`}</span>
         </div>
         {!!data.no_next_step.length && (
           <CatalogSelect label="Причина" value={reason} onChange={(value) => { setReason(value); setAllPeople(false); }}
-            options={[["all", "Все причины"], ...Object.entries(hrEmptyReasons)]} />
+            options={[["all", "Все причины"], ...Object.entries(hrEmptyReasons).filter(([key]) => key === reason || data.no_next_step.some((person) => person.reason === key))]} />
         )}
-        <div className="attention-list">
+        <div className="attention-list" id="hr-attention-list">
           {available.slice(0, allPeople ? undefined : 8).map((p) => (
             <button
               className="attention-row"
@@ -187,6 +191,8 @@ export function HrOverview({
         {available.length > 8 && (
           <button
             className="secondary attention-expand"
+            aria-expanded={allPeople}
+            aria-controls="hr-attention-list"
             onClick={() => setAllPeople((v) => !v)}
           >
             {allPeople
@@ -202,6 +208,16 @@ export function HrOverview({
                 ? "Для всех сотрудников доступен следующий шаг."
                 : "В команде пока нет сотрудников. Добавьте их через импорт."}
           </p>
+        )}
+        {!available.length && reason !== "all" && (
+          <button className="secondary" onClick={() => { setReason("all"); setAllPeople(false); }}>
+            Показать все причины
+          </button>
+        )}
+        {!data.employee_count && showImport && (
+          <button className="secondary" onClick={showImport}>
+            Перейти к импорту
+          </button>
         )}
       </section>
       <section className="hr-surface">
@@ -266,6 +282,9 @@ export function HrOverview({
         </details>
         <details className="analytics-details">
           <summary>Статистика по каждой активности</summary>
+          {!data.participation.by_activity.length && (
+            <p className="empty-state">История участия пока пуста. Данные появятся после импорта истории обучения.</p>
+          )}
           {data.participation.by_activity.map((a) => (
             <details className="activity-breakdown" key={a.event_id}>
               <summary>{a.title}</summary>

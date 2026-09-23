@@ -26,9 +26,9 @@ export function Navigation({
         <nav aria-label="Главная навигация">
           <a href={home} aria-current={!profileActive ? "page" : undefined}>
             {session.role === "hr" ? (
-              <LayoutDashboard size={17} />
+              <LayoutDashboard size={17} aria-hidden="true" />
             ) : (
-              <Sprout size={18} />
+              <Sprout size={18} aria-hidden="true" />
             )}{" "}
             {session.role === "hr" ? "Пространство HR" : "Моё развитие"}
           </a>
@@ -44,12 +44,13 @@ export function Navigation({
             <small>{session.role === "hr" ? "HR-партнёр" : "Сотрудник"}</small>
           </span>
           <button
+            type="button"
             className="secondary nav-logout"
             disabled={busy}
             onClick={logout}
             aria-label={busy ? "Выход…" : "Выйти"}
           >
-            <LogOut size={17} />
+            <LogOut size={17} aria-hidden="true" />
             <span>{busy ? "Выход…" : "Выйти"}</span>
           </button>
         </div>

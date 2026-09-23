@@ -90,6 +90,7 @@ export function Login({
           </div>
           <Failure error={notice} />
           <form
+            aria-busy={busy}
             onSubmit={async (e) => {
               e.preventDefault();
               if (lock.current) return;
@@ -126,6 +127,9 @@ export function Login({
                 name="username"
                 placeholder="Введите ваш логин"
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 disabled={busy}
                 value={username}
@@ -147,6 +151,7 @@ export function Login({
                 type={visible ? "text" : "password"}
                 placeholder="Введите пароль"
                 autoComplete="current-password"
+                aria-describedby={error ? "login-error" : undefined}
                 required
                 disabled={busy}
                 value={password}
@@ -166,7 +171,7 @@ export function Login({
                 {visible ? <EyeOff size={19} /> : <Eye size={19} />}
               </button>
             </div>
-            <Failure error={error} />
+            <div id="login-error"><Failure error={error} /></div>
             <button className="primary login-submit" disabled={busy}>
               {busy ? (
                 <>

@@ -19,12 +19,14 @@ export function useLearning(employeeId: string, moduleId: string, target: Comple
   const version = useRef(initialVersion);
   const receipt = useRef<{ key: string; body: SubmitQuizRequest } | null>(null);
   const targetKey = JSON.stringify(target);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
   const fail = useCallback((value: unknown) => {
     setError(value);
     setNeedsRefresh(value instanceof ApiFailure && value.code === "REVISION_CONFLICT");
-    onError(value);
-  }, [onError]);
+    onErrorRef.current(value);
+  }, []);
 
   const initialize = useCallback(async () => {
     if (lock.current) return;

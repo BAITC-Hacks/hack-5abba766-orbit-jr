@@ -51,7 +51,7 @@ export function RecommendationCard({
           <summary>Что даст обучение</summary>
           {card.relevance === "prerequisite" && (
             <p>
-              Подготовка к: {card.unlocks_event_ids.map(id => eventNames[id] ?? id).join(", ")}. Доступ зависит от условий участия после завершения.
+              {card.unlocks_event_ids.length > 0 && <>Подготовка к: {card.unlocks_event_ids.map(id => eventNames[id] ?? id).join(", ")}. </>}Доступ зависит от условий участия после завершения.
             </p>
           )}
           {!!card.expected_skill_changes.length && (
@@ -70,7 +70,7 @@ export function RecommendationCard({
           })}
         </details>
       </div>
-      <button className="text-button learning-row-action" onClick={select}>
+      <button type="button" className="text-button learning-row-action" aria-label={`${actionLabel}: ${card.title}`} onClick={select}>
         {actionLabel} <ArrowUpRight size={17} aria-hidden="true" />
       </button>
     </article>

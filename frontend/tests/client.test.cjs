@@ -918,7 +918,7 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
 
 test("HR read-only profile names the selected employee and only reads their data", async () => {
   const previousDocument = global.document;
-  global.document = { activeElement: null, querySelector: () => null };
+  global.document = { activeElement: null, documentElement: { style: { overflow: "" } }, querySelector: () => null };
   const profile = {
     ...employee(1, "hr-selected"), full_name: "Анна Петровна Иванова",
     department: "Разработка", role: "Engineer", grade: "Junior",

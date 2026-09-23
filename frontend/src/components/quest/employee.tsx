@@ -80,6 +80,10 @@ export function Employee({
   );
   const eventNames = Object.fromEntries(catalog.data?.events.map(event => [event.event_id, event.title]) ?? []);
   const learningModules = modules.data?.modules ?? [];
+  const filteredEvents = catalog.data?.events.filter(event =>
+    (type === "all" || event.type === type) &&
+    `${event.title} ${event.description}`.toLocaleLowerCase("ru-RU").includes(query.trim().toLocaleLowerCase("ru-RU")),
+  ) ?? [];
   const moduleFor = (eventId: string) => learningModules.find(module => module.event_id === eventId);
   const disabled = state.busy || !!state.pendingTarget;
   const isHr = viewer === "hr";
@@ -120,6 +124,7 @@ export function Employee({
   return (
     <>
       {state.loading && <Loading>Загрузка профиля…</Loading>}
+      {state.busy && !state.loading && <Loading>Сохраняем изменения…</Loading>}
       <Failure error={state.error} retry={() => void state.refresh()} />
       {!readOnly && <Failure
         error={state.mutationError}
@@ -327,8 +332,6 @@ export function Employee({
           )}
           {tab === "catalog" && (
             <>
-              {catalog.loading && <Loading>Загрузка каталога…</Loading>}
-              <Failure error={catalog.error} retry={catalog.reload} />
               <div className="catalog-banner">
                 <div>
                   <span className="eyebrow">БИБЛИОТЕКА ВОЗМОЖНОСТЕЙ</span>
@@ -355,15 +358,7 @@ export function Employee({
                 <CatalogSelect value={type} onChange={setType} options={[["all", "Все типы"], ...Object.entries(eventTypes)]} />
               </div>
               <div className="course-grid catalog-grid">
-                {catalog.data?.events
-                  .filter(
-                    (e) =>
-                      (type === "all" || e.type === type) &&
-                      `${e.title} ${e.description}`
-                        .toLowerCase()
-                        .includes(query.toLowerCase()),
-                  )
-                  .map((e) => (
+                {filteredEvents.map((e) => (
                     <article className="course-card" key={e.event_id}>
                       <span className="catalog-row-icon" aria-hidden="true"><BookOpen size={22} /></span>
                       <div className="course-body">
@@ -384,17 +379,10 @@ export function Employee({
                     </article>
                   ))}
               </div>
-              {catalog.data &&
-                !catalog.data.events.some(
-                  (e) =>
-                    (type === "all" || e.type === type) &&
-                    `${e.title} ${e.description}`
-                      .toLowerCase()
-                      .includes(query.toLowerCase()),
-                ) && (
+              {catalog.data && !catalog.loading && filteredEvents.length === 0 && (
                   <div className="empty">
-                    <p>Ничего не найдено.</p>
-                    <button
+                    <p>{catalog.data.events.length === 0 ? "В каталоге пока нет программ обучения." : "Ничего не найдено. Попробуйте другой запрос или сбросьте фильтры."}</p>
+                    {catalog.data.events.length > 0 && <button
                       className="secondary"
                       onClick={() => {
                         setQuery("");
@@ -403,7 +391,7 @@ export function Employee({
                       }}
                     >
                       Сбросить фильтры
-                    </button>
+                    </button>}
                   </div>
                 )}
             </>
@@ -413,9 +401,10 @@ export function Employee({
             <div className="compact-meta"><span>Демомодули</span><span>Короткие уроки</span><span>Мини-тесты</span></div>
             {modules.loading && <Loading>Загрузка учебных модулей…</Loading>}
             <Failure error={modules.error} retry={modules.reload} />
+            {!modules.loading && !modules.error && modules.data && learningModules.length === 0 && <p className="empty">Учебных модулей пока нет. Другие программы доступны в каталоге.</p>}
             <div className="learning-library-grid">{learningModules.map(module => <article className="learning-library-card" key={module.id}>
               <span>{module.estimated_minutes} минут · {module.lesson_count} урока · мини-тест</span><h3>{module.title}</h3><details className="compact-details"><summary>О модуле</summary><p>{module.summary}</p></details>
-              {!readOnly && <button className="secondary" disabled={disabled || !catalog.data} onClick={() => openLearning(module.id, module.event_id)}>Открыть модуль →</button>}
+              {!readOnly && <button className="secondary" disabled={disabled || !catalog.data?.events.some(event => event.event_id === module.event_id)} onClick={() => openLearning(module.id, module.event_id)}>Открыть модуль →</button>}
             </article>)}</div>
           </section>}
           {selected &&
@@ -522,6 +511,7 @@ export function Employee({
       )}
       {catalog.loading && <Loading>Загрузка справочника…</Loading>}
       <Failure error={catalog.error} retry={catalog.reload} />
+      {tab !== "learning" && tab !== "profile" && <Failure error={modules.error} retry={modules.reload} />}
     </>
   );
 }

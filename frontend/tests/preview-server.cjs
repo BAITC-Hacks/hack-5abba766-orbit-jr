@@ -189,6 +189,7 @@ const overview = () => ({
     },
   ],
   no_next_step: [],
+  catalog_gaps: [],
   participation: {
     actual_by_status: statuses,
     simulated_completions: completed ? 1 : 0,
@@ -282,6 +283,8 @@ const server = http.createServer(async (req, res) => {
       return send({ logged_out: true });
     }
     if (url.pathname === "/api/catalog") return send(catalog());
+    // This preview intentionally has no lesson content; exercise the empty library.
+    if (url.pathname === "/api/learning/modules") return send({ modules: [] });
     if (url.pathname === "/api/hr/overview") return send(overview());
     if (url.pathname === "/api/employees") {
       const items = [
