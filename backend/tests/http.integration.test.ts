@@ -92,7 +92,7 @@ describe.skipIf(!databaseUrl)('HTTP: isolated PostgreSQL end-to-end', () => {
     expect((await call('/api/employees/JUDGE_NEW', { cookie: hrCookie })).status).toBe(200);
     const malformed = await handle(new Request('http://localhost:3000/api/employees/PERSON_A/goal', { method: 'PUT', headers: { cookie, origin: 'http://localhost:3000', 'Content-Type': 'application/json' }, body: '{' }));
     expect(malformed.status).toBe(400);
-    expect((await call('/api/auth/logout', { method: 'POST', cookie, body: {} })).status).toBe(200);
+    expect((await handle(new Request('http://localhost:3000/api/auth/logout', { method: 'POST', headers: { cookie, origin: 'http://localhost:3000' } }))).status).toBe(200);
     expect((await call('/api/auth/session', { cookie })).status).toBe(401);
   }, 30000);
 });

@@ -1,7 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700;750;800&display=swap");
 :root {
   --ink: #202124;
-  --muted: #797b83;
+  --muted: #62656e;
   --blue: #0876e9;
   --bg: #f7f8fa;
   --line: #e8e9ed;
@@ -1801,225 +1800,211 @@ dialog::backdrop {
   }
 }
 
-/* Connected states share the original prototype's visual language. */
-button:disabled {
-  opacity: 0.55;
+/* Connected UI uses the existing surfaces, typography and responsive grid. */
+.login-page {
+  max-width: 660px;
+  padding-top: 10vh;
 }
-.login-shell {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 40px 20px;
+.login-page h1 {
+  font-size: clamp(32px, 6vw, 54px);
 }
-.login-card {
-  width: min(520px, 100%);
-  padding: 38px;
-  border: 1px solid var(--line);
-  border-radius: 25px;
-  background: white;
-  box-shadow: 0 18px 70px #17243a0a;
+.login-page .panel {
+  padding: 36px;
 }
-.login-card > .brand {
-  margin-bottom: 32px;
-}
-.login-card h1 {
-  font-size: 34px;
-  line-height: 1.25;
-  letter-spacing: -1.2px;
-  margin: 12px 0 18px;
-}
-.login-card > p {
-  color: #7b8493;
-  font-size: 13px;
-  line-height: 1.8;
-}
-.login-card form {
-  display: grid;
-  gap: 16px;
-  margin: 27px 0;
-}
-.field-label input {
+.field-label input,
+.toolbar input,
+.toolbar select {
   display: block;
   width: 100%;
-  padding: 13px;
-  border: 1px solid #dfe4ec;
-  border-radius: 10px;
-  margin-top: 9px;
+  padding: 12px 14px;
+  border: 1px solid #a5a8ae;
+  border-radius: 12px;
   background: white;
-  color: #536279;
+  color: var(--ink);
+  margin: 8px 0 18px;
 }
-.demo-credentials {
+.feedback {
+  margin: 18px 0;
+  padding: 18px 22px;
+  border-radius: 16px;
+  background: #eef4fc;
+  overflow-wrap: anywhere;
+}
+.feedback.error {
+  background: #fff0ed;
+  color: #842e20;
+}
+.feedback pre {
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow: auto;
+}
+.feedback button {
+  margin-top: 10px;
+}
+.verified-facts {
+  padding-left: 20px;
+  color: #54575f;
+  line-height: 1.7;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.global-nav nav a {
+  color: inherit;
+  text-decoration: none;
+  padding: 12px;
+}
+.import-panel,
+.selected-employee {
+  margin: 32px 0;
+}
+.import-panel {
+  padding: 28px;
+}
+.import-panel input {
+  max-width: 100%;
+}
+.selected-employee {
   border-top: 1px solid var(--line);
-  padding-top: 18px;
-  color: #7b8493;
-  font-size: 11px;
+  padding-top: 28px;
+}
+.people-panel details {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
 }
 summary {
   cursor: pointer;
 }
-.demo-credentials > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 13px;
+.history-row {
+  gap: 18px;
   flex-wrap: wrap;
 }
-.demo-credentials code {
-  font-size: 10px;
-  overflow-wrap: anywhere;
+.toolbar {
+  flex-wrap: wrap;
 }
-.error-panel {
-  background: #fff3ef;
-  color: #9b4936;
-  border: 1px solid #f0cbbf;
-  border-radius: 12px;
-  padding: 16px;
-  margin: 16px 0;
-  font-size: 12px;
-  line-height: 1.7;
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 12px;
-}
-.error-details {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 10px;
-  max-height: 220px;
-  overflow: auto;
-}
-.loading-panel {
-  padding: 32px;
-  border: 1px solid #cad7e7;
-  color: #7286a1;
-  background: #f0f5fc;
-  border-radius: 16px;
-  font-size: 12px;
-  text-align: center;
-  margin: 18px 0;
-}
-.employee-switcher {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: #eef3fa;
-  border-radius: 13px;
-  padding: 16px 20px;
-  color: #7386a1;
-  margin-bottom: 24px;
-}
-.employee-switcher label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  flex: 1;
-}
-.employee-switcher select {
-  max-width: 440px;
-  min-width: 220px;
-  padding: 10px;
-  background: white;
-  border: 1px solid #d9e2ee;
-  border-radius: 8px;
-  color: #465771;
-}
-.logout-button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  color: #7c8899;
-}
-.spaced {
-  margin-top: 22px;
-}
-.block-muted {
-  display: block;
-  margin-top: 4px;
-  font-size: 9px;
-  color: #959ca9;
-}
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 18px;
-  font-size: 11px;
-  color: #8390a3;
-}
-.attention-list {
-  max-height: 420px;
-  overflow-y: auto;
-}
-.attention-list .history-row > div {
-  flex: 1;
-}
-.attention-list .history-row p {
-  max-width: 760px;
-  line-height: 1.8;
-}
-.import-files {
-  display: grid;
-  gap: 12px;
-}
-.issue-error {
-  color: #a54c37;
-}
-.hr-note > div + div {
-  margin-top: 9px;
-}
-.hero h2 > span {
-  overflow-wrap: anywhere;
-}
-.hero-copy {
+.toolbar label {
   min-width: 0;
 }
-.course-body p {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+:focus-visible {
+  outline: 3px solid #075ac0;
+  outline-offset: 4px;
 }
-.course-bottom {
-  gap: 8px;
-}
-.course-bottom .gain {
-  max-width: 65%;
-}
-@media (max-width: 750px) {
-  .employee-switcher {
+@media (max-width: 600px) {
+  .global-nav .nav-inner {
     flex-wrap: wrap;
+    height: auto;
+    gap: 10px;
+    padding: 12px 0;
   }
-  .employee-switcher label {
-    min-width: 0;
-    flex-wrap: wrap;
+  .global-nav {
+    height: auto;
   }
-  .employee-switcher select {
-    min-width: 0;
-    width: 100%;
+  .global-nav nav {
+    display: flex;
+  }
+  .global-nav .text-button {
     max-width: 100%;
-    font-size: 11px;
+    overflow-wrap: anywhere;
   }
-  .people-panel .section-heading {
+  .page-top {
     flex-wrap: wrap;
+    gap: 16px;
   }
-  .people-panel .search {
-    min-width: 0;
+  .login-page .panel,
+  .import-panel {
+    padding: 22px;
+  }
+  .toolbar label,
+  .toolbar input,
+  .toolbar select {
     width: 100%;
   }
-  .login-card {
-    padding: 27px;
+  .history-row button {
+    min-height: 44px;
   }
-  .login-card h1 {
-    font-size: 29px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
-  .logout-button span {
-    display: none;
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
-  .hero h2 {
-    font-size: 31px;
-  }
+}
+
+/* Secondary copy retains readable contrast on the pale surfaces. */
+.eyebrow,
+.date-chip,
+.subnav button,
+.hero-copy > p,
+.hero-foot,
+.progress-orb > span,
+.progress-orb p,
+.metrics p,
+.insight p,
+.outline-tag,
+.course-meta,
+.course-body > p,
+.gain,
+.skills-intro p,
+.skills-intro small,
+.legend,
+.skill-row em,
+.critical,
+.catalog-count,
+.history-row p,
+.hr-metrics p,
+th,
+td,
+.table-note,
+.fine-print,
+.modal-meta,
+.modal-lead,
+.field-label,
+.profile-details > span,
+.demo-strip {
+  color: #586272;
+}
+.primary {
+  background: #0066cc;
+}
+.status-tag.ok,
+.completed-mini,
+.success {
+  color: #246a4e;
+}
+.status-tag.attention {
+  color: #785321;
+}
+
+.demo-credentials {
+  margin-top: 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.demo-credentials summary {
+  cursor: pointer;
+  color: #66768e;
+}
+.demo-credentials p {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.demo-credentials code {
+  font-size: 11px;
+}
+.import-preview-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0;
+  font-size: 12px;
+}
+.import-preview-toggle input {
+  width: auto;
 }

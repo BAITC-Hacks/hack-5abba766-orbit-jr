@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool, readSnapshotWithClient, withTransaction, SCHEMA_VERSION } from '../db';
 import { AppError } from '../errors';
+import { isAiConfigured } from '../ai/adapter';
 import { employeeView, assertCompletionAllowed, skillChanges } from '../domain';
 import { canonicalJson, sourceHash, validateRelations, employeeSchema, participationSchema, careerGoalSchema } from '../validation';
 import type { DatasetSnapshot, SessionView, HealthView, GoalRequest, GoalResult, CompletionRequest, CompletionResult, ImportCommand, ImportResult, ImportIssue, EmployeeSource, ParticipationSource } from '../types';
 
 export async function readSnapshot(): Promise<DatasetSnapshot> { return withTransaction(readSnapshotWithClient, { readOnly: true }); }
 export async function getHealth(): Promise<HealthView> {
-  const base: HealthView = { status: 'not_ready', dataset_initialized: false, schema_version: null, ai_configured: Boolean(process.env.LLM_API_KEY && process.env.LLM_MODEL) };
+  const base: HealthView = { status: 'not_ready', dataset_initialized: false, schema_version: null, ai_configured: isAiConfigured() };
   try {
     const { rows } = await pool.query('SELECT seed_complete FROM app_meta WHERE id=1');
     const migrations = await pool.query('SELECT version FROM schema_migrations WHERE version=$1', [SCHEMA_VERSION]);

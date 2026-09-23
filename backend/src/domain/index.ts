@@ -1,3 +1,4 @@
+import { rankBaseline, type BaselineSignals } from './baseline';
 import { AppError, invariant } from '../errors';
 import type {
   Candidate, CatalogView, CompletionRequest, DatasetSnapshot, EmployeeSource,
@@ -256,7 +257,9 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
   const actions = availableActions(snapshot, employee, levels);
   if (!actions.length) return empty('NO_ELIGIBLE_EVENTS');
   let hasBenefit = false;
-  const ranked: { candidate: Candidate; closedCritical: number; benefit: number; negative: number }[] = [];
+  const candidates: Candidate[] = [];
+  const unlockedWeightedGain = new Map<string, number>();
+  const negativeOutcomes = new Map<string, number>();
   for (const action of actions) {
     const after = applyEvent(levels, action.event);
     const changes = levelChanges(levels, after);
@@ -274,18 +277,13 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
       unlocks_event_ids: unlocked.map(item => item.event.event_id),
     };
     const recent = snapshot.history.filter(row => row.employee_id === employeeId && row.event_id === action.event.event_id && terminalStatuses.has(row.status)).sort(byDateAndId).slice(-3);
-    ranked.push({
-      candidate: { ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked) },
-      closedCritical: profile.critical_skills.filter(id => (levels[id] ?? 0) < (profile.required_skills[id] ?? 0) && (after[id] ?? 0) >= (profile.required_skills[id] ?? 0)).length,
-      benefit: direct + 0.5 * Math.max(0, ...unlocked.map(item => item.weighted_gain)),
-      negative: recent.filter(row => row.status !== 'completed').length,
-    });
+    candidates.push({ ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked) });
+    unlockedWeightedGain.set(base.candidate_id, Math.max(0, ...unlocked.map(item => item.weighted_gain)));
+    negativeOutcomes.set(base.candidate_id, recent.filter(row => row.status !== 'completed').length);
   }
-  if (!ranked.length) return empty(hasBenefit ? 'NO_GOAL_RELEVANT_EVENTS' : 'NO_BENEFICIAL_EVENTS');
-  ranked.sort((a, b) => b.closedCritical - a.closedCritical || b.benefit - a.benefit || a.negative - b.negative
-    || a.candidate.duration_hours - b.candidate.duration_hours || compareText(a.candidate.event_id, b.candidate.event_id)
-    || compareText(a.candidate.candidate_id, b.candidate.candidate_id));
-  return { employee, candidates: ranked.map(item => item.candidate), emptyReason: null };
+  if (!candidates.length) return empty(hasBenefit ? 'NO_GOAL_RELEVANT_EVENTS' : 'NO_BENEFICIAL_EVENTS');
+  const signals: BaselineSignals = { unlockedWeightedGain, negativeOutcomes };
+  return { employee, candidates: rankBaseline({ profile: { skills: employee.skills }, candidates }, signals), emptyReason: null };
 }
 
 export function assertCompletionAllowed(snapshot: DatasetSnapshot, employeeId: string, request: CompletionRequest): { event_id: string; participation_id: string | null; session_date: string | null; occurrence_key: string } {

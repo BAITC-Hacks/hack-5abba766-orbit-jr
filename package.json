@@ -7,7 +7,7 @@
     "build": "npm run typecheck -w backend && npm run build -w frontend",
     "start": "node --env-file-if-exists=.env scripts/serve.mjs start",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test -w backend",
+    "test": "npm run test -w backend && npm run test:client -w frontend",
     "test:integration": "node scripts/integration.mjs"
   },
   "engines": {"node": ">=24 <25"}

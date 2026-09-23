@@ -106,7 +106,7 @@ export async function handleRequest(request: Request): Promise<Response> {
     const snapshot = await readSnapshot(); asOf = snapshot.as_of_date;
     if (path === '/api/auth/session' && method === 'GET') return success(actor);
     if (path === '/api/auth/logout' && method === 'POST') {
-      await jsonBody(request); await logout(request); headers['Set-Cookie'] = sessionCookie('', true);
+      await logout(request); headers['Set-Cookie'] = sessionCookie('', true);
       return success({ logged_out: true });
     }
     if (path === '/api/catalog' && method === 'GET') return success(catalogView(snapshot));

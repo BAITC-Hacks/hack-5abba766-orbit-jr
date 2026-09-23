@@ -6,19 +6,23 @@
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:client",
+    "test:client": "node --test tests/client.test.cjs",
+    "start:container": "next start --hostname 0.0.0.0"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.468.0",
     "@career-quest/backend": "file:../backend"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "react-test-renderer": "^19.3.0",
+    "typescript": "^5.7.0"
   }
 }
