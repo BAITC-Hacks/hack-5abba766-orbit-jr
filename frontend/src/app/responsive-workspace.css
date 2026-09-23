@@ -1,4 +1,4 @@
-/* Shared layout constraints: content wraps; only tables and code scroll. */
+/* Shared layout constraints: content wraps; bounded cards, tables and code scroll. */
 html[data-theme] [hidden] { display: none !important; }
 html[data-theme] :is(main, section, article, form, fieldset, .course-body, .learning-row-body, .profile-identity, .hr-view) { min-width: 0; }
 html[data-theme] :is(h1, h2, h3, p, dd, .feedback, .employee-card-body, .fact-list, .verified-facts) { overflow-wrap: anywhere; }
@@ -23,9 +23,9 @@ html[data-theme] .activity-card-footer { flex-wrap: wrap; }
 html[data-theme] .catalog-grid .course-card {
   display: block;
   box-sizing: border-box;
-  height: 320px;
+  height: 100%;
   min-height: 0;
-  max-height: 320px;
+  max-height: var(--catalog-card-height, 320px);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
