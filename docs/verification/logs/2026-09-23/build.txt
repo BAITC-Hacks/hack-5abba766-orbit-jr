@@ -1,0 +1,41 @@
+
+> build
+> npm run typecheck -w backend && npm run build -w frontend
+
+
+> @career-quest/backend@1.0.0 typecheck
+> tsc --noEmit
+
+
+> career-quest-ui@0.1.0 build
+> next build
+
+▲ Next.js 16.3.6 (Turbopack)
+- Environments: .env.local
+  Using cached swc package @next/swc-win32-x64-msvc...
+✓ Running next.config.ts took 902ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.4s
+  Running TypeScript ...
+  Finished TypeScript in 4.8s ...
+  Collecting page data using 8 workers ...
+  Generating static pages using 8 workers (0/6) ...
+  Generating static pages using 8 workers (1/6) 
+  Generating static pages using 8 workers (2/6) 
+  Generating static pages using 8 workers (4/6) 
+✓ Generating static pages using 8 workers (6/6) in 1585ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/[...path]
+├ ○ /demo
+├ ○ /employee
+└ ○ /hr
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -36,8 +36,8 @@ export function Skills({
         </div>
         <small>
           {skill.gap !== null
-            ? skill.gap === 0 ? "Требование цели выполнено" : `Оставшийся разрыв: ${skill.gap}`
-            : employee.goal.target ? "Не входит в требования выбранной цели" : "Цель не выбрана"}
+            ? skill.gap === 0 ? "Цель достигнута" : `До цели: ${skill.gap}`
+            : employee.goal.target ? "Вне цели" : "Цель не выбрана"}
         </small>
       </div>
     ));
@@ -46,8 +46,8 @@ export function Skills({
     <section className="skills-panel">
       <div className="skills-intro">
         <h2>Навыки к цели</h2>
-        <p>Сначала — навыки, которые приблизят вас к выбранной цели.</p>
-        <small>Соответствие навыков не является гарантией повышения.</small>
+
+
         <button
           className="secondary skill-filter"
           aria-pressed={filteringGaps}
@@ -56,7 +56,7 @@ export function Skills({
             setOnlyGaps((v) => !v);
           }}
         >
-          {filteringGaps ? "Показать все навыки" : "Только навыки с разрывом"}
+          {filteringGaps ? "Показать все навыки" : "С разрывом"}
         </button>
       </div>
       <div className="skill-list">

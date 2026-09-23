@@ -1,0 +1,83 @@
+
+> career-quest-ui@0.1.0 test:client
+> node --test tests/client.test.cjs tests/career-journey.test.cjs tests/learning.test.cjs tests/catalog-gaps.test.cjs
+
+✔ journey hides stale choices and names prerequisite activities in the current snapshot (23.0844ms)
+✔ skill focus prioritizes critical gaps and keeps non-target skills collapsed (1.9724ms)
+✔ recommendation explanation includes only cited facts and the supplied action (2.7877ms)
+✔ completion compares saved skill changes and coverage without inventing an earlier snapshot (20.3553ms)
+React expects the `children` prop of <title> tags to be a string, number, bigint, or object with a novel `toString` method but found an Array with length 3 instead. Browsers treat all child Nodes of <title> tags as Text content and React expects to be able to convert `children` of <title> tags to a single string value which is why Arrays of length greater than 1 are not supported. When using JSX it can be common to combine text nodes and value nodes. For example: <title>hello {nameOfUser}</title>. While not immediately apparent, `children` in this case is an Array with length 2. If your `children` prop is using this form try rewriting it using a template string: <title>{`hello ${nameOfUser}`}</title>.
+React expects the `children` prop of <title> tags to be a string, number, bigint, or object with a novel `toString` method but found an Array with length 3 instead. Browsers treat all child Nodes of <title> tags as Text content and React expects to be able to convert `children` of <title> tags to a single string value which is why Arrays of length greater than 1 are not supported. When using JSX it can be common to combine text nodes and value nodes. For example: <title>hello {nameOfUser}</title>. While not immediately apparent, `children` in this case is an Array with length 2. If your `children` prop is using this form try rewriting it using a template string: <title>{`hello ${nameOfUser}`}</title>.
+React expects the `children` prop of <title> tags to be a string, number, bigint, or object with a novel `toString` method but found an Array with length 3 instead. Browsers treat all child Nodes of <title> tags as Text content and React expects to be able to convert `children` of <title> tags to a single string value which is why Arrays of length greater than 1 are not supported. When using JSX it can be common to combine text nodes and value nodes. For example: <title>hello {nameOfUser}</title>. While not immediately apparent, `children` in this case is an Array with length 2. If your `children` prop is using this form try rewriting it using a template string: <title>{`hello ${nameOfUser}`}</title>.
+React expects the `children` prop of <title> tags to be a string, number, bigint, or object with a novel `toString` method but found an Array with length 3 instead. Browsers treat all child Nodes of <title> tags as Text content and React expects to be able to convert `children` of <title> tags to a single string value which is why Arrays of length greater than 1 are not supported. When using JSX it can be common to combine text nodes and value nodes. For example: <title>hello {nameOfUser}</title>. While not immediately apparent, `children` in this case is an Array with length 2. If your `children` prop is using this form try rewriting it using a template string: <title>{`hello ${nameOfUser}`}</title>.
+✔ an uncovered goal skill shows catalog action, critical count and an employee profile button (11.1268ms)
+✔ audience mismatch and level cap receive distinct explanations and actions (2.3811ms)
+✔ an empty diagnostic does not promise an executable route (0.6811ms)
+✔ a large catalog diagnostic keeps later needs available in a disclosure (4.0974ms)
+✔ the HR overview includes actionable catalog diagnostics and neutral goal attribution (12.2447ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ transport preserves structured 403, conflict details and request id (33.9799ms)
+✔ multipart leaves browser boundary intact and combines timeout with caller cancellation (2.5229ms)
+✔ malformed success is not turned into demo data (1.1588ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ profile renders while recommendations are pending; stale version is rejected (29.0629ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ completion retries use identical body/key and no optimistic skill update; receipt replay refetches current state (11.6762ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ late recommendations are discarded after completion and after switching profile (5.0906ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ double completion click sends one request; separate EV_036 sessions have distinct targets (4.5321ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import submits JSON+CSV with revision; atomic conflict is not reported as success (22.158ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import preserves key and files after connection loss and reports server counts on replay (25.802ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ employee session visiting HR never requests HR data (8.2056ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ 401 shows login without requesting profiles or recommendations (9.0896ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ connected profile displays missing goal and distinguishes AI, fallback and empty results (34.3304ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ 408 and 429 preserve completion receipts and replay the same key (12.7255ms)
+✔ login failure distinguishes invalid credentials from an expired session (1.6463ms)
+✔ null successful payload is rejected before components dereference it (0.4054ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ history status filtering keeps separate participations and their exact action targets (18.2079ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ skill filter uses remaining server gaps, keeping above-target levels intact (4.6151ms)
+✔ scheduled activity with no date is never presented as self-paced (0.3958ms)
+✔ login failure keeps authentication message instead of claiming an expired session (0.8443ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import preview sends dry_run and never refreshes persisted data (13.0796ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a skill outside an active goal is not labeled as missing career goal (2.1227ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR sections preserve selected import files and keep panels separate (49.3355ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR skill totals retain denominators and distinguish reached goals from missing goals (10.2904ms)
+✔ HR goal action names the employee and writes only to the selected profile (34.5638ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ resumes the attempt content version and only advances a lesson after the server confirms it (54.7298ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a failed quiz keeps skills unchanged and a later server-confirmed pass supplies the completion (14.0446ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an ambiguous quiz response retries the exact body and key and freezes answer changes (9.2521ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ quiz HTTP 408 keeps the original receipt until the outcome is known (6.7285ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ quiz HTTP 429 keeps the original receipt until the outcome is known (3.4948ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a definite version conflict keeps answers and requires refreshed state with a new submission key (5.7563ms)
+✔ refreshing a stale profile starts the module again when no attempt was created (4.3138ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1346.1623

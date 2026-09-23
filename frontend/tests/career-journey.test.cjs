@@ -23,6 +23,7 @@ const { CareerJourney } = load("src/components/quest/career-journey.tsx");
 const { CompletionResultPanel } = load("src/components/quest/completion-result.tsx");
 const { RecommendationCard } = load("src/components/quest/recommendation-card.tsx");
 const { Skills } = load("src/components/quest/skills.tsx");
+const { EmployeeProfile } = load("src/components/quest/employee-profile.tsx");
 const version = { dataset_revision: 1, employee_revision: 2 };
 const employee = {
   version, employee_id: "synthetic", grade: "Junior", role: "Engineer",
@@ -50,6 +51,19 @@ const card = {
 const noop = () => {};
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 
+test("employee profile renders source details and handles a missing goal without invented progress", () => {
+  const profile = { ...employee, department: "Разработка", tenure_months: 5,
+    work_format: "remote", preferred_language: "kk", last_review_date: "2026-09-11",
+    history: [], goal: { source: "missing", target: null }, progress: null };
+  const html = render(EmployeeProfile, { employee: profile, names, onGoal: noop, disabled: false });
+  assert.match(html, /Удалённо/);
+  assert.match(html, /Қазақша/);
+  assert.match(html, /11 сентября 2026/);
+  assert.match(html, /5 мес\./);
+  assert.match(html, /Выбрать цель/);
+  assert.doesNotMatch(html, /<progress/);
+});
+
 test("journey hides stale choices and names prerequisite activities in the current snapshot", () => {
   const result = { version, mode: "rules_fallback", recommendations: [card] };
   const props = { employee, recommendations: result, names, eventNames: { advanced: "Advanced course" }, onSelect: noop };
@@ -61,13 +75,21 @@ test("journey hides stale choices and names prerequisite activities in the curre
   assert.doesNotMatch(stale, /Candidate A/);
 });
 
+test("prerequisite without unlock targets still explains participation requirements cleanly", () => {
+  const result = { version, mode: "rules_fallback", recommendations: [{ ...card, unlocks_event_ids: [] }] };
+  const html = render(CareerJourney, { employee, recommendations: result, names, eventNames: {}, onSelect: noop });
+  assert.match(html, /Подготовительный шаг/);
+  assert.match(html, /Доступ зависит от условий участия\./);
+  assert.doesNotMatch(html, /<p>\s*\. Доступ/);
+});
+
 test("skill focus prioritizes critical gaps and keeps non-target skills collapsed", () => {
   const html = render(Skills, { employee, names });
   assert.ok(html.indexOf("Critical skill") < html.indexOf("Broad skill"));
   assert.ok(html.indexOf("Broad skill") < html.indexOf("Covered skill"));
   assert.match(html, /<details class="cq-other-skills">/);
   assert.ok(html.indexOf("<details") < html.indexOf("Unrelated skill"));
-  assert.match(html, /Не входит в требования выбранной цели/);
+  assert.match(html, /Вне цели/);
 });
 
 test("recommendation explanation includes only cited facts and the supplied action", () => {

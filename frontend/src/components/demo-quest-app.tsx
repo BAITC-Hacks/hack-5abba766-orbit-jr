@@ -1,4 +1,5 @@
 "use client";
+import { CatalogSelect } from "./quest/catalog-select";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Brand, ActivityArt } from "./quest/visuals";
 import {
@@ -179,6 +180,9 @@ export default function QuestApp({
   }
   return (
     <>
+      <a className="skip-link" href="#main-content">
+        Перейти к содержимому
+      </a>
       <header className="global-nav">
         <div className="nav-inner">
           <a href="/demo" aria-label="Halyk Career Quest — демо">
@@ -220,7 +224,7 @@ export default function QuestApp({
         Интерактивный прототип<span className="strip-divider">/</span>
         Демонстрационные данные · AI не подключён
       </div>
-      <main className="connected-main demo-main">
+      <main id="main-content" tabIndex={-1} className="connected-main demo-main">
         <div className="page-top">
           <div>
             <div className="eyebrow">
@@ -250,7 +254,7 @@ export default function QuestApp({
           <span className="date-chip">1 октября 2026</span>
         </div>
         {view !== "hr" && (
-          <div className="subnav" aria-label="Разделы развития">
+          <nav className="subnav" aria-label="Разделы развития">
             {(
               [
                 ["overview", "Обзор"],
@@ -261,6 +265,7 @@ export default function QuestApp({
               <button
                 key={v}
                 className={view === v ? "selected" : ""}
+                aria-current={view === v ? "page" : undefined}
                 onClick={() => navigate(v)}
               >
                 {label}
@@ -269,7 +274,7 @@ export default function QuestApp({
                 )}
               </button>
             ))}
-          </div>
+          </nav>
         )}
         {view === "overview" && (
           <>
@@ -680,20 +685,8 @@ export default function QuestApp({
             <section className="people-panel">
               <div className="section-heading">
                 <h2>Потребности команды</h2>
-                <label className="select-wrap">
-                  <SlidersHorizontal size={15} />
-                  <select
-                    aria-label="Фильтр отдела"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                  >
-                    {["Все отделы", "Разработка", "Аналитика", "Продукт"].map(
-                      (d) => (
-                        <option key={d}>{d}</option>
-                      ),
-                    )}
-                  </select>
-                </label>
+                <CatalogSelect label="Фильтр отдела" value={department} onChange={setDepartment}
+                  options={["Все отделы", "Разработка", "Аналитика", "Продукт"].map((d) => [d, d])} />
               </div>
               <div className="table-scroll">
                 <table>
@@ -869,16 +862,7 @@ export default function QuestApp({
             <p className="modal-lead">
               Выберите следующий ориентир в Backend Engineering.
             </p>
-            <label className="field-label">
-              Целевой грейд
-              <select
-                value={draftGoal}
-                onChange={(e) => setDraftGoal(e.target.value)}
-              >
-                <option>Senior</option>
-                <option disabled>Lead — требования ожидаются от сервера</option>
-              </select>
-            </label>
+            <CatalogSelect label="Целевой грейд" value={draftGoal} onChange={setDraftGoal} options={[["Senior", "Senior"]]} />
             <p className="fine-print">
               В прототипе доступна демонстрационная цель Senior. Полный список
               ролей будет поступать с backend.
