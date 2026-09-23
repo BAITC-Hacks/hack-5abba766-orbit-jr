@@ -1,14 +1,17 @@
 "use client";
 import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import type { EmployeeView, SkillView } from "../../../../contracts/backend";
 export function Skills({
   employee,
   names,
   readOnly = false,
+  onBrowseSkill,
 }: {
   employee: EmployeeView;
   names: Record<string, string>;
   readOnly?: boolean;
+  onBrowseSkill?: (skillId: string) => void;
 }) {
   const [onlyGaps, setOnlyGaps] = useState(false);
   const filteringGaps = onlyGaps && !!employee.goal.target;
@@ -36,11 +39,19 @@ export function Skills({
             <span key={i} className={i < skill.current_level ? "filled" : i < (skill.required_level ?? 0) ? "needed" : ""} />
           ))}
         </div>
-        <small>
-          {skill.gap !== null
-            ? skill.gap === 0 ? "Цель достигнута" : `До цели: ${skill.gap}`
-            : employee.goal.target ? "Вне цели" : "Цель не выбрана"}
-        </small>
+        <div className="skill-next-step">
+          <small>
+            {skill.gap !== null
+              ? skill.gap === 0 ? "Цель достигнута" : `До цели: ${skill.gap}`
+              : employee.goal.target ? "Вне цели" : "Цель не выбрана"}
+          </small>
+          {(skill.gap ?? 0) > 0 && onBrowseSkill && <button
+            type="button"
+            className="text-button skill-browse"
+            aria-label={`Найти обучение: ${names[skill.skill_id] ?? skill.skill_id}`}
+            onClick={() => onBrowseSkill(skill.skill_id)}
+          >Найти обучение <ArrowUpRight size={14} aria-hidden="true" /></button>}
+        </div>
       </div>
     ));
   }
