@@ -33,6 +33,7 @@ describe('independently authored challenge scenarios', () => {
     const { input, signals } = testCase
     expect(signals.negativeOutcomes.size).toBe(input.candidates.length)
     expect(signals.unlockedWeightedGain.size).toBe(input.candidates.length)
+    expect(signals.similarFormatPenalty.size).toBe(input.candidates.length)
     const skills = new Map(input.profile.skills.map((item) => [item.skill_id, item]))
     const requirements = input.profile.skills.filter((item) => item.required_level !== null)
     const total = requirements.reduce((sum, item) => sum + item.required_level!, 0)
@@ -78,6 +79,7 @@ describe('independently authored challenge scenarios', () => {
       expect(outcomes.length).toBeLessThanOrEqual(3)
       const negatives = outcomes.filter((status) => ['dropped', 'no_show', 'declined'].includes(status)).length
       expect(signals.negativeOutcomes.get(candidate.candidate_id)).toBe(negatives)
+      expect(signals.similarFormatPenalty.get(candidate.candidate_id)).toBe(0)
       expect(history).toContain(`Negative outcomes: ${negatives}.`)
       expect(validateRanking({ choices: [{
         candidate_id: candidate.candidate_id, reason_fact_ids: candidate.facts.map((fact) => fact.fact_id),

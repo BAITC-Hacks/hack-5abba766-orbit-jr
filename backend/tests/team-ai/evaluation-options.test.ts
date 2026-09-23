@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { evaluationCases } from '../../evaluation/cases'
 import { acceptanceCases } from '../../evaluation/acceptance-cases'
+import { domainEvaluationCases, domainEmptyCases } from '../../evaluation/domain-cases'
 import { parseEvaluationOptions, resolveEvaluationSuites, summarizeLatencies } from '../../evaluation/options'
 import { evaluateAi } from '../../scripts/evaluate-ai'
 
@@ -27,6 +28,11 @@ describe('evaluation CLI options', () => {
     expect(parseEvaluationOptions(['--suite=comparison', '--repeat=3', '--live', '--json'])).toEqual({ live: true, smoke: false, json: true, suite: 'comparison', repeat: 3 })
   })
 
+  it('accepts the additive domain suite without changing the default suite', () => {
+    expect(parseEvaluationOptions(['--suite=domain', '--repeat=2', '--json'])).toEqual({ live: false, smoke: false, json: true, suite: 'domain', repeat: 2 })
+    expect(parseEvaluationOptions([]).suite).toBe('regression')
+  })
+
   it.each([
     ['--unknown'], ['--live=true'], ['--json=false'], ['--suite'], ['--suite='],
     ['--suite=official'], ['--repeat'], ['--repeat=0'], ['--repeat=6'],
@@ -43,12 +49,12 @@ describe('evaluation CLI options', () => {
 })
 
 describe('evaluation suite membership', () => {
-  it('includes acceptance in all while preserving the original comparison membership', () => {
-    expect(resolveEvaluationSuites('all')).toEqual(['regression', 'challenge', 'acceptance'])
+  it('includes acceptance and domain in all while preserving the original comparison membership', () => {
+    expect(resolveEvaluationSuites('all')).toEqual(['regression', 'challenge', 'acceptance', 'domain'])
     expect(resolveEvaluationSuites('comparison')).toEqual(['regression', 'challenge'])
   })
 
-  it.each(['regression', 'challenge', 'acceptance'] as const)('runs %s alone when explicitly selected', (suite) => {
+  it.each(['regression', 'challenge', 'acceptance', 'domain'] as const)('runs %s alone when explicitly selected', (suite) => {
     expect(resolveEvaluationSuites(suite)).toEqual([suite])
   })
 })
@@ -108,13 +114,38 @@ describe('evaluation execution and exit status', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(report()).toMatchObject({
       run: 'baseline_only', model: null, repetitions: 2,
-      suitesIncluded: ['regression', 'challenge', 'acceptance'],
-      summary: { totalCases: 34, baselineExpectedChoicePassRate: 1, aiAcceptanceRate: null, aiEndToEndPassRate: null, aiCandidateOrderPassRate: null, fallbackRate: null },
+      suitesIncluded: ['regression', 'challenge', 'acceptance', 'domain'],
+      summary: { totalCases: 46, baselineExpectedChoicePassRate: 1, aiAcceptanceRate: null, aiEndToEndPassRate: null, aiCandidateOrderPassRate: null, fallbackRate: null },
     })
     expect(report().cases.every((row: { mode: string; fallback: boolean | null; validSnapshotVersion: boolean }) =>
       row.mode === 'baseline_only' && row.fallback === null && row.validSnapshotVersion)).toBe(true)
     for (const name of ['promptSha256', 'schemaSha256', 'casesSha256']) expect(report()[name]).toMatch(/^[a-f0-9]{64}$/)
+    expect(report().emptyChecks).toHaveLength(domainEmptyCases.length)
+    expect(report().emptyChecks.every((check: { pass: boolean }) => check.pass)).toBe(true)
+    expect(report().recommendationLatencyScope).toContain('excludes source validation, domain candidate generation, HTTP, database and browser latency')
     expect(printed.join('\n')).not.toContain('synthetic-evaluation-key')
+  })
+
+  it('keeps domain empty states separate from repeated ranking scores and uses no provider offline', async () => {
+    fetchMock.mockRejectedValue(new Error('Offline evaluation must never call a provider'))
+    expect(await evaluateAi(['--suite=domain', '--repeat=2', '--json'])).toBe(0)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(report()).toMatchObject({
+      suite: 'domain', suitesIncluded: ['domain'], repetitions: 2,
+      summary: { totalCases: domainEvaluationCases.length * 2, noCandidatesCases: 0, aiAcceptanceRate: null },
+    })
+    expect(report().emptyChecks).toHaveLength(2)
+    expect(report().emptyChecks.map((check: { caseId: string }) => check.caseId)).toEqual(domainEmptyCases.map(testCase => testCase.id))
+    expect(report().cases.every((row: { candidateCount: number }) => row.candidateCount > 0)).toBe(true)
+    expect(report().emptyCheckScope).toContain('excluded from ranking scores and latency samples')
+  })
+
+  it('retains the original default regression set without domain empty checks', async () => {
+    expect(await evaluateAi(['--json'])).toBe(0)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(report().summary.totalCases).toBe(evaluationCases.length)
+    expect(report().suitesIncluded).toEqual(['regression'])
+    expect(report().emptyChecks).toEqual([])
   })
 
   it('returns success only for an accepted, correctly ranked live smoke response', async () => {

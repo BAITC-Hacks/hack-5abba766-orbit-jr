@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AppError } from '../src/errors';
 import { assertCompletionAllowed, catalogView, employeeView, getCandidates, hrOverview, skillChanges } from '../src/domain';
 import { pickReasonFactIds } from '../src/domain/baseline';
+import { latestTerminalHistoryByEvent } from '../src/domain/baseline-signals';
 import type { CompletionRequest, DatasetSnapshot, EmployeeSource, EventView, ParticipationSource, RuntimeCompletion } from '../src/types';
 
 const person: EmployeeSource = {
@@ -213,7 +214,7 @@ describe('preparation paths and grounded ranking', () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({ event_id: 'prepare', relevance: 'prerequisite', goal_coverage_delta: 0, unlocks_event_ids: ['advanced'] });
     expect(new Set(candidates[0].facts.map(fact => fact.category))).toEqual(new Set(['grade', 'skill_gap', 'history', 'target_requirement', 'eligibility', 'effort']));
-    expect(candidates[0].facts.find(fact => fact.category === 'history')!.text).toContain('нет терминальных исходов');
+    expect(candidates[0].facts.find(fact => fact.category === 'history')!.text).toContain('нет итоговых исходов');
   });
 
   it('keeps conditional future gains citable without adding them to preparation progress', () => {
@@ -266,11 +267,16 @@ describe('preparation paths and grounded ranking', () => {
     const candidate = candidates[0];
     expect(signals.negativeOutcomes.get(candidate.candidate_id)).toBe(3);
     const text = candidate.facts.find(fact => fact.category === 'history')!.text;
-    expect(text).toContain('терминальных исходов этой активности на 2026-10-01');
-    expect(text).toContain('terminal-c: 2026-08-03 — no_show; terminal-b: 2026-08-02 — dropped; terminal-a: 2026-08-01 — declined');
-    expect(text).toContain('Негативных исходов: 3');
-    expect(text).toContain('Текущее участие ongoing-c');
-    for (const excluded of ['outside-window', 'future-outcome', 'foreign-outcome', 'ongoing-a', 'ongoing-b']) expect(text).not.toContain(excluded);
+    expect(text).toContain('Итоговые исходы этой активности на 2026-10-01');
+    expect(text).toContain('2026-08-03 — пропуск; 2026-08-02 — прекращено; 2026-08-01 — отказ');
+    expect(text).toContain('Отказов, пропусков и прекращений: 3');
+    expect(text).toContain('Текущее участие от 2026-09-03: в процессе (50%)');
+    const observed = latestTerminalHistoryByEvent(new Set(['course']), {
+      employeeId: person.employee_id, asOfDate: data.as_of_date, history: data.history,
+    }).get('course');
+    expect(observed?.map(row => row.record_id)).toEqual(['terminal-c', 'terminal-b', 'terminal-a']);
+    for (const row of data.history) expect(text).not.toContain(row.record_id);
+    for (const excludedDate of ['2026-07-01', '2026-10-02', '2026-09-30', '2026-09-01', '2026-09-02']) expect(text).not.toContain(excludedDate);
   });
 
   it('requires all prerequisites and positive remaining target gain after preparation', () => {

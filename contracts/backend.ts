@@ -1,4 +1,5 @@
 /** Shared design contract; declarations only. Runtime validation belongs in Zod schemas. */
+import type { HrCatalogCoverageGap } from './development-insights';
 export type Id = string; // Nonempty; never restrict judge IDs to the original dataset range.
 export type DateOnly = string; // Valid YYYY-MM-DD, not an arbitrary string at runtime.
 export type UtcTimestamp = string; // ISO 8601 UTC timestamp.
@@ -18,7 +19,7 @@ export type ErrorCode =
   | 'IDEMPOTENCY_CONFLICT' | 'IMPORT_CONFLICT' | 'ALREADY_COMPLETED'
   | 'SESSION_ALREADY_COMPLETED' | 'USE_EXISTING_PARTICIPATION'
   | 'INVALID_PARTICIPATION_STATE' | 'INELIGIBLE_EVENT' | 'STALE_RECOMMENDATION'
-  | 'RECOMMENDATION_IN_PROGRESS' | 'STORAGE_BUSY' | 'INTERNAL_ERROR';
+  | 'RECOMMENDATION_IN_PROGRESS' | 'RECOMMENDATION_BUSY' | 'STORAGE_BUSY' | 'INTERNAL_ERROR';
 export type ApiError = {
   error: { code: ErrorCode; message: string; details?: Record<string, unknown> };
   request_id: string;
@@ -243,6 +244,8 @@ export type HrOverview = {
   employee_count: number;
   goals_by_source: Record<GoalSource, number>;
   skill_gaps: HrSkillGap[];
+  /** HR-only structural catalog limitations; not a measure of employee performance. */
+  catalog_gaps: HrCatalogCoverageGap[];
   no_next_step: {
     employee_id: Id; full_name: string; goal_source: GoalSource; reason: EmptyReason;
   }[];

@@ -6,7 +6,7 @@ const rankWithModel = vi.hoisted(() => vi.fn())
 vi.mock('../../src/ai/adapter', () => ({ rankWithModel }))
 const { recommend } = await import('../../src/ai/recommend')
 const snapshot = () => input([candidate({ candidate_id: 'NEW_JUDGE_ID' }), candidate({ candidate_id: 'OTHER' })])
-const testSignals: BaselineSignals = { unlockedWeightedGain: new Map([['NEW_JUDGE_ID', 0], ['OTHER', 0]]), negativeOutcomes: new Map([['NEW_JUDGE_ID', 0], ['OTHER', 0]]) }
+const testSignals: BaselineSignals = { similarFormatPenalty: new Map([['NEW_JUDGE_ID', 0], ['OTHER', 0]]), unlockedWeightedGain: new Map([['NEW_JUDGE_ID', 0], ['OTHER', 0]]), negativeOutcomes: new Map([['NEW_JUDGE_ID', 0], ['OTHER', 0]]) }
 const options = { signals: testSignals }
 
 afterEach(() => vi.resetAllMocks())

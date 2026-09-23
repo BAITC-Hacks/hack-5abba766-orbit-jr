@@ -85,7 +85,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
   }
 
   it('initializes all data and preserves changes without source files on restart', async () => {
-    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '001_initial', dataset_initialized: true });
+    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '002_learning', dataset_initialized: true });
     const initial = await data.readSnapshot();
     expect(initial.employees).toHaveLength(2);
     expect(initial.history).toHaveLength(1);

@@ -19,6 +19,7 @@ function aiResult(testCase: EvaluationCase, ...candidateIds: string[]): Recommen
 describe('authored evaluation scenarios', () => {
   it.each(evaluationCases)('$id has coherent levels, coverage, signals and citable facts', (testCase) => {
     const { input, signals } = testCase
+    expect(signals.similarFormatPenalty.size).toBe(input.candidates.length)
     const skills = new Map(input.profile.skills.map((skill) => [skill.skill_id, skill]))
     const required = input.profile.skills.filter((skill) => skill.required_level !== null)
     const targetSum = required.reduce((sum, skill) => sum + skill.required_level!, 0)
@@ -45,6 +46,7 @@ describe('authored evaluation scenarios', () => {
       expect(candidate.goal_coverage_delta).toBeCloseTo(goalGain / targetSum)
       expect(signals.negativeOutcomes.get(candidate.candidate_id)).toBeGreaterThanOrEqual(0)
       expect(signals.negativeOutcomes.get(candidate.candidate_id)).toBeLessThanOrEqual(3)
+      expect(signals.similarFormatPenalty.get(candidate.candidate_id)).toBe(0)
       expect(aiResult(testCase, candidate.candidate_id).recommendations[0]?.candidate_id).toBe(candidate.candidate_id)
     }
   })

@@ -1,4 +1,4 @@
-export type EvaluationCaseSuite = 'regression' | 'challenge' | 'acceptance'
+export type EvaluationCaseSuite = 'regression' | 'challenge' | 'acceptance' | 'domain'
 export type EvaluationSuite = EvaluationCaseSuite | 'comparison' | 'all'
 
 export type EvaluationOptions = {
@@ -9,10 +9,10 @@ export type EvaluationOptions = {
   repeat: number
 }
 
-const USAGE = 'Usage: npm run eval:ai -- [--live] [--smoke] [--json] [--suite=regression|challenge|acceptance|comparison|all] [--repeat=1..5]'
+const USAGE = 'Usage: npm run eval:ai -- [--live] [--smoke] [--json] [--suite=regression|challenge|acceptance|domain|comparison|all] [--repeat=1..5]'
 
 export function resolveEvaluationSuites(suite: EvaluationSuite): EvaluationCaseSuite[] {
-  if (suite === 'all') return ['regression', 'challenge', 'acceptance']
+  if (suite === 'all') return ['regression', 'challenge', 'acceptance', 'domain']
   if (suite === 'comparison') return ['regression', 'challenge']
   return [suite]
 }
@@ -27,7 +27,7 @@ export function parseEvaluationOptions(args: readonly string[]): EvaluationOptio
     if (arg === '--live') options.live = true
     else if (arg === '--smoke') options.smoke = true
     else if (arg === '--json') options.json = true
-    else if (/^--suite=(regression|challenge|acceptance|comparison|all)$/.test(arg)) options.suite = arg.slice('--suite='.length) as EvaluationSuite
+    else if (/^--suite=(regression|challenge|acceptance|domain|comparison|all)$/.test(arg)) options.suite = arg.slice('--suite='.length) as EvaluationSuite
     else if (/^--repeat=[1-5]$/.test(arg)) options.repeat = Number(arg.slice('--repeat='.length))
     else throw new Error(USAGE)
   }

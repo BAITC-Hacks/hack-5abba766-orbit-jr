@@ -16,31 +16,31 @@ export async function getHealth(): Promise<HealthView> {
     return { ...base, status: rows[0]?.seed_complete && migrations.rowCount ? 'ok' : 'not_ready', dataset_initialized: Boolean(rows[0]?.seed_complete), schema_version: migrations.rows[0]?.version || null };
   } catch { return base; }
 }
-function scope(actor: SessionView, id?: string): void {
+export function scope(actor: SessionView, id?: string): void {
   if (actor.role !== 'hr' && (id === undefined || actor.employee_id !== id)) throw new AppError('FORBIDDEN', 'Доступ запрещён', 403);
 }
-async function lockDataset(client: PoolClient): Promise<void> {
+export async function lockDataset(client: PoolClient): Promise<void> {
   const lock = await client.query('SELECT id FROM app_meta WHERE id=1 AND seed_complete=true FOR UPDATE');
   if (!lock.rowCount) throw new AppError('NOT_READY', 'Датасет ещё не инициализирован', 503);
 }
-function checkVersion(snapshot: DatasetSnapshot, id: string, version: GoalRequest['expected_version']): void {
+export function checkVersion(snapshot: DatasetSnapshot, id: string, version: GoalRequest['expected_version']): void {
   if (!Object.hasOwn(snapshot.employee_revisions, id)) throw new AppError('NOT_FOUND', 'Сотрудник не найден', 404);
   const current = { dataset_revision: snapshot.dataset_revision, employee_revision: snapshot.employee_revisions[id] };
   if (current.dataset_revision !== version.dataset_revision || current.employee_revision !== version.employee_revision) throw new AppError('REVISION_CONFLICT', 'Данные изменились, обновите профиль', 409, { current_version: current });
 }
-function ensureKey(key?: string): asserts key is string {
+export function ensureKey(key?: string): asserts key is string {
   if (!key || key.length > 200 || !/^[\x21-\x7E]+$/.test(key)) throw new AppError('INVALID_REQUEST', 'Нужен Idempotency-Key длиной до 200 ASCII-символов', 400);
 }
-async function receipt<T>(client: PoolClient, actor: SessionView, operation: string, key: string, hash: string): Promise<T | undefined> {
+export async function receipt<T>(client: PoolClient, actor: SessionView, operation: string, key: string, hash: string): Promise<T | undefined> {
   const { rows } = await client.query('SELECT request_hash,result FROM action_receipts WHERE actor_id=$1 AND operation=$2 AND idempotency_key=$3', [actor.account_id, operation, key]);
   if (!rows.length) return undefined;
   if (rows[0].request_hash !== hash) throw new AppError('IDEMPOTENCY_CONFLICT', 'Этот ключ уже использован для другого запроса', 409);
   return rows[0].result as T;
 }
-async function saveReceipt(client: PoolClient, actor: SessionView, operation: string, key: string, hash: string, result: unknown): Promise<void> {
+export async function saveReceipt(client: PoolClient, actor: SessionView, operation: string, key: string, hash: string, result: unknown): Promise<void> {
   await client.query('INSERT INTO action_receipts(actor_id,operation,idempotency_key,request_hash,result) VALUES($1,$2,$3,$4,$5::jsonb)', [actor.account_id, operation, key, hash, JSON.stringify(result)]);
 }
-async function audit(client: PoolClient, actor: SessionView, operation: string, target: string | null, details: unknown): Promise<void> {
+export async function audit(client: PoolClient, actor: SessionView, operation: string, target: string | null, details: unknown): Promise<void> {
   await client.query('INSERT INTO audit_records(actor_id,operation,target_employee_id,details) VALUES($1,$2,$3,$4::jsonb)', [actor.account_id, operation, target, JSON.stringify(details)]);
 }
 export async function updateGoal(actor: SessionView, id: string, request: GoalRequest): Promise<GoalResult> {
@@ -68,31 +68,38 @@ export async function updateGoal(actor: SessionView, id: string, request: GoalRe
 }
 export async function completeActivity(actor: SessionView, id: string, request: CompletionRequest, key: string): Promise<{ result: CompletionResult; replayed: boolean }> {
   scope(actor, id); ensureKey(key);
+  return withTransaction(async client => {
+    await lockDataset(client);
+    return completeActivityInTransaction(client, actor, id, request, key);
+  });
+}
+
+/** Caller must hold app_meta FOR UPDATE on this same transaction connection.
+ * Learning uses this helper so quiz state, effects, receipts and audit commit together. */
+export async function completeActivityInTransaction(client: PoolClient, actor: SessionView, id: string, request: CompletionRequest, key: string): Promise<{ result: CompletionResult; replayed: boolean }> {
+  scope(actor, id); ensureKey(key);
   if (request.simulation !== true) throw new AppError('INVALID_REQUEST', 'Поддерживается только явно указанная симуляция');
   const operation = 'completion';
   const hash = sourceHash({ operation, target_employee_id: id, body: request });
-  return withTransaction(async client => {
-    await lockDataset(client);
-    const previous = await receipt<CompletionResult>(client, actor, operation, key, hash);
-    if (previous) return { result: previous, replayed: true };
-    const snapshot = await readSnapshotWithClient(client);
-    checkVersion(snapshot, id, request.expected_version);
-    const target = assertCompletionAllowed(snapshot, id, request);
-    const before = employeeView(snapshot, id);
-    const completionId = `SIM_${randomUUID()}`;
-    const { rows } = await client.query('INSERT INTO demo_completions(id,employee_id,event_id,participation_id,session_date,occurrence_key,applied_as_of,actor_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING recorded_at,sequence', [completionId, id, target.event_id, target.participation_id, target.session_date, target.occurrence_key, snapshot.as_of_date, actor.account_id]);
-    const recordedAt = new Date(rows[0].recorded_at).toISOString();
-    snapshot.completions.push({ id: completionId, employee_id: id, ...target, applied_as_of: snapshot.as_of_date, recorded_at: recordedAt, sequence: Number(rows[0].sequence) });
-    snapshot.employee_revisions[id]++;
-    snapshot.global_revision++;
-    await client.query('UPDATE employees SET employee_revision=employee_revision+1 WHERE employee_id=$1', [id]);
-    await client.query('UPDATE app_meta SET global_revision=global_revision+1 WHERE id=1');
-    const employee = employeeView(snapshot, id);
-    const result: CompletionResult = { version: employee.version, participation_id: target.participation_id || completionId, completion_origin: 'simulation', scheduled_session_date: target.session_date, applied_as_of: snapshot.as_of_date, recorded_at: recordedAt, skill_changes: skillChanges(before, employee), employee };
-    await saveReceipt(client, actor, operation, key, hash, result);
-    await audit(client, actor, 'completion.simulate', id, { completion_id: completionId, event_id: target.event_id, participation_id: target.participation_id, skill_changes: result.skill_changes });
-    return { result, replayed: false };
-  });
+  const previous = await receipt<CompletionResult>(client, actor, operation, key, hash);
+  if (previous) return { result: previous, replayed: true };
+  const snapshot = await readSnapshotWithClient(client);
+  checkVersion(snapshot, id, request.expected_version);
+  const target = assertCompletionAllowed(snapshot, id, request);
+  const before = employeeView(snapshot, id);
+  const completionId = `SIM_${randomUUID()}`;
+  const { rows } = await client.query('INSERT INTO demo_completions(id,employee_id,event_id,participation_id,session_date,occurrence_key,applied_as_of,actor_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING recorded_at,sequence', [completionId, id, target.event_id, target.participation_id, target.session_date, target.occurrence_key, snapshot.as_of_date, actor.account_id]);
+  const recordedAt = new Date(rows[0].recorded_at).toISOString();
+  snapshot.completions.push({ id: completionId, employee_id: id, ...target, applied_as_of: snapshot.as_of_date, recorded_at: recordedAt, sequence: Number(rows[0].sequence) });
+  snapshot.employee_revisions[id]++;
+  snapshot.global_revision++;
+  await client.query('UPDATE employees SET employee_revision=employee_revision+1 WHERE employee_id=$1', [id]);
+  await client.query('UPDATE app_meta SET global_revision=global_revision+1 WHERE id=1');
+  const employee = employeeView(snapshot, id);
+  const result: CompletionResult = { version: employee.version, participation_id: target.participation_id || completionId, completion_origin: 'simulation', scheduled_session_date: target.session_date, applied_as_of: snapshot.as_of_date, recorded_at: recordedAt, skill_changes: skillChanges(before, employee), employee };
+  await saveReceipt(client, actor, operation, key, hash, result);
+  await audit(client, actor, 'completion.simulate', id, { completion_id: completionId, event_id: target.event_id, participation_id: target.participation_id, skill_changes: result.skill_changes });
+  return { result, replayed: false };
 }
 
 function validateImportRows(command: ImportCommand): { employees: EmployeeSource[]; history: ParticipationSource[] } {

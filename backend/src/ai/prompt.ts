@@ -6,8 +6,8 @@ import { candidateRankingFactors, type BaselineSignals } from '../domain/baselin
  * Prompt construction for the ranking call.
  *
  * Per docs/BACKEND.md section 9 the model reorders and picks evidence; it never
- * produces a level, a gain or a new event. Event descriptions from the dataset
- * are untrusted input and travel as JSON data inside the user message.
+ * produces a level, a gain or a new event. Candidate titles and verified facts
+ * travel as JSON data; free source descriptions are not included.
  */
 
 export const SYSTEM_PROMPT = `You order internal learning activities for one employee.
@@ -34,11 +34,20 @@ Rules:
 - Use the supplied participation history when comparing relevant alternatives;
   repeated missed or declined activities can make another useful format preferable.
   Missing history is unknown, not a failure or a judgment about motivation.
+- History distinguishes this exact activity from other activities that develop the
+  same skills, grouped by the same or another format. Respect the observation window,
+  sample sizes and uncertainty. Do not generalize a sparse sample into a preference
+  or treat an observed negative share as a predicted probability of completion.
 - When history changes your choice, cite that candidate's history fact as one of
   the reasons. Three true but irrelevant facts are not an adequate explanation.
-- For equivalent goal benefit, compare recent terminal negative outcomes, then
-  lower duration. When duration decides the choice, cite its effort fact too;
+- For equivalent goal benefit, compare recent terminal negative outcomes of the
+  same event, then similar_format_penalty from sufficiently observed similar activities,
+  then lower duration. A zero similar_format_penalty with insufficient history means
+  unknown, not a demonstrated preference or a prediction of success.
+  When duration decides the choice, cite its effort fact too;
   effort does not replace any of the three required categories.
+- When selecting alternatives, cite the concrete distinguishing evidence instead
+  of generic profile facts.
 - A candidate with action "continue" is already in progress; prefer finishing it over
   starting an equivalent activity.
 - A candidate with relevance "prerequisite" is only worth choosing when it unlocks

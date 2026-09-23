@@ -8,6 +8,7 @@ describe('additional synthetic acceptance scenarios', () => {
     const { input, signals } = testCase
     expect(signals.negativeOutcomes.size).toBe(input.candidates.length)
     expect(signals.unlockedWeightedGain.size).toBe(input.candidates.length)
+    expect(signals.similarFormatPenalty.size).toBe(input.candidates.length)
     const skills = new Map(input.profile.skills.map((item) => [item.skill_id, item]))
     const total = input.profile.skills.reduce((sum, item) => sum + item.required_level!, 0)
     const covered = input.profile.skills.reduce((sum, item) => sum + Math.min(item.current_level, item.required_level!), 0)
@@ -39,6 +40,7 @@ describe('additional synthetic acceptance scenarios', () => {
       expect(candidate.goal_coverage_delta).toBeGreaterThan(0)
       expect(candidate.facts.find((fact) => fact.category === 'target_requirement')!.text).toContain(`this activity adds ${gain} covered points`)
       expect(signals.negativeOutcomes.get(candidate.candidate_id)).toBe(0)
+      expect(signals.similarFormatPenalty.get(candidate.candidate_id)).toBe(0)
       expect(candidate.facts.find((fact) => fact.category === 'history')!.text).toContain('negative outcomes: 0')
       expect(candidate.unlocks_event_ids).toEqual([])
       expect(signals.unlockedWeightedGain.get(candidate.candidate_id)).toBe(0)

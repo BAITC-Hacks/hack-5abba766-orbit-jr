@@ -1,0 +1,25 @@
+CREATE TABLE learning_attempts (
+  id text PRIMARY KEY,
+  employee_id text NOT NULL REFERENCES employees(employee_id),
+  event_id text NOT NULL REFERENCES events(event_id),
+  module_id text NOT NULL,
+  module_version integer NOT NULL CHECK (module_version > 0),
+  occurrence_key text NOT NULL,
+  target jsonb NOT NULL,
+  course_snapshot jsonb NOT NULL,
+  completed_lesson_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+  status text NOT NULL DEFAULT 'learning' CHECK (status IN ('learning','ready_for_quiz','passed')),
+  quiz_attempts integer NOT NULL DEFAULT 0 CHECK (quiz_attempts >= 0),
+  last_score integer CHECK (last_score >= 0 AND last_score <= 100),
+  last_answers jsonb,
+  last_feedback jsonb NOT NULL DEFAULT '[]'::jsonb,
+  completion_result jsonb,
+  previous_progress jsonb,
+  created_by text NOT NULL REFERENCES accounts(id),
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  passed_at timestamptz,
+  UNIQUE (employee_id,event_id,occurrence_key,module_id,module_version),
+  CHECK ((status = 'passed') = (completion_result IS NOT NULL AND passed_at IS NOT NULL))
+);
+CREATE INDEX learning_attempts_employee_idx ON learning_attempts(employee_id,updated_at DESC);

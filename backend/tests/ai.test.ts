@@ -6,11 +6,13 @@ import type { AiRankingInput, Candidate, DatasetSnapshot, EmployeeView, Recommen
 
 const mocks = vi.hoisted(() => ({
   readSnapshot: vi.fn(), readSnapshotWithClient: vi.fn(), getCandidates: vi.fn(),
-  connect: vi.fn(), query: vi.fn(), release: vi.fn(), fetch: vi.fn(),
+  connect: vi.fn(), query: vi.fn(), release: vi.fn(), fetch: vi.fn(), run: vi.fn(),
 }));
 vi.mock('../src/db', () => ({ recommendationLockPool: { connect: mocks.connect }, readSnapshotWithClient: mocks.readSnapshotWithClient }));
 vi.mock('../src/services/data', () => ({ readSnapshot: mocks.readSnapshot }));
 vi.mock('../src/domain', () => ({ getCandidates: mocks.getCandidates }));
+// Admission/cache behavior is covered separately; these tests isolate the DB protocol.
+vi.mock('../src/services/recommendation-work', () => ({ recommendationWork: { run: mocks.run } }));
 
 function candidate(id: string): Candidate {
   const categories: RecommendationFact['category'][] = ['grade', 'skill_gap', 'history', 'target_requirement', 'eligibility', 'effort'];
@@ -50,6 +52,7 @@ const providerResponse = (output: unknown = { choices: [choice()] }) => new Resp
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.run.mockImplementation((_key: string, operation: () => Promise<unknown>) => operation());
   vi.stubEnv('LLM_API_KEY', 'synthetic-test-key-not-a-secret');
   vi.stubEnv('LLM_MODEL', 'synthetic-test-model');
   vi.stubEnv('LLM_TIMEOUT_MS', '8000');
@@ -59,7 +62,7 @@ beforeEach(() => {
   const snapshot = { as_of_date: '2026-10-01', dataset_revision: 1, employee_revisions: { employee: 0 } } as unknown as DatasetSnapshot;
   mocks.readSnapshot.mockResolvedValue(snapshot);
   mocks.readSnapshotWithClient.mockResolvedValue(snapshot);
-  mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: input().candidates, emptyReason: null, signals: { unlockedWeightedGain: new Map(input().candidates.map(c => [c.candidate_id, 0])), negativeOutcomes: new Map(input().candidates.map(c => [c.candidate_id, 0])) } });
+  mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: input().candidates, emptyReason: null, signals: { similarFormatPenalty: new Map(input().candidates.map(c => [c.candidate_id, 0])), unlockedWeightedGain: new Map(input().candidates.map(c => [c.candidate_id, 0])), negativeOutcomes: new Map(input().candidates.map(c => [c.candidate_id, 0])) } });
   mocks.query.mockResolvedValue({ rows: [{ acquired: true }] });
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
 });
@@ -144,6 +147,88 @@ describe('provider adapter without network calls', () => {
 describe('recommendation service modes and version boundaries', () => {
   const version = { dataset_revision: 1, employee_revision: 0 };
 
+  it('uses a stable opaque cache key without exposing credentials or profile contents', async () => {
+    const first = await recommendations('employee', { expected_version: version });
+    const key = mocks.run.mock.lastCall![0] as string;
+    expect(key).toMatch(/^[a-f0-9]{64}$/);
+    for (const raw of [process.env.LLM_API_KEY!, employee().full_name, employee().role, 'employee', 'event-first']) {
+      expect(key).not.toContain(raw);
+    }
+    mocks.run.mockResolvedValue(first);
+    await recommendations('employee', { expected_version: version });
+    expect(mocks.run.mock.lastCall![0]).toBe(key);
+  });
+
+  it('invalidates cache identity when provider configuration, employee, evidence, ranking signals, limit or either revision changes', async () => {
+    const first = await recommendations('employee', { expected_version: version });
+    const originalKey = mocks.run.mock.lastCall![0] as string;
+    const originalDomain = mocks.getCandidates.mock.results.at(-1)!.value;
+    mocks.run.mockResolvedValue(first); // Inspect service keys independently of the DB protocol.
+    const expectNewKey = async (id = 'employee', expectedVersion = version, limit?: 1 | 2 | 3) => {
+      await recommendations(id, { expected_version: expectedVersion, ...(limit ? { limit } : {}) });
+      expect(mocks.run.mock.lastCall![0]).not.toBe(originalKey);
+    };
+    for (const [name, changed] of [
+      ['LLM_MODEL', 'other-model'], ['LLM_API_URL', 'https://other-provider.invalid/test'],
+      ['LLM_API_KEY', 'rotated-synthetic-key'], ['LLM_TIMEOUT_MS', '1000'],
+    ] as const) {
+      const original = process.env[name];
+      vi.stubEnv(name, changed);
+      await expectNewKey();
+      vi.stubEnv(name, original);
+    }
+    await expectNewKey('employee', version, 1);
+    mocks.getCandidates.mockReturnValue({ ...originalDomain, employee: { ...originalDomain.employee, employee_id: 'judge/new-person' } });
+    await expectNewKey('judge/new-person');
+    const changedEvidence = structuredClone(originalDomain);
+    changedEvidence.candidates[0].facts[0].text = 'Updated verified evidence from the current snapshot';
+    mocks.getCandidates.mockReturnValue(changedEvidence);
+    await expectNewKey();
+    for (const signalName of ['negativeOutcomes', 'similarFormatPenalty', 'unlockedWeightedGain'] as const) {
+      const changedSignals = structuredClone(originalDomain);
+      changedSignals.signals[signalName].set(changedSignals.candidates[0].candidate_id, 1);
+      mocks.getCandidates.mockReturnValue(changedSignals);
+      await expectNewKey();
+    }
+    for (const updatedVersion of [{ ...version, dataset_revision: 2 }, { ...version, employee_revision: 1 }]) {
+      mocks.getCandidates.mockReturnValue({ ...originalDomain, employee: { ...originalDomain.employee, version: updatedVersion } });
+      mocks.readSnapshot.mockResolvedValue({ as_of_date: '2026-10-01', dataset_revision: updatedVersion.dataset_revision, employee_revisions: { employee: updatedVersion.employee_revision } });
+      await expectNewKey('employee', updatedVersion);
+    }
+  });
+
+  it('reuses actual cached AI work while fresh version checks and post-provider staleness still reject', async () => {
+    const { RecommendationWork } = await vi.importActual<typeof import('../src/services/recommendation-work')>('../src/services/recommendation-work');
+    const work = new RecommendationWork();
+    mocks.run.mockImplementation((key: string, operation: Parameters<typeof work.run>[1], options: Parameters<typeof work.run>[2]) => work.run(key, operation, options));
+    // A fresh Response is needed for each real adapter invocation because its body is consumed once.
+    mocks.fetch.mockImplementation(async () => providerResponse());
+    const first = await recommendations('employee', { expected_version: version });
+    expect(first.mode).toBe('ai');
+    expect(await recommendations('employee', { expected_version: version })).toEqual(first);
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+    expect(mocks.connect).toHaveBeenCalledOnce();
+    expect(mocks.readSnapshot).toHaveBeenCalledTimes(2);
+
+    const updatedVersion = { ...version, employee_revision: 1 };
+    const originalDomain = mocks.getCandidates.mock.results.at(-1)!.value;
+    mocks.getCandidates.mockReturnValue({ ...originalDomain, employee: { ...originalDomain.employee, version: updatedVersion } });
+    const updatedSnapshot = { as_of_date: '2026-10-01', dataset_revision: 1, employee_revisions: { employee: 1 } };
+    mocks.readSnapshot.mockResolvedValue(updatedSnapshot);
+    await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+    expect(mocks.fetch).toHaveBeenCalledOnce();
+
+    mocks.readSnapshotWithClient.mockResolvedValue({ ...updatedSnapshot, employee_revisions: { employee: 2 } });
+    await expect(recommendations('employee', { expected_version: updatedVersion })).rejects.toMatchObject({ code: 'STALE_RECOMMENDATION' });
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.release).toHaveBeenCalledTimes(2);
+    // A discarded stale result is not cached; recovery performs a new provider request.
+    mocks.readSnapshotWithClient.mockResolvedValue(updatedSnapshot);
+    await expect(recommendations('employee', { expected_version: updatedVersion })).resolves.toMatchObject({ mode: 'ai', version: updatedVersion });
+    expect(mocks.fetch).toHaveBeenCalledTimes(3);
+    expect(mocks.release).toHaveBeenCalledTimes(3);
+  });
+
   it('returns explicit rules_fallback with no key while keeping grounded facts', async () => {
     vi.stubEnv('LLM_API_KEY', '');
     const result = await recommendations('employee', { expected_version: version, limit: 2 });
@@ -172,7 +257,7 @@ describe('recommendation service modes and version boundaries', () => {
   });
 
   it('does not acquire a connection or call the provider for an empty candidate set', async () => {
-    mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: [], emptyReason: 'GOAL_REQUIRED', signals: { unlockedWeightedGain: new Map(), negativeOutcomes: new Map() } });
+    mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: [], emptyReason: 'GOAL_REQUIRED', signals: { unlockedWeightedGain: new Map(), negativeOutcomes: new Map(), similarFormatPenalty: new Map() } });
     await expect(recommendations('employee', { expected_version: version })).resolves.toEqual({ version, mode: 'no_candidates', empty_reason: 'GOAL_REQUIRED', recommendations: [], fallback_reason: null });
     expect(mocks.connect).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
@@ -212,6 +297,7 @@ describe('recommendation service modes and version boundaries', () => {
     }));
     const pending = recommendations('employee', { expected_version: version }, controller.signal);
     await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
+    expect(mocks.run.mock.lastCall![2]).toEqual({ sharePending: false });
     controller.abort();
     await expect(pending).resolves.toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_timeout' });
     expect((mocks.fetch.mock.calls[0][1] as RequestInit).signal!.aborted).toBe(true);
@@ -224,6 +310,7 @@ describe('recommendation service modes and version boundaries', () => {
     mocks.fetch.mockReturnValue(new Promise<Response>(resolve => { resolveProvider = resolve; }));
     const pending = recommendations('employee', { expected_version: version });
     await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
+    expect(mocks.run.mock.lastCall![2]).toEqual({ sharePending: true });
     expect(mocks.query.mock.calls.map(call => call[0])).toEqual(['SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired']);
     resolveProvider(providerResponse());
     await expect(pending).resolves.toMatchObject({ mode: 'ai' });

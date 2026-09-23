@@ -24,7 +24,11 @@ export function closePools(): Promise<void> {
   return closing ??= Promise.all([pool.end(), recommendationLockPool.end()]).then(() => undefined);
 }
 export const db = drizzle(pool, { schema });
-export const SCHEMA_VERSION = '001_initial';
+export const SCHEMA_VERSION = '002_learning';
+const MIGRATIONS = [
+  { version: '001_initial', read: () => readFile(new URL('./migrations/001_initial.sql', import.meta.url), 'utf8') },
+  { version: '002_learning', read: () => readFile(new URL('./migrations/002_learning.sql', import.meta.url), 'utf8') },
+] as const;
 
 export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>, options: { readOnly?: boolean; bootstrap?: boolean } = {}): Promise<T> {
   const client = await pool.connect();
@@ -45,11 +49,12 @@ export async function migrate(client?: PoolClient): Promise<void> {
   if (!client) return withTransaction(c => migrate(c), { bootstrap: true });
   await client.query('SELECT pg_advisory_xact_lock(734119012)');
   await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT clock_timestamp())');
-  const existing = await client.query('SELECT version FROM schema_migrations WHERE version=$1', [SCHEMA_VERSION]);
-  if (existing.rowCount) return;
-  const sql = await readFile(new URL('./migrations/001_initial.sql', import.meta.url), 'utf8');
-  await client.query(sql);
-  await client.query('INSERT INTO schema_migrations(version) VALUES($1)', [SCHEMA_VERSION]);
+  for (const migration of MIGRATIONS) {
+    const existing = await client.query('SELECT version FROM schema_migrations WHERE version=$1', [migration.version]);
+    if (existing.rowCount) continue;
+    await client.query(await migration.read());
+    await client.query('INSERT INTO schema_migrations(version) VALUES($1)', [migration.version]);
+  }
 }
 export async function readSnapshotWithClient(client: PoolClient): Promise<DatasetSnapshot> {
   const { rows: metaRows } = await client.query('SELECT * FROM app_meta WHERE id=1 AND seed_complete=true');

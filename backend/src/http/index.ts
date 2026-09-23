@@ -4,6 +4,7 @@ import { AppError, invariant } from '../errors';
 import { login, logout, session, sessionCookie, requireEmployee, requireHr } from '../auth';
 import { readSnapshot, getHealth, updateGoal, completeActivity, importData } from '../services/data';
 import { recommendations } from '../services/recommendations';
+import { listLearningModules, getLearningModule, startLearning, getLearningAttempt, completeLesson, submitQuiz, startLearningSchema, completeLessonSchema, submitQuizSchema } from '../learning/service';
 import { employeeView, catalogView, hrOverview } from '../domain';
 import { parseEmployeeFile, parseHistoryCsv } from '../validation';
 import type { ImportCommand, RequestMeta } from '../types';
@@ -110,6 +111,35 @@ export async function handleRequest(request: Request): Promise<Response> {
       return success({ logged_out: true });
     }
     if (path === '/api/catalog' && method === 'GET') return success(catalogView(snapshot));
+
+    if (path === '/api/learning/modules' && method === 'GET') return success(listLearningModules());
+    const moduleMatch = /^\/api\/learning\/modules\/([^/]+)$/.exec(path);
+    if (moduleMatch && method === 'GET') {
+      let moduleId: string;
+      try { moduleId = idSchema.parse(decodeURIComponent(moduleMatch[1])); } catch { throw new AppError('VALIDATION_ERROR', 'Некорректный идентификатор модуля'); }
+      return success(getLearningModule(moduleId));
+    }
+    const learningMatch = /^\/api\/employees\/([^/]+)\/learning\/attempts(?:\/([^/]+)(?:\/(lessons|quiz))?)?$/.exec(path);
+    if (learningMatch) {
+      let employeeId: string;
+      let attemptId: string | undefined;
+      try {
+        employeeId = idSchema.parse(decodeURIComponent(learningMatch[1]));
+        attemptId = learningMatch[2] ? idSchema.parse(decodeURIComponent(learningMatch[2])) : undefined;
+      } catch { throw new AppError('VALIDATION_ERROR', 'Некорректный идентификатор учебной попытки'); }
+      requireEmployee(actor, employeeId);
+      if (!attemptId && method === 'POST') return success(await startLearning(actor, employeeId, startLearningSchema.parse(await jsonBody(request))));
+      if (attemptId && !learningMatch[3] && method === 'GET') return success(await getLearningAttempt(actor, employeeId, attemptId));
+      if (attemptId && learningMatch[3] === 'lessons' && method === 'POST') {
+        const body = completeLessonSchema.parse(await jsonBody(request));
+        return success(await completeLesson(actor, employeeId, attemptId, body.lesson_id));
+      }
+      if (attemptId && learningMatch[3] === 'quiz' && method === 'POST') {
+        const result = await submitQuiz(actor, employeeId, attemptId, submitQuizSchema.parse(await jsonBody(request)), idempotencyKey(request));
+        return success(result.result, 200, result.replayed);
+      }
+    }
+
     if (path === '/api/employees' && method === 'GET') {
       requireHr(actor);
       const query = z.object({ q: z.string().max(200).optional(), department: z.string().max(200).optional(), role: z.string().max(200).optional(), grade: grades.optional(), offset: z.coerce.number().int().min(0).default(0), limit: z.coerce.number().int().min(1).max(200).default(50) }).strict().parse(Object.fromEntries(url.searchParams));

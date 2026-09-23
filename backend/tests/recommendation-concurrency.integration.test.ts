@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
-import type { AiRankingInput, EmployeeSource } from '../src/types';
+import type { AiRankingInput, EmployeeSource, RecommendationResult } from '../src/types';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -96,13 +96,28 @@ describe.skipIf(!databaseUrl)('recommendation concurrency on isolated PostgreSQL
     vi.unstubAllEnvs();
   });
 
-  it('keeps profile GET below two seconds while ten provider calls remain pending', async () => {
+  it('keeps profile GET below two seconds under ten concurrent requests with bounded provider work', async () => {
     const fetch = delayedProvider();
-    const pending = people.map(person => recommend(person.employee_id, { expected_version: version }));
+    // Admit three requests and reject excess work explicitly, without blocking
+    // ordinary reads. Observe every rejection immediately, not after AI settles.
+    const pending: Promise<RecommendationResult>[] = [];
     let profile: Promise<Response> | undefined;
     let deadline: ReturnType<typeof setTimeout> | undefined;
     try {
-      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(10), { timeout: 6000, interval: 10 });
+      for (const person of people.slice(0, 3)) {
+        const request = recommend(person.employee_id, { expected_version: version });
+        void request.catch(() => undefined);
+        pending.push(request);
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(pending.length), { timeout: 3000, interval: 10 });
+      }
+      const overflow = Promise.allSettled(people.slice(3).map(person => recommend(person.employee_id, { expected_version: version })));
+      const rejected = await overflow;
+      expect(rejected).toHaveLength(7);
+      for (const result of rejected) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') expect(result.reason).toMatchObject({ code: 'RECOMMENDATION_BUSY', status: 429 });
+      }
+      expect(fetch).toHaveBeenCalledTimes(3);
       const started = performance.now();
       profile = call('/api/employees/PERSON_0');
       const result = await Promise.race([
@@ -111,7 +126,7 @@ describe.skipIf(!databaseUrl)('recommendation concurrency on isolated PostgreSQL
       ]);
       expect(result, JSON.stringify(result)).toMatchObject({ status: 200 });
       expect(result.elapsedMs).toBeLessThan(2000);
-      console.info(JSON.stringify({ activeProviderCalls: 10, profileLatencyMs: Math.round(result.elapsedMs) }));
+      console.info(JSON.stringify({ requests: 10, activeProviderCalls: 3, rejectedBusy: 7, profileLatencyMs: Math.round(result.elapsedMs) }));
     } finally {
       if (deadline) clearTimeout(deadline);
       providerResponses.splice(0).forEach(complete => complete());
@@ -123,12 +138,12 @@ describe.skipIf(!databaseUrl)('recommendation concurrency on isolated PostgreSQL
   it('propagates HTTP cancellation to the provider and releases the database lock', async () => {
     const fetch = delayedProvider();
     const controller = new AbortController();
-    const pending = call('/api/employees/PERSON_0/recommendations', {
+    const pending = call('/api/employees/PERSON_9/recommendations', {
       method: 'POST', body: { expected_version: version }, signal: controller.signal,
     });
     let deadline: ReturnType<typeof setTimeout> | undefined;
     const observer = await admin.connect();
-    const lockName = 'recommend:PERSON_0:1:1';
+    const lockName = 'recommend:PERSON_9:1:1';
     let acquired = false;
     try {
       await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce(), { timeout: 3000 });

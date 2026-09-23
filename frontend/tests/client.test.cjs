@@ -201,7 +201,7 @@ test("completion retries use identical body/key and no optimistic skill update; 
     assert.deepEqual(requests[0], requests[1]);
     assert.equal(value.profile.version.employee_revision, 3);
     assert.equal(value.recommendations.version.employee_revision, 3);
-    assert.match(value.notice, /Повторный запрос/);
+    assert.match(value.notice, /повторно не начислены/);
   } finally {
     await unmount(root);
   }
@@ -457,7 +457,9 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
     let root;
     global.fetch = async (url) =>
       reply(
-        url === "/api/catalog"
+        url === api.endpoints.learningModules
+          ? { modules: [] }
+          : url === "/api/catalog"
           ? { skills: [], role_profiles: [], events: [] }
           : url.endsWith("/recommendations")
             ? {
@@ -514,7 +516,7 @@ test("408 and 429 preserve completion receipts and replay the same key", async (
       assert.ok(value.pendingTarget);
       await act(async () => value.retryCompletion());
       assert.deepEqual(requests[0], requests[1]);
-      assert.match(value.notice, /Повторный запрос/);
+      assert.match(value.notice, /повторно не начислены/);
     } finally {
       await unmount(root);
     }
@@ -757,6 +759,7 @@ test("HR sections preserve selected import files and keep panels separate", asyn
         employee_count: 1,
         goals_by_source: { selected: 1, imported: 0, suggested: 0, missing: 0 },
         skill_gaps: [],
+        catalog_gaps: [],
         no_next_step: [],
         participation: {
           actual_by_status: counts,
@@ -844,6 +847,7 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
         names: { s: "Архитектура" },
         data: {
           employee_count: 5,
+          catalog_gaps: [],
           goals_by_source: {
             selected: 2,
             imported: 3,

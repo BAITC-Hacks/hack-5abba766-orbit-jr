@@ -119,7 +119,7 @@ function authoredCase(
       },
       candidates,
     },
-    signals: { negativeOutcomes, unlockedWeightedGain },
+    signals: { negativeOutcomes, unlockedWeightedGain, similarFormatPenalty: new Map(steps.map((step) => [step.id, 0])) },
     expectedTopCandidateIds: [expectedTopId],
     requiredTopFactIds: requiredFactSuffixes.map((suffix) => `${expectedTopId}/${suffix}`),
   }

@@ -3,6 +3,7 @@ import { performance } from 'node:perf_hooks'
 import { pathToFileURL } from 'node:url'
 import type { RecommendationResult } from '../../contracts/backend'
 import { evaluationCases } from '../evaluation/cases'
+import { domainEvaluationCases, domainEmptyCases } from '../evaluation/domain-cases'
 import { scoreEvaluation, summarizeEvaluations } from '../evaluation/metrics'
 import { parseEvaluationOptions, resolveEvaluationSuites, summarizeLatencies } from '../evaluation/options'
 import { getModel, getTimeoutMs, isAiConfigured } from '../src/ai/adapter'
@@ -30,9 +31,13 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
   const acceptance = selectedSuites.includes('acceptance')
     ? (await import('../evaluation/acceptance-cases')).acceptanceCases.map((testCase) => ({ testCase, suite: 'acceptance' as const }))
     : []
-  const selected = [...regression, ...challenge, ...acceptance]
+  const domain = selectedSuites.includes('domain')
+    ? domainEvaluationCases.map((testCase) => ({ testCase, suite: 'domain' as const }))
+    : []
+  const selected = [...regression, ...challenge, ...acceptance, ...domain]
   const cases = options.smoke ? selected.slice(0, 1) : selected
   if (!cases.length) throw new Error('The selected evaluation suite has no authored cases')
+  const includesDomain = cases.some(item => item.suite === 'domain')
   const rows = []
   for (let repeatIndex = 1; repeatIndex <= repeat; repeatIndex++) {
     for (const { testCase, suite: caseSuite } of cases) {
@@ -63,6 +68,17 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
     }
   }
   const scored = summarizeEvaluations(rows)
+  const emptyChecks = []
+  // Domain empty states are deterministic checks, excluded from ranking-quality and latency denominators.
+  for (const testCase of includesDomain ? domainEmptyCases : []) {
+    const result = await recommend(testCase.input, { signals: testCase.signals, emptyReason: testCase.expectedEmptyReason })
+    emptyChecks.push({ caseId: testCase.id, expectedEmptyReason: testCase.expectedEmptyReason,
+      actualEmptyReason: result.empty_reason,
+      pass: result.mode === 'no_candidates' && result.empty_reason === testCase.expectedEmptyReason &&
+        result.recommendations.length === 0 && result.fallback_reason === null &&
+        result.version.dataset_revision === testCase.input.version.dataset_revision &&
+        result.version.employee_revision === testCase.input.version.employee_revision })
+  }
   const summary = live ? scored : {
     ...scored,
     acceptedAiCases: 0,
@@ -97,11 +113,18 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
       signals: {
         negativeOutcomes: [...testCase.signals.negativeOutcomes],
         unlockedWeightedGain: [...testCase.signals.unlockedWeightedGain],
+        similarFormatPenalty: [...testCase.signals.similarFormatPenalty],
       },
     })))).digest('hex'),
     dataset: 'authored synthetic cases; not official or hidden judge profiles',
     qualityScope: 'top-ranked choice and decisive evidence; full returned order only where expectedCandidateOrder is authored, otherwise other cards are validated for identifiers and citations only',
     comparisonScope: 'agreement with authored rules; baseline agreement does not establish an AI benefit',
+    coverage: includesDomain
+      ? 'includes validated source profiles and history through the actual domain candidate pipeline'
+      : 'hand-authored ranking snapshots',
+    recommendationLatencyScope: 'live: recommendation call including baseline preparation and provider validation; baseline_only: deterministic baseline card generation; excludes source validation, domain candidate generation, HTTP, database and browser latency',
+    emptyCheckScope: 'deterministic domain empty states, run once and excluded from ranking scores and latency samples',
+    emptyChecks,
     summary,
     recommendationLatencyMs: summarizeLatencies(rows.map((row) => row.recommendationLatencyMs)),
     cases: rows.map((row) => ({
@@ -126,12 +149,14 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
     for (const row of report.cases) {
       console.log(`${row.caseId} [${row.repeatIndex}]: ${JSON.stringify(row.selectedChoices)}`)
     }
-    console.log(JSON.stringify({ summary, recommendationLatencyMs: report.recommendationLatencyMs }, null, 2))
+    console.log(JSON.stringify({ summary, recommendationLatencyMs: report.recommendationLatencyMs,
+      recommendationLatencyScope: report.recommendationLatencyScope, emptyChecks }, null, 2))
     console.log(`promptSha256=${report.promptSha256}; schemaSha256=${report.schemaSha256}; casesSha256=${report.casesSha256}`)
     console.log('This measures authored top-choice expectations and recommendation-call latency, not product impact, HTTP latency or judge performance. Agreement with the rules baseline does not establish an AI benefit.')
   }
   if (rows.some((row) => !row.baselineExpectedChoicePass || !row.validCitations || !row.validSnapshotVersion
     || row.requiredTopEvidencePass === false || row.expectedCandidateOrderPass === false)) return 1
+  if (emptyChecks.some(check => !check.pass)) return 1
   if (live && rows.some((row) => !row.acceptedAi || row.aiExpectedChoicePass !== true
     || row.recommendationLatencyMs > 10_000)) {
     return 1

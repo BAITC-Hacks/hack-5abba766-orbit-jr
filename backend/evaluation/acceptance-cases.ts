@@ -74,7 +74,11 @@ function acceptanceCase(
       },
       candidates,
     },
-    signals: { negativeOutcomes: new Map(steps.map((step) => [step.id, 0])), unlockedWeightedGain: new Map(steps.map((step) => [step.id, 0])) },
+    signals: {
+      negativeOutcomes: new Map(steps.map((step) => [step.id, 0])),
+      unlockedWeightedGain: new Map(steps.map((step) => [step.id, 0])),
+      similarFormatPenalty: new Map(steps.map((step) => [step.id, 0])),
+    },
     expectedTopCandidateIds: [expectedTopId],
     expectedCandidateOrder,
     requiredTopFactIds: [`${expectedTopId}/gap`],

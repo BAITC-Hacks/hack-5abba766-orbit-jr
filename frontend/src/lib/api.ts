@@ -96,6 +96,12 @@ export const endpoints = {
     `/api/employees/${encodeURIComponent(id)}/completions`,
   hr: "/api/hr/overview",
   import: "/api/import",
+  learningModules: "/api/learning/modules",
+  learningModule: (moduleId: string) => `/api/learning/modules/${encodeURIComponent(moduleId)}`,
+  learningAttempts: (id: string) => `/api/employees/${encodeURIComponent(id)}/learning/attempts`,
+  learningAttempt: (id: string, attemptId: string) => `/api/employees/${encodeURIComponent(id)}/learning/attempts/${encodeURIComponent(attemptId)}`,
+  learningLessons: (id: string, attemptId: string) => `/api/employees/${encodeURIComponent(id)}/learning/attempts/${encodeURIComponent(attemptId)}/lessons`,
+  learningQuiz: (id: string, attemptId: string) => `/api/employees/${encodeURIComponent(id)}/learning/attempts/${encodeURIComponent(attemptId)}/quiz`,
 };
 // Timeouts and throttling do not establish whether a write committed.
 export function isDefinitiveRejection(error: unknown): error is ApiFailure {

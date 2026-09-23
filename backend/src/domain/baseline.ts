@@ -14,8 +14,8 @@ import type {
  *   1. more fully closed critical gaps
  *   2. higher weighted_direct_gain + 0.5 * weighted_unlocked_gain (critical weight 2)
  *   3. fewer negative outcomes across the last three participations of the same event
- *   4. lower effort
- *   5. continue an equivalent existing attempt, then stable event and candidate IDs
+ *   4. fewer negative observations in a sufficiently observed similar format
+ *   5. lower effort, then continue an equivalent attempt and stable IDs
  *
  * This is a product heuristic for comparison, not a trained metric and not a
  * claimed probability of success. It is also what mode=rules_fallback returns,
@@ -24,9 +24,9 @@ import type {
  */
 
 /**
- * Two terms of the specified ordering cannot be computed from Candidate alone:
- * the gains behind unlocks_event_ids, and the outcome history of the same
- * event. The domain layer supplies both signals for every candidate. Missing signals
+ * Three terms of the ordering cannot be computed from Candidate alone: gains
+ * behind unlocks_event_ids, exact-event outcomes, and similar-format outcomes.
+ * The domain layer supplies all signals for every candidate. Missing signals
  * are a programming error: production must not silently weaken the baseline.
  */
 export type BaselineSignals = {
@@ -34,6 +34,8 @@ export type BaselineSignals = {
   unlockedWeightedGain: ReadonlyMap<Id, number>
   /** Negative outcomes among the last three participations of the same event. */
   negativeOutcomes: ReadonlyMap<Id, number>
+  /** Observed negative share for other same-skill, same-format activities; zero when sample < 3. Not a success probability. */
+  similarFormatPenalty: ReadonlyMap<Id, number>
 }
 
 type BaselineInput = Pick<AiRankingInput, 'candidates'> & { profile: Pick<AiRankingInput['profile'], 'skills'> }
@@ -79,12 +81,15 @@ export function weightedDirectGain(candidate: Candidate, skills: Map<Id, SkillVi
 export function candidateRankingFactors(candidate: Candidate, skills: Map<Id, SkillView>, signals: BaselineSignals) {
   const direct = weightedDirectGain(candidate, skills)
   const unlocked = signalValue(signals.unlockedWeightedGain, candidate.candidate_id)
+  const formatPenalty = signalValue(signals.similarFormatPenalty, candidate.candidate_id)
+  if (formatPenalty > 1) throw new Error(`Invalid similar-format baseline signal for ${candidate.candidate_id}`)
   return {
     closed_critical_gaps: closedCriticalGaps(candidate, skills),
     weighted_direct_gain: direct,
     best_unlocked_weighted_gain: unlocked,
     weighted_target_value: direct + UNLOCKED_DISCOUNT * unlocked,
     recent_negative_outcomes: signalValue(signals.negativeOutcomes, candidate.candidate_id),
+    similar_format_penalty: formatPenalty,
   }
 }
 
@@ -111,6 +116,10 @@ export function rankBaseline(
     const negA = aFactors.recent_negative_outcomes
     const negB = bFactors.recent_negative_outcomes
     if (negA !== negB) return negA - negB
+
+    const formatA = aFactors.similar_format_penalty
+    const formatB = bFactors.similar_format_penalty
+    if (formatA !== formatB) return formatA - formatB
 
     if (a.duration_hours !== b.duration_hours) return a.duration_hours - b.duration_hours
 
