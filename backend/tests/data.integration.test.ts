@@ -10,6 +10,8 @@ const connectionString = process.env.TEST_DATABASE_URL;
 const schema = `cq_test_${randomBytes(8).toString('hex')}`;
 const hr: SessionView = { account_id: 'demo-hr', role: 'hr', employee_id: null, display_name: 'HR' };
 const employee: SessionView = { account_id: 'demo-employee', role: 'employee', employee_id: 'E0001', display_name: 'Employee' };
+const otherAccount: SessionView = { ...employee, account_id: 'test-employee-alias' };
+const employee2: SessionView = { account_id: 'test-employee-2', role: 'employee', employee_id: 'E0002', display_name: 'Employee 2' };
 const people: EmployeeSource[] = ['E0001', 'E0002'].map((employee_id, i) => ({ employee_id, full_name: `Test person ${i}`, department: 'Test', role: 'Engineer', grade: i ? 'Lead' : 'Junior', manager_id: null, hire_date: '2020-01-01', tenure_months: 81, work_format: 'remote', preferred_language: 'ru', career_goal: { target_role: 'Engineer', target_grade: 'Middle' }, skills: { SK_1: 1 }, last_review_date: '2026-09-01' }));
 const history = (overrides: Partial<ParticipationSource> = {}): ParticipationSource => ({ record_id: 'NEW_HISTORY', employee_id: 'E0002', event_id: 'EV_A', date: '2026-09-10', due_date: null, status: 'completed', completion_pct: 100, score: null, feedback_rating: null, assigned_by: 'self', ...overrides });
 let admin: pg.Pool;
@@ -40,6 +42,9 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);
     await admin.query(`CREATE SCHEMA ${schema}`);
     await bootstrap.bootstrapDatabase(directory);
+    for (const actor of [employee2, otherAccount]) {
+      await db.pool.query("INSERT INTO accounts(id,username,password_hash,role,employee_id,display_name) SELECT $1,$1,password_hash,'employee',$2,$3 FROM accounts WHERE id='demo-employee'", [actor.account_id, actor.employee_id, actor.display_name]);
+    }
   });
   afterAll(async () => {
     if (db) await db.closePools();
@@ -85,7 +90,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
   }
 
   it('initializes all data and preserves changes without source files on restart', async () => {
-    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '002_learning', dataset_initialized: true });
+    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '003_learning_external_completion', dataset_initialized: true });
     const initial = await data.readSnapshot();
     expect(initial.employees).toHaveLength(2);
     expect(initial.history).toHaveLength(1);
@@ -130,7 +135,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     expect(responses.map(result => result.replayed).sort()).toEqual([false, true]);
     expect(responses[0].result).toEqual(responses[1].result);
     expect(await durableCounts()).toEqual({ receipts: 1, audits: 1, batches: 0 });
-    await expect(data.completeActivity(hr, 'E0001', completion(2), 'same-receipt')).rejects.toMatchObject({ code: 'ALREADY_COMPLETED' });
+    await expect(data.completeActivity(otherAccount, 'E0001', completion(2), 'same-receipt')).rejects.toMatchObject({ code: 'ALREADY_COMPLETED' });
     expect((await data.readSnapshot()).employee_revisions.E0001).toBe(2);
   });
 
@@ -158,12 +163,12 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     await data.completeActivity(employee, 'E0001', request, 'shared-key');
     await data.importData(hr, { expected_dataset_revision: 1, dry_run: false,
       history: [history({ status: 'declined', completion_pct: 0 })] }, 'shared-key');
-    const other = await data.completeActivity(hr, 'E0002', {
+    const other = await data.completeActivity(employee2, 'E0002', {
       expected_version: { dataset_revision: 2, employee_revision: 2 }, simulation: true,
       target: { kind: 'new_participation', event_id: 'EV_A', session_date: null },
     }, 'shared-key');
     expect(other.replayed).toBe(false);
-    await expect(data.completeActivity(hr, 'E0001', request, 'shared-key')).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    await expect(data.completeActivity(employee2, 'E0002', request, 'shared-key')).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
     expect(await durableCounts()).toEqual({ receipts: 3, audits: 3, batches: 1 });
   });
 
@@ -290,7 +295,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
   });
 
   it('rejects source participation IDs already assigned to local simulations', async () => {
-    const simulated = await data.completeActivity(hr, 'E0002', {
+    const simulated = await data.completeActivity(employee2, 'E0002', {
       expected_version: { dataset_revision: 1, employee_revision: 1 }, simulation: true,
       target: { kind: 'new_participation', event_id: 'EV_A', session_date: null },
     }, 'local-participation');

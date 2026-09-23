@@ -1,7 +1,7 @@
 import type { HrOverview } from "../../../../contracts/backend";
 import { goalSources } from "@/lib/labels";
 
-const colors = ["#74c9a7", "#b6a0e9", "#e3bf77", "#859bb7"];
+const colors = ["#72aaff", "#b6a0e9", "#e3bf77", "#859bb7"];
 export function GoalDonut({ data }: { data: HrOverview }) {
   const entries = Object.entries(data.goals_by_source);
   const total = entries.reduce((sum, [, count]) => sum + count, 0);
@@ -13,7 +13,7 @@ export function GoalDonut({ data }: { data: HrOverview }) {
         {entries.map(([key, count], i) => {
           const length = total ? count / total * 100 : 0;
           const start = offset; offset += length;
-          return <circle key={key} className="donut-segment" cx="80" cy="80" r="64" fill="none" stroke={colors[i % colors.length]} strokeWidth="13" pathLength="100" strokeDasharray={`${length} ${100 - length}`} strokeDashoffset={-start} transform="rotate(-90 80 80)"><title>{goalSources[key as keyof typeof goalSources]}: {count}</title></circle>;
+          return <circle key={key} className="donut-segment" cx="80" cy="80" r="64" fill="none" stroke={colors[i % colors.length]} strokeWidth="13" pathLength="100" strokeDasharray={`${length} ${100 - length}`} strokeDashoffset={-start} transform="rotate(-90 80 80)"><title>{`${goalSources[key as keyof typeof goalSources]}: ${count}`}</title></circle>;
         })}
       </svg>
       <div className="donut-center" aria-hidden="true"><strong>{total}</strong><span>{total ? "сотрудников" : "нет данных"}</span></div>

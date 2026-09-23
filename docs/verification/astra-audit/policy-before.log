@@ -70,4 +70,3 @@ AssertionError: expected { version: { …(2) }, mode: 'ai', …(3) } to match ob
       Tests  7 failed | 4 passed (11)
    Start at  17:19:48
    Duration  584ms (transform 110ms, setup 0ms, import 250ms, tests 27ms, environment 0ms)
-

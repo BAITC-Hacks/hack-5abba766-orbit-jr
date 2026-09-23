@@ -131,6 +131,7 @@ describe('provider adapter without network calls', () => {
 
   it('distinguishes provider HTTP failures and invalid model content', async () => {
     mocks.fetch.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
+    mocks.fetch.mockResolvedValueOnce(new Response('Still unavailable', { status: 503 }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'provider_error' });
     mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('invented')] }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
@@ -247,6 +248,34 @@ describe('recommendation service modes and version boundaries', () => {
   it('returns provider_error fallback for a failed provider, rather than a failed page', async () => {
     mocks.fetch.mockRejectedValue(new TypeError('Simulated offline provider'));
     await expect(recommendations('employee', { expected_version: version })).resolves.toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_error' });
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('returns grounded AI recommendations after a transient failure while holding one advisory lock', async () => {
+    mocks.fetch.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
+    mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('first')] }));
+    const result = await recommendations('employee', { expected_version: version });
+    expect(result).toMatchObject({ mode: 'ai', fallback_reason: null });
+    expect(result.recommendations[0]).toMatchObject({ candidate_id: 'first', expected_skill_changes: candidate('first').expected_skill_changes });
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.connect).toHaveBeenCalledOnce();
+    expect(mocks.readDomainVersionWithClient).toHaveBeenCalledOnce();
+    expect(mocks.query.mock.calls.map(call => call[0])).toEqual([
+      'SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired',
+      'SELECT pg_advisory_unlock(hashtextextended($1,0))',
+    ]);
+    expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('still validates facts after a successful transport retry', async () => {
+    mocks.fetch.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
+    mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('invented')] }));
+    const result = await recommendations('employee', { expected_version: version });
+    expect(result).toMatchObject({ mode: 'rules_fallback', fallback_reason: 'invalid_response' });
+    expect(result.recommendations.map(card => card.candidate_id)).not.toContain('invented');
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.release).toHaveBeenCalledOnce();
   });
 
   it('returns invalid_response fallback when the model invents an event', async () => {

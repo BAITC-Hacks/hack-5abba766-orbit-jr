@@ -27,10 +27,38 @@ const reply = (data) => Response.json({ data, meta: { request_id: 'authored-test
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 let state;
 const onError = () => {};
-function Harness() { state = useLearning('person', course.id, target, version, onError); return null; }
+function Harness({ handleError = onError } = {}) { state = useLearning('person', course.id, target, version, handleError); return null; }
 async function mount() { let root; await act(async () => { root = create(React.createElement(Harness)); }); return root; }
 async function close(root) { await act(async () => root.unmount()); }
 const initial = (url) => url.startsWith('/api/learning/modules/') ? reply(course) : reply(progress());
+
+test('changing the error callback does not abort an in-flight lesson save or restart the attempt', async () => {
+  const pending = defer();
+  let starts = 0;
+  let saveSignal;
+  const errors = [];
+  global.fetch = async (url, options) => {
+    if (url.endsWith('/lessons')) { saveSignal = options.signal; return pending.promise; }
+    if (url.startsWith('/api/learning/modules/')) return reply(course);
+    starts++;
+    return reply(progress({ status: 'learning', completed_lesson_ids: [] }));
+  };
+  const root = await mount();
+  try {
+    let request;
+    await act(async () => { request = state.completeLesson('lesson'); });
+    await act(async () => root.update(React.createElement(Harness, { handleError: error => errors.push(error) })));
+    assert.equal(starts, 1);
+    assert.equal(saveSignal.aborted, false);
+    assert.equal(state.busy, true);
+    await act(async () => {
+      pending.resolve(Response.json({ error: { code: 'HTTP_ERROR', message: 'Lesson save failed' } }, { status: 503 }));
+      await request;
+    });
+    assert.equal(errors.length, 1);
+    assert.equal(state.busy, false);
+  } finally { await close(root); }
+});
 
 test('resumes the attempt content version and only advances a lesson after the server confirms it', async () => {
   const saved = progress({ status: 'learning', completed_lesson_ids: [] });
@@ -164,5 +192,47 @@ test('refreshing a stale profile starts the module again when no attempt was cre
     assert.equal(state.attempt.status, 'learning');
     assert.equal(state.needsRefresh, false);
     assert.equal(state.loading, false);
+  } finally { await close(root); }
+});
+
+test('a quiz passed after external completion is terminal without a new effect', async () => {
+  let submissions = 0;
+  const terminal = { ...quizResult(), attempt: progress({ status: 'passed', last_score: 100, quiz_attempts: 1 }), completion: null };
+  global.fetch = async (url) => {
+    if (url.endsWith('/quiz')) { submissions++; return reply(terminal); }
+    return initial(url);
+  };
+  const root = await mount();
+  try {
+    await act(async () => state.answer('question', 'b'));
+    await act(async () => state.submitQuiz());
+    assert.equal(state.attempt.status, 'passed');
+    assert.equal(state.result.completion, null);
+    assert.equal(state.pending, false);
+    await act(async () => state.submitQuiz());
+    assert.equal(submissions, 1);
+  } finally { await close(root); }
+});
+
+test('a resumed passed module explains the existing effect and returns without a fabricated completion', async () => {
+  const terminalState = { attempt: progress({ status: 'passed', last_score: 100, quiz_attempts: 1 }), module: course };
+  const { LearningPlayer } = load('src/components/quest/learning-player.tsx', {
+    '@/hooks/use-learning': { useLearning: () => terminalState },
+    './feedback': { Loading: () => null },
+  });
+  let closed = 0;
+  let completed = 0;
+  let root;
+  await act(async () => { root = create(React.createElement(LearningPlayer, {
+    employee: { employee_id: 'person', version }, moduleId: course.id, target, names: {},
+    event: { title: 'Authored event', duration_hours: 16 }, onError,
+    onClose: () => closed++, onCompleted: () => completed++,
+  })); });
+  try {
+    assert.match(root.root.findByProps({ role: 'status' }).children.join(''), /ранее учтён/);
+    assert.equal(root.root.findAllByProps({ className: 'learning-gains' }).length, 0);
+    await act(async () => root.root.findByProps({ className: 'primary' }).props.onClick());
+    assert.equal(closed, 1);
+    assert.equal(completed, 0);
   } finally { await close(root); }
 });

@@ -247,19 +247,19 @@ Unicode, включая emoji, разрешён. Коллизия ключей �
 | `GET /api/catalog` | Вошедший | Навыки, требования и активности |
 | `GET /api/employees` | HR | Поиск/фильтры, offset/limit, список сотрудников |
 | `GET /api/employees/:id` | Сам сотрудник или HR | Рассчитанный профиль |
-| `PUT /api/employees/:id/goal` | Сам сотрудник или HR | Выбор/сброс цели |
+| `PUT /api/employees/:id/goal` | Только сам сотрудник | Выбор/сброс цели |
 | `POST /api/employees/:id/recommendations` | Сам сотрудник или HR | Подбор следующего шага |
-| `POST /api/employees/:id/completions` | Сам сотрудник или HR | Симуляция выполнения |
+| `POST /api/employees/:id/completions` | Только сам сотрудник | Симуляция выполнения |
 | `GET /api/hr/overview` | HR | Общий срез |
 | `POST /api/import` | HR | Проверка/добавление источника |
 | `GET /api/learning/modules` | Вошедший | Список модулей, без ответов |
 | `GET /api/learning/modules/:moduleId` | Вошедший | Публичные уроки и вопросы |
-| `POST /api/employees/:id/learning/attempts` | Сам сотрудник или HR | Старт/возобновление попытки |
+| `POST /api/employees/:id/learning/attempts` | Только сам сотрудник | Старт/возобновление попытки |
 | `GET /api/employees/:id/learning/attempts/:attemptId` | Сам сотрудник или HR | Попытка и её публичный снимок материала |
-| `POST /api/employees/:id/learning/attempts/:attemptId/lessons` | Сам сотрудник или HR | Завершение очередного урока |
-| `POST /api/employees/:id/learning/attempts/:attemptId/quiz` | Сам сотрудник или HR | Серверная проверка и атомарная симуляция эффекта |
+| `POST /api/employees/:id/learning/attempts/:attemptId/lessons` | Только сам сотрудник | Завершение очередного урока |
+| `POST /api/employees/:id/learning/attempts/:attemptId/quiz` | Только сам сотрудник | Серверная проверка и атомарная симуляция эффекта |
 
-HR может изменять цель и симулировать выполнение за сотрудника для демонстрации импортированных профилей. Actor и target сохраняются раздельно. Это явно ограниченная demo-модель полномочий.
+HR просматривает профили, рекомендации и прогресс, а также импортирует исходные профили и историю. Изменение цели и прохождение активностей разрешены только роли `employee` для собственного `employee_id`. Проверка действует в HTTP-обработчиках и сервисах; попытки HR выполнить эти операции возвращают `403 FORBIDDEN` без изменения данных. Импорт добавляет исходные записи, но не заменяет существующие профили и выбранные цели. Автор разрешённой операции сохраняется в аудите.
 
 Учебные маршруты используют те же cookie, Origin и scope. Попытка ищется одновременно по attempt ID и employee ID: подмена ID в URL не открывает чужие данные. Для quiz нужен `Idempotency-Key`; тело содержит только ответы и expected version, без готового score. Полный контракт — [contracts/learning.ts](../contracts/learning.ts).
 

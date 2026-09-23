@@ -11,7 +11,10 @@
     "test:integration": "node scripts/integration.mjs",
     "eval:ai": "npm run eval:ai -w backend --",
     "smoke:ai": "npm run smoke:ai -w backend",
-    "verify:ai-flow": "npm run verify:ai-flow -w backend --"
+    "verify:ai-flow": "npm run verify:ai-flow -w backend --",
+    "audit:journeys": "node --import tsx backend/scripts/audit-journeys.ts",
+    "demo:prepare": "node --env-file-if-exists=.env --import tsx backend/scripts/prepare-demo.ts",
+    "demo:start": "node --env-file-if-exists=.env scripts/serve.mjs start --local --demo"
   },
   "engines": {"node": ">=24 <25"}
 }

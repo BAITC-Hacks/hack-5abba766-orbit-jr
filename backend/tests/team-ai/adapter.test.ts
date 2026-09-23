@@ -12,6 +12,7 @@ beforeEach(() => {
   vi.stubEnv('LLM_API_KEY', 'synthetic-key');
   vi.stubEnv('LLM_MODEL', 'synthetic-model');
   vi.stubEnv('LLM_API_URL', 'https://provider.invalid/chat/completions');
+  vi.stubEnv('LLM_TIMEOUT_MS', '8000');
 });
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
@@ -71,10 +72,10 @@ describe('rankWithModel', () => {
     const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(payload).toMatchObject({ store: false, max_completion_tokens: 1400, model: 'synthetic-model' });
   });
-  it('maps a provider failure to provider_error without throwing or automatic retries', async () => {
+  it('maps a persistent network failure to provider_error after one bounded retry', async () => {
     fetchMock.mockRejectedValue(new Error('503 service unavailable'));
     expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'provider_error' });
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it('closes an unfinished HTTP 503 body before returning fallback without reading it', async () => {
     vi.stubGlobal('fetch', nativeFetch);
@@ -110,6 +111,7 @@ describe('rankWithModel', () => {
   it('maps non-JSON content to invalid_response', async () => {
     fetchMock.mockResolvedValue(response('sorry, I cannot'));
     expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
   it('aborts at the configured budget and reports provider_timeout', async () => {
     vi.stubEnv('LLM_TIMEOUT_MS', '100');
@@ -125,6 +127,146 @@ describe('rankWithModel', () => {
     const controller = new AbortController(); controller.abort();
     expect(await rankWithModel(snapshot, controller.signal)).toMatchObject({ ok: false, reason: 'provider_timeout' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('bounded provider recovery', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it.each([408, 429, 500, 502, 503, 504])('recovers from HTTP %s with one retry and a fresh transport', async status => {
+    fetchMock.mockResolvedValueOnce(new Response('Temporary failure', { status }));
+    fetchMock.mockResolvedValueOnce(response('{"recovered":true}'));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(249);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ ok: true, output: { recovered: true }, ms: 250 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(false);
+    expect(fetchMock.mock.calls[1][1].signal).not.toBe(fetchMock.mock.calls[0][1].signal);
+    expect(fetchMock.mock.calls[1][1].body).toBe(fetchMock.mock.calls[0][1].body);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('recovers from a network rejection without exposing transport error details', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('private provider connection details'));
+    fetchMock.mockResolvedValueOnce(response('{"recovered":true}'));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(250);
+    const result = await pending;
+    expect(result).toMatchObject({ ok: true, output: { recovered: true }, ms: 250 });
+    expect(JSON.stringify(result)).not.toContain('private');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([400, 401, 403, 404, 422])('does not repeat a permanent HTTP %s failure', async status => {
+    fetchMock.mockResolvedValue(new Response('private provider response details', { status }));
+    const result = await rankWithModel(snapshot);
+    expect(result).toMatchObject({ ok: false, reason: 'provider_error' });
+    expect(JSON.stringify(result)).not.toContain('private');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('returns fallback after two transient failures instead of retrying without a bound', async () => {
+    fetchMock.mockImplementation(async () => new Response('Unavailable', { status: 503 }));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_error', ms: 250 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(call => call[1].signal.aborted)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['seconds', 'HTTP date'])('respects Retry-After as %s when the deadline allows it', async format => {
+    vi.setSystemTime(new Date('2026-09-23T12:00:00.000Z'));
+    const delay = 2000;
+    const retryAfter = format === 'seconds' ? '2' : new Date(Date.now() + delay).toUTCString();
+    fetchMock.mockResolvedValueOnce(new Response('Throttled', { status: 429, headers: { 'Retry-After': retryAfter } }));
+    fetchMock.mockResolvedValueOnce(response('{"recovered":true}'));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(delay - 1);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ ok: true, ms: delay });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not shorten Retry-After to fit a retry into the remaining budget', async () => {
+    fetchMock.mockResolvedValue(new Response('Throttled', { status: 429, headers: { 'Retry-After': '60' } }));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'provider_error', ms: 0 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not schedule a retry when less than its delay plus two seconds remain', async () => {
+    vi.stubEnv('LLM_TIMEOUT_MS', '2000');
+    fetchMock.mockRejectedValue(new TypeError('Temporary connection failure'));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'provider_error', ms: 0 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('includes time spent in the first transport when deciding whether to retry', async () => {
+    let finish!: (value: Response) => void;
+    fetchMock.mockReturnValue(new Promise<Response>(resolve => { finish = resolve; }));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(6000);
+    finish(new Response('Unavailable', { status: 503 }));
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_error', ms: 6000 });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels retry backoff without starting another provider request', async () => {
+    const caller = new AbortController();
+    fetchMock.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
+    const pending = rankWithModel(snapshot, caller.signal);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    caller.abort(new Error('private cancellation reason'));
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout', detail: 'Request cancelled', ms: 100 });
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('cancels the second transport and observes its late rejection', async () => {
+    const caller = new AbortController();
+    let rejectSecond!: (reason: Error) => void;
+    fetchMock.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
+    fetchMock.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectSecond = reject; }));
+    const pending = rankWithModel(snapshot, caller.signal);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    caller.abort();
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout', detail: 'Request cancelled', ms: 250 });
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    rejectSecond(new TypeError('Late private provider failure'));
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('shares the original eight-second deadline across both attempts', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
+    fetchMock.mockReturnValueOnce(new Promise(() => {}));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(7999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout', ms: 8000 });
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -209,12 +351,15 @@ describe('provider deadline and evidence regressions', () => {
     const removeListener = vi.spyOn(controller.signal, 'removeEventListener');
     if (outcome === 'success') fetchMock.mockResolvedValue(response('{"choices":[]}'));
     else fetchMock.mockRejectedValue(new Error('secret key and provider error'));
-    const result = await rankWithModel(snapshot, controller.signal);
+    const pending = rankWithModel(snapshot, controller.signal);
+    await vi.advanceTimersByTimeAsync(250);
+    const result = await pending;
     expect(JSON.stringify(result)).not.toContain('secret');
     expect(removeListener).toHaveBeenCalledWith('abort', addListener.mock.calls[0][1]);
     expect(vi.getTimerCount()).toBe(0);
+    const settledStates = fetchMock.mock.calls.map(call => call[1].signal.aborted);
     controller.abort();
-    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(false);
+    expect(fetchMock.mock.calls.map(call => call[1].signal.aborted)).toEqual(settledStates);
   });
   it.each([{}, null, { choices: [{}] }, { choices: [{ finish_reason: 'stop', message: { content: ' ' } }] }, { choices: [{ finish_reason: 'stop', message: { content: {} } }] }])('rejects malformed provider envelope %#', async body => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(body)));

@@ -7,4 +7,3 @@ Database endpoint validated: loopback port 54329; isolated integration schemas o
       Tests  54 passed | 1 skipped (55)
    Start at  17:21:03
    Duration  8.17s (transform 1.16s, setup 0ms, import 2.22s, tests 28.28s, environment 1ms)
-

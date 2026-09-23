@@ -78,8 +78,11 @@ export async function logout(request: Request): Promise<void> {
 export function requireHr(actor: SessionView): void {
   invariant(actor.role === 'hr', 'FORBIDDEN', 'Доступно только HR.', 403);
 }
-export function requireEmployee(actor: SessionView, employeeId: string): void {
-  invariant(actor.role === 'hr' || actor.employee_id === employeeId, 'FORBIDDEN', 'Нет доступа к этому сотруднику.', 403);
+export function requireEmployeeRead(actor: SessionView, employeeId: string): void {
+  invariant(actor.role === 'hr' || (actor.role === 'employee' && actor.employee_id === employeeId), 'FORBIDDEN', 'Нет доступа к этому сотруднику.', 403);
+}
+export function requireEmployeeWrite(actor: SessionView, employeeId: string): void {
+  invariant(actor.role === 'employee' && actor.employee_id === employeeId, 'FORBIDDEN', 'Только сотрудник может менять свою цель и проходить обучение.', 403);
 }
 export function sessionCookie(token: string, clear = false): string {
   const secure = (process.env.APP_ORIGIN || '').startsWith('https:') ? '; Secure' : '';

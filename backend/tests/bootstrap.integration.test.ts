@@ -54,7 +54,7 @@ describe.skipIf(!connectionString)('Bootstrap on a fresh PostgreSQL schema', () 
   it('serializes concurrent migration and seed calls without duplicate records', async () => {
     const results = await Promise.all(Array.from({ length: 8 }, () => bootstrapDatabase(directory)));
     expect(results.filter(result => result.seeded)).toHaveLength(1);
-    expect(await counts()).toEqual({ migrations: 2, metadata: 1, employees: 1, history: 1, events: 2, accounts: 2 });
+    expect(await counts()).toEqual({ migrations: 3, metadata: 1, employees: 1, history: 1, events: 2, accounts: 2 });
     expect((await db.pool.query('SELECT seed_complete FROM app_meta WHERE id=1')).rows[0]?.seed_complete).toBe(true);
   }, 30_000);
 
@@ -64,10 +64,10 @@ describe.skipIf(!connectionString)('Bootstrap on a fresh PostgreSQL schema', () 
       BEGIN RAISE EXCEPTION 'Synthetic account write failure'; END $$`);
     await db.pool.query('CREATE TRIGGER fail_bootstrap BEFORE INSERT ON accounts FOR EACH ROW EXECUTE FUNCTION fail_bootstrap_account()');
     await expect(bootstrapDatabase(directory)).rejects.toThrow('Synthetic account write failure');
-    expect(await counts()).toEqual({ migrations: 2, metadata: 0, employees: 0, history: 0, events: 0, accounts: 0 });
+    expect(await counts()).toEqual({ migrations: 3, metadata: 0, employees: 0, history: 0, events: 0, accounts: 0 });
     await db.pool.query('DROP TRIGGER fail_bootstrap ON accounts');
     expect(await bootstrapDatabase(directory)).toEqual({ seeded: true });
-    expect(await counts()).toEqual({ migrations: 2, metadata: 1, employees: 1, history: 1, events: 2, accounts: 2 });
+    expect(await counts()).toEqual({ migrations: 3, metadata: 1, employees: 1, history: 1, events: 2, accounts: 2 });
   });
 
   it('preserves state and existing credentials while recreating a missing demo account without source files', async () => {
@@ -80,6 +80,6 @@ describe.skipIf(!connectionString)('Bootstrap on a fresh PostgreSQL schema', () 
     expect((await db.pool.query("SELECT password_hash FROM accounts WHERE username='employee'")).rows[0]?.password_hash).toBe('existing-custom-credential');
     expect((await db.pool.query("SELECT employee_revision FROM employees WHERE employee_id='FLOW_PERSON'")).rows[0]?.employee_revision).toBe(7);
     expect((await db.pool.query('SELECT dataset_revision,global_revision FROM app_meta WHERE id=1')).rows[0]).toEqual({ dataset_revision: 3, global_revision: 8 });
-    expect(await counts()).toEqual({ migrations: 2, metadata: 1, employees: 1, history: 1, events: 2, accounts: 2 });
+    expect(await counts()).toEqual({ migrations: 3, metadata: 1, employees: 1, history: 1, events: 2, accounts: 2 });
   });
 });

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -109,7 +109,7 @@ describe('Portable integration runner', () => {
     });
     expect(result.status, result.stderr).toBe(0);
     const observed = JSON.parse(await readFile(report, 'utf8')) as { cwd: string; args: string[] };
-    expect(observed.cwd).toBe(backend);
+    expect(await realpath(observed.cwd)).toBe(await realpath(backend));
     expect(observed.args).toEqual(['run', '--config', 'vitest.integration.config.ts']);
   });
 });

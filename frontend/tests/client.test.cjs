@@ -331,6 +331,7 @@ test("import submits JSON+CSV with revision; atomic conflict is not reported as 
       inputs[1].props.onChange({
         target: { files: [new File(["record_id\nR1"], "history.csv")] },
       });
+      inputs.find((input) => input.props.type === "checkbox").props.onChange({ target: { checked: false } });
     });
     await act(async () => root.root.findByType("button").props.onClick());
     const text = JSON.stringify(root.toJSON());
@@ -376,6 +377,7 @@ test("import preserves key and files after connection loss and reports server co
     );
   });
   try {
+    await act(async () => root.root.findAllByType("input").find((input) => input.props.type === "checkbox").props.onChange({ target: { checked: false } }));
     await act(async () =>
       root.root.findAllByType("input")[0].props.onChange({
         target: { files: [new File(["{}"], "employees.json")] },
@@ -394,8 +396,13 @@ test("import preserves key and files after connection loss and reports server co
 });
 
 const QuestApp = load("src/components/quest-app.tsx").default;
-test("employee session visiting HR never requests HR data", async () => {
+test("employee session visiting HR replaces the route without requesting HR data", async () => {
   const paths = [];
+  const replacements = [];
+  const previousWindow = global.window;
+  const browser = new EventTarget();
+  browser.location = { pathname: "/hr", replace: (path) => replacements.push(path) };
+  global.window = browser;
   let root;
   global.fetch = async (url) => {
     paths.push(url);
@@ -406,14 +413,17 @@ test("employee session visiting HR never requests HR data", async () => {
       display_name: "Тест",
     });
   };
-  await act(async () => {
-    root = create(React.createElement(QuestApp, { initialView: "hr" }));
-  });
   try {
+    await act(async () => {
+      root = create(React.createElement(QuestApp, { initialView: "hr" }));
+    });
     assert.deepEqual(paths, ["/api/auth/session"]);
-    assert.match(JSON.stringify(root.toJSON()), /Нет доступа к HR/);
+    assert.deepEqual(replacements, ["/employee"]);
+    assert.doesNotMatch(JSON.stringify(root.toJSON()), /Нет доступа к HR/);
   } finally {
     await unmount(root);
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
   }
 });
 test("401 shows login without requesting profiles or recommendations", async () => {
@@ -451,7 +461,7 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
   };
   for (const [mode, expected] of [
     ["ai", "AI-подборка"],
-    ["rules_fallback", "Резервная подборка по правилам"],
+    ["rules_fallback", "Подборка по правилам"],
     ["no_candidates", "Выберите направление развития"],
   ]) {
     let root;
@@ -691,10 +701,10 @@ test("import preview sends dry_run and never refreshes persisted data", async ()
       root.root.findAllByType("input")[0].props.onChange({
         target: { files: [new File(["{}"], "employees.json")] },
       });
-      root.root
+      assert.equal(root.root
         .findAllByType("input")
         .find((input) => input.props.type === "checkbox")
-        .props.onChange({ target: { checked: true } });
+        .props.checked, true);
     });
     await act(async () => root.root.findByType("button").props.onClick());
     assert.equal(changed, 0);
@@ -734,7 +744,7 @@ test("a skill outside an active goal is not labeled as missing career goal", asy
   });
   try {
     const text = JSON.stringify(root.toJSON());
-    assert.match(text, /Не входит в требования выбранной цели/);
+    assert.match(text, /Вне цели/);
     assert.doesNotMatch(text, /[Цц]ель не выбрана/);
   } finally {
     await unmount(root);
@@ -903,8 +913,8 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
     assert.equal(bar.props.max, 5);
     await act(async () =>
       root.root
-        .findByType("select")
-        .props.onChange({ target: { value: "GOAL_REACHED" } }),
+        .findByProps({ label: "Причина" })
+        .props.onChange("GOAL_REACHED"),
     );
     assert.doesNotMatch(JSON.stringify(root.toJSON()), /No course/);
     await act(async () =>
@@ -916,37 +926,34 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
   }
 });
 
-test("HR goal action names the employee and writes only to the selected profile", async () => {
+test("HR read-only profile names the selected employee and only reads their data", async () => {
   const previousDocument = global.document;
-  global.document = { activeElement: null, querySelector: () => null };
+  global.document = { activeElement: null, documentElement: { style: { overflow: "" } }, querySelector: () => null };
   const profile = {
     ...employee(1, "hr-selected"), full_name: "Анна Петровна Иванова",
     department: "Разработка", role: "Engineer", grade: "Junior",
     goal: { source: "missing", target: null }, progress: null,
     tenure_months: 6, last_review_date: "2026-09-01", has_simulated_progress: false,
   };
-  const writes = [];
+  const requests = [];
   let root;
   global.fetch = async (url, options) => {
-    if (options.method === "PUT") {
-      writes.push({ url, body: JSON.parse(options.body) });
-      return reply({ employee: profile, changed: true, version: profile.version });
-    }
+    requests.push({ url, method: options.method ?? "GET" });
     return reply(url === "/api/catalog"
       ? { skills: [], events: [], role_profiles: [{ role: "Engineer", grade: "Senior" }] }
       : url.endsWith("/recommendations") ? rec() : profile);
   };
   try {
-    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", onError })); });
+    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", readOnly: true, onError })); });
     assert.equal(root.root.findByType("h1").children.join(""), profile.full_name);
-    const actions = root.root.findByProps({ "aria-label": "Действия HR" });
-    await act(async () => actions.findAllByType("button")[0].props.onClick());
-    assert.equal(root.root.findByType("dialog").findByType("strong").children.join(""), profile.full_name);
-    await act(async () => root.root.findByType("select").props.onChange({ target: { value: "0" } }));
-    await act(async () => root.root.findByType("form").props.onSubmit({ preventDefault() {} }));
-    assert.deepEqual(writes, [{ url: "/api/employees/hr-selected/goal", body: {
-      expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Senior" },
-    } }]);
+    assert.equal(root.root.findAllByType("dialog").length, 0);
+    const renderedButtons = root.root.findAllByType("button").map(node => node.children.filter(child => typeof child === "string").join(""));
+    assert.equal(renderedButtons.some(label => /Выбрать цель|Назначить цель|Изменить цель|Убрать явную цель/.test(label)), false);
+    assert.ok(requests.some(request => request.url === "/api/employees/hr-selected"));
+    assert.ok(requests.some(request => request.url === "/api/employees/hr-selected/recommendations"));
+    assert.ok(requests.every(request => request.method === "GET" || (
+      request.method === "POST" && request.url === "/api/employees/hr-selected/recommendations"
+    )));
   } finally {
     if (root) await unmount(root);
     global.document = previousDocument;

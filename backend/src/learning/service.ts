@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { readSnapshotWithClient, withTransaction } from '../db';
-import { invariant } from '../errors';
+import { AppError, invariant } from '../errors';
+import { requireEmployeeRead, requireEmployeeWrite } from '../auth';
 import { assertCompletionAllowed, employeeView } from '../domain';
-import { audit, checkVersion, completeActivityInTransaction, ensureKey, lockDataset, receipt, saveReceipt, scope } from '../services/data';
+import { audit, checkVersion, completeActivityInTransaction, ensureKey, lockDataset, receipt, saveReceipt } from '../services/data';
 import { sourceHash, idSchema } from '../validation';
 import { learningCourses } from './content';
 import type { CompletionRequest, CompletionResult, DatasetSnapshot, GoalProgress, SessionView } from '../types';
@@ -77,7 +78,7 @@ function learningOccurrence(snapshot: DatasetSnapshot, employeeId: string, cours
 }
 
 export async function startLearning(actor: SessionView, employeeId: string, rawRequest: StartLearningRequest): Promise<LearningAttempt> {
-  scope(actor, employeeId);
+  requireEmployeeWrite(actor, employeeId);
   const request = startLearningSchema.parse(rawRequest);
   const course = courseById(request.module_id);
   return withTransaction(async client => {
@@ -98,7 +99,7 @@ export async function startLearning(actor: SessionView, employeeId: string, rawR
   });
 }
 export async function getLearningAttempt(actor: SessionView, employeeId: string, attemptId: string): Promise<LearningAttempt> {
-  scope(actor, employeeId);
+  requireEmployeeRead(actor, employeeId);
   return withTransaction(async client => {
     const row = await findAttempt(client, employeeId, attemptId);
     const snapshot = await readSnapshotWithClient(client);
@@ -106,7 +107,7 @@ export async function getLearningAttempt(actor: SessionView, employeeId: string,
   }, { readOnly: true });
 }
 export async function completeLesson(actor: SessionView, employeeId: string, attemptId: string, lessonId: string): Promise<LearningAttempt> {
-  scope(actor, employeeId);
+  requireEmployeeWrite(actor, employeeId);
   completeLessonSchema.parse({ lesson_id: lessonId });
   return withTransaction(async client => {
     await lockDataset(client);
@@ -137,7 +138,7 @@ export function gradeQuiz(course: CourseDefinition, answers: Record<string, stri
   return { score: Math.round(correct / course.questions.length * 100), passed: correct === course.questions.length, feedback };
 }
 export async function submitQuiz(actor: SessionView, employeeId: string, attemptId: string, rawRequest: SubmitQuizRequest, key: string): Promise<{ result: SubmitQuizResult; replayed: boolean }> {
-  scope(actor, employeeId); ensureKey(key);
+  requireEmployeeWrite(actor, employeeId); ensureKey(key);
   const request = submitQuizSchema.parse(rawRequest);
   const operation = 'learning.quiz';
   const hash = sourceHash({ operation, employee_id: employeeId, attempt_id: attemptId, body: request });
@@ -169,15 +170,25 @@ export async function submitQuiz(actor: SessionView, employeeId: string, attempt
           && item.status === 'in_progress' && (!event.repeatable || item.date === row.occurrence_key));
         if (participation) target = { kind: 'existing_participation', participation_id: participation.record_id };
       }
-      const applied = await completeActivityInTransaction(client, actor, employeeId, { expected_version: request.expected_version, simulation: true, target }, `learning:${attemptId}`);
-      completion = applied.result;
+      try {
+        const applied = await completeActivityInTransaction(client, actor, employeeId, { expected_version: request.expected_version, simulation: true, target }, `learning:${attemptId}`);
+        completion = applied.result;
+      } catch (error) {
+        // Only a completed occurrence of this employee/event may satisfy the effect.
+        // Keep the successful quiz without manufacturing a second completion receipt.
+        const event = snapshot.events.find(item => item.event_id === row.event_id)!;
+        const alreadyRecorded = snapshot.completions.some(item => item.employee_id === employeeId && item.event_id === row.event_id && item.occurrence_key === row.occurrence_key)
+          || snapshot.history.some(item => item.employee_id === employeeId && item.event_id === row.event_id && item.status === 'completed' && (!event.repeatable || item.date === row.occurrence_key));
+        if (!(error instanceof AppError && ['ALREADY_COMPLETED', 'SESSION_ALREADY_COMPLETED'].includes(error.code) && alreadyRecorded)) throw error;
+      }
     }
     const { rows } = await client.query<AttemptRow>('UPDATE learning_attempts SET quiz_attempts=quiz_attempts+1,last_score=$2,last_answers=$3::jsonb,last_feedback=$4::jsonb,status=$5,completion_result=$6::jsonb,previous_progress=$7::jsonb,passed_at=CASE WHEN $8 THEN clock_timestamp() ELSE NULL END,target=$9::jsonb,updated_at=clock_timestamp() WHERE id=$1 RETURNING *', [attemptId, grading.score, JSON.stringify(request.answers), JSON.stringify(grading.feedback), grading.passed ? 'passed' : 'ready_for_quiz', completion ? JSON.stringify(completion) : null, previousProgress ? JSON.stringify(previousProgress) : null, grading.passed, JSON.stringify(target)]);
     row = rows[0];
     if (completion) snapshot = await readSnapshotWithClient(client);
     const result: SubmitQuizResult = { attempt: attemptView(row, snapshot), feedback: grading.feedback, completion, previous_progress: previousProgress };
     await saveReceipt(client, actor, operation, key, hash, result);
-    await audit(client, actor, grading.passed ? 'learning.pass' : 'learning.quiz', employeeId, { attempt_id: attemptId, module_id: row.module_id, score: grading.score, passed: grading.passed });
+    await audit(client, actor, grading.passed ? 'learning.pass' : 'learning.quiz', employeeId, { attempt_id: attemptId, module_id: row.module_id, score: grading.score, passed: grading.passed,
+      effect_already_recorded: grading.passed && completion === null });
     return { result, replayed: false };
   });
 }

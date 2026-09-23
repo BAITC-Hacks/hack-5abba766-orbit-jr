@@ -1,12 +1,17 @@
 "use client";
 import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import type { EmployeeView, SkillView } from "../../../../contracts/backend";
 export function Skills({
   employee,
   names,
+  readOnly = false,
+  onBrowseSkill,
 }: {
   employee: EmployeeView;
   names: Record<string, string>;
+  readOnly?: boolean;
+  onBrowseSkill?: (skillId: string) => void;
 }) {
   const [onlyGaps, setOnlyGaps] = useState(false);
   const filteringGaps = onlyGaps && !!employee.goal.target;
@@ -29,16 +34,24 @@ export function Skills({
           </span>
           <b>{skill.current_level}<em> / {skill.required_level ?? "—"}</em></b>
         </div>
-        <div className="skill-segments" aria-label={`Уровень ${skill.current_level}, требование ${skill.required_level ?? "нет"}`}>
+        <div className="skill-segments" role="img" aria-label={`${names[skill.skill_id] ?? skill.skill_id}: уровень ${skill.current_level} из 5, требование ${skill.required_level ?? "нет"}`}>
           {Array.from({ length: 5 }, (_, i) => (
             <span key={i} className={i < skill.current_level ? "filled" : i < (skill.required_level ?? 0) ? "needed" : ""} />
           ))}
         </div>
-        <small>
-          {skill.gap !== null
-            ? skill.gap === 0 ? "Требование цели выполнено" : `Оставшийся разрыв: ${skill.gap}`
-            : employee.goal.target ? "Не входит в требования выбранной цели" : "Цель не выбрана"}
-        </small>
+        <div className="skill-next-step">
+          <small>
+            {skill.gap !== null
+              ? skill.gap === 0 ? "Цель достигнута" : `До цели: ${skill.gap}`
+              : employee.goal.target ? "Вне цели" : "Цель не выбрана"}
+          </small>
+          {(skill.gap ?? 0) > 0 && onBrowseSkill && <button
+            type="button"
+            className="text-button skill-browse"
+            aria-label={`Найти обучение: ${names[skill.skill_id] ?? skill.skill_id}`}
+            onClick={() => onBrowseSkill(skill.skill_id)}
+          >Найти обучение <ArrowUpRight size={14} aria-hidden="true" /></button>}
+        </div>
       </div>
     ));
   }
@@ -46,8 +59,6 @@ export function Skills({
     <section className="skills-panel">
       <div className="skills-intro">
         <h2>Навыки к цели</h2>
-        <p>Сначала — навыки, которые приблизят вас к выбранной цели.</p>
-        <small>Соответствие навыков не является гарантией повышения.</small>
         <button
           className="secondary skill-filter"
           aria-pressed={filteringGaps}
@@ -56,7 +67,7 @@ export function Skills({
             setOnlyGaps((v) => !v);
           }}
         >
-          {filteringGaps ? "Показать все навыки" : "Только навыки с разрывом"}
+          {filteringGaps ? "Показать все навыки" : "С разрывом"}
         </button>
       </div>
       <div className="skill-list">
@@ -64,7 +75,7 @@ export function Skills({
         {gaps.length > 0 && <div className="cq-skill-group"><h3>Фокус развития <span>{gaps.length}</span></h3>{rows(gaps)}</div>}
         {employee.goal.target && gaps.length === 0 && <p className="cq-skills-covered" role="status">{filteringGaps ? "Нет оставшихся разрывов до цели." : "Все требования выбранной цели закрыты."}</p>}
         {!filteringGaps && covered.length > 0 && <div className="cq-skill-group cq-covered-skills"><h3>Уже соответствует цели <span>{covered.length}</span></h3>{rows(covered)}</div>}
-        {!employee.goal.target && employee.skills.length > 0 && <p className="cq-skills-covered">Выберите цель, чтобы выделить навыки для развития.</p>}
+        {!employee.goal.target && employee.skills.length > 0 && <p className="cq-skills-covered">{readOnly ? "Навыки для развития появятся после выбора цели сотрудником." : "Выберите цель, чтобы выделить навыки для развития."}</p>}
         {!filteringGaps && other.length > 0 && <details className="cq-other-skills"><summary>{employee.goal.target ? "Остальные навыки" : "Все навыки профиля"}<span>{other.length}</span></summary>{rows(other)}</details>}
       </div>
     </section>
