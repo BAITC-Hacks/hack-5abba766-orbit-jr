@@ -5,6 +5,10 @@ import type {
   RecommendationCard,
   RecommendationFact,
 } from '../../../../contracts/backend'
+import {
+  MIN_REQUIRED_FACT_CATEGORIES,
+  REQUIRED_FACT_CATEGORIES,
+} from '../domain/recommendation-evidence'
 
 /**
  * Semantic validation of the model's ranking.
@@ -22,14 +26,11 @@ export const AiRankingOutputSchema = z.object({
         candidate_id: z.string().min(1),
         reason_fact_ids: z.array(z.string().min(1)).min(1),
         alternative_candidate_id: z.string().min(1).nullish(),
-      }),
+      }).strict(),
     )
-    .min(1),
-})
-
-/** Contract: cited facts must cover at least three of these four categories. */
-const REQUIRED_CATEGORIES = new Set(['grade', 'skill_gap', 'history', 'target_requirement'])
-const MIN_CATEGORY_COVERAGE = 3
+    .min(1)
+    .max(3),
+}).strict()
 
 export type ValidationResult =
   | { ok: true; cards: RecommendationCard[] }
@@ -82,13 +83,13 @@ export function validateRanking(raw: unknown, input: AiRankingInput): Validation
       }
       if (factIds.includes(factId)) continue
       factIds.push(factId)
-      if (REQUIRED_CATEGORIES.has(fact.category)) categories.add(fact.category)
+      if (REQUIRED_FACT_CATEGORIES.has(fact.category)) categories.add(fact.category)
     }
 
-    if (categories.size < MIN_CATEGORY_COVERAGE) {
+    if (categories.size < MIN_REQUIRED_FACT_CATEGORIES) {
       return {
         ok: false,
-        detail: `${choice.candidate_id} covers ${categories.size} required fact categories, needs ${MIN_CATEGORY_COVERAGE}`,
+        detail: `${choice.candidate_id} covers ${categories.size} required fact categories, needs ${MIN_REQUIRED_FACT_CATEGORIES}`,
       }
     }
 

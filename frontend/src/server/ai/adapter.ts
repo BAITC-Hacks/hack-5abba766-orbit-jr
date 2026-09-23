@@ -22,7 +22,7 @@ export type AdapterResult =
 
 /** Mirrors HealthView.ai_configured: presence of configuration, not connectivity. */
 export function isAiConfigured(): boolean {
-  return Boolean(process.env['LLM_API_KEY'])
+  return Boolean(process.env['LLM_API_KEY']?.trim())
 }
 
 export function getModel(): string {
@@ -33,24 +33,36 @@ export function getModel(): string {
 }
 
 export function getTimeoutMs(): number {
-  const parsed = Number.parseInt(process.env['LLM_TIMEOUT_MS'] ?? '', 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS
+  const configured = process.env['LLM_TIMEOUT_MS']?.trim() ?? ''
+  if (!/^\d+$/.test(configured)) return DEFAULT_TIMEOUT_MS
+  const parsed = Number(configured)
+  return Number.isSafeInteger(parsed) && parsed > 0
+    ? Math.min(parsed, DEFAULT_TIMEOUT_MS)
+    : DEFAULT_TIMEOUT_MS
 }
 
 let client: OpenAI | null = null
+let clientApiKey: string | null = null
 
 function getClient(apiKey: string): OpenAI {
-  if (!client) client = new OpenAI({ apiKey })
+  if (!client || clientApiKey !== apiKey) {
+    client = new OpenAI({ apiKey, maxRetries: 0 })
+    clientApiKey = apiKey
+  }
   return client
 }
 
 /** Test seam: the module caches one client per process. */
 export function resetClientForTests(): void {
   client = null
+  clientApiKey = null
 }
 
-export async function rankWithModel(input: AiRankingInput): Promise<AdapterResult> {
-  const apiKey = process.env['LLM_API_KEY']
+export async function rankWithModel(
+  input: AiRankingInput,
+  signal?: AbortSignal,
+): Promise<AdapterResult> {
+  const apiKey = process.env['LLM_API_KEY']?.trim()
   if (!apiKey) {
     return { ok: false, reason: 'missing_api_key', detail: 'LLM_API_KEY is not set', ms: null }
   }
@@ -58,14 +70,30 @@ export async function rankWithModel(input: AiRankingInput): Promise<AdapterResul
     // Section 10: an empty set is mode=no_candidates, decided before we are called.
     return { ok: false, reason: 'provider_error', detail: 'called with no candidates', ms: null }
   }
+  if (signal?.aborted) {
+    return { ok: false, reason: 'provider_error', detail: 'request cancelled', ms: 0 }
+  }
 
   const timeoutMs = getTimeoutMs()
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
   const started = Date.now()
+  let stoppedBy: 'deadline' | 'caller' | undefined
+  let rejectBoundary: (reason: Error) => void = () => {}
+  const boundary = new Promise<never>((_resolve, reject) => {
+    rejectBoundary = reject
+  })
+  const stop = (reason: 'deadline' | 'caller') => {
+    if (stoppedBy) return
+    stoppedBy = reason
+    rejectBoundary(new Error('request stopped'))
+    controller.abort()
+  }
+  const onCallerAbort = () => stop('caller')
+  const timer = setTimeout(() => stop('deadline'), timeoutMs)
+  signal?.addEventListener('abort', onCallerAbort, { once: true })
 
   try {
-    const response = await getClient(apiKey).chat.completions.create(
+    const request = getClient(apiKey).chat.completions.create(
       {
         model: getModel(),
         messages: [
@@ -75,12 +103,25 @@ export async function rankWithModel(input: AiRankingInput): Promise<AdapterResul
         response_format: { type: 'json_schema', json_schema: RANKING_JSON_SCHEMA },
         temperature: 0,
       },
-      { signal: controller.signal },
+      { signal: controller.signal, timeout: timeoutMs, maxRetries: 0 },
     )
+    // Aborting the transport alone is insufficient if it ignores the signal.
+    // Promise.race also observes any late provider rejection after we return.
+    const response = await Promise.race([request, boundary])
 
     const ms = Date.now() - started
-    const content = response.choices[0]?.message.content
-    if (!content) {
+    const choice = response?.choices?.[0]
+    if (choice?.message?.refusal) {
+      return { ok: false, reason: 'invalid_response', detail: 'provider refused completion', ms }
+    }
+    if (choice?.finish_reason === 'length') {
+      return { ok: false, reason: 'invalid_response', detail: 'completion exceeded output limit', ms }
+    }
+    if (choice?.finish_reason && choice.finish_reason !== 'stop') {
+      return { ok: false, reason: 'invalid_response', detail: 'completion did not finish normally', ms }
+    }
+    const content = choice?.message?.content
+    if (typeof content !== 'string' || !content.trim()) {
       return { ok: false, reason: 'invalid_response', detail: 'empty completion', ms }
     }
 
@@ -89,14 +130,15 @@ export async function rankWithModel(input: AiRankingInput): Promise<AdapterResul
     } catch {
       return { ok: false, reason: 'invalid_response', detail: 'completion was not JSON', ms }
     }
-  } catch (error) {
+  } catch {
     const ms = Date.now() - started
-    if (controller.signal.aborted) {
+    if (stoppedBy === 'deadline') {
       return { ok: false, reason: 'provider_timeout', detail: `aborted after ${timeoutMs}ms`, ms }
     }
-    const detail = error instanceof Error ? error.message : String(error)
+    const detail = stoppedBy === 'caller' ? 'request cancelled' : 'provider request failed'
     return { ok: false, reason: 'provider_error', detail, ms }
   } finally {
     clearTimeout(timer)
+    signal?.removeEventListener('abort', onCallerAbort)
   }
 }

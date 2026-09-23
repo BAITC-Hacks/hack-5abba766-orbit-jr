@@ -9,6 +9,9 @@ Career Quest — проект команды orbit.jr для HackAlem AI. При
 - [Обзор архитектуры](docs/ARCHITECTURE.md)
 - [Полная архитектура бэкенда](docs/BACKEND.md)
 - [Общие контракты для UI, backend и AI](contracts/backend.ts)
+- [AI: подключение, настройки и проверка качества](docs/AI.md)
+- [Разбор кейса и приоритеты AI-зоны](docs/AI_PLAN.md)
+- [Передача работы следующему участнику](docs/HANDOFF.md)
 - [Запуск и интеграционные заметки фронтенда](frontend/README.md)
 
 ## Запуск фронтенда
@@ -26,6 +29,7 @@ npm run dev
 ```sh
 npm run build
 npm run typecheck
+npm run eval:ai
 ```
 
 Рабочие страницы обращаются к относительным /api и показывают ошибку, если серверные обработчики отсутствуют. Фикстуры и localStorage используются только на /demo. Проверки: npm test (AI/domain и клиентские тесты), npm run typecheck, npm run build. Ключи API и официальный датасет не включены.

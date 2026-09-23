@@ -5,6 +5,7 @@ import type {
   RecommendationCard,
   SkillView,
 } from '../../../../contracts/backend'
+import { assertCandidateEvidence } from './recommendation-evidence'
 
 /**
  * Reproducible baseline ordering, per docs/BACKEND.md section 9.
@@ -14,7 +15,7 @@ import type {
  *   2. higher weighted_direct_gain + 0.5 * weighted_unlocked_gain (critical weight 2)
  *   3. fewer negative outcomes across the last three participations of the same event
  *   4. lower effort
- *   5. event_id
+ *   5. continue an equivalent existing attempt, then event_id and candidate_id
  *
  * This is a product heuristic for comparison, not a trained metric and not a
  * claimed probability of success. It is also what mode=rules_fallback returns,
@@ -64,8 +65,12 @@ export function weightedDirectGain(candidate: Candidate, skills: Map<Id, SkillVi
   let total = 0
   for (const change of candidate.expected_skill_changes) {
     if (change.gain <= 0) continue
-    const critical = skills.get(change.skill_id)?.critical === true
-    total += change.gain * (critical ? CRITICAL_WEIGHT : ORDINARY_WEIGHT)
+    const skill = skills.get(change.skill_id)
+    if (!skill || skill.required_level === null) continue
+    const remainingGap = Math.max(0, skill.required_level - skill.current_level)
+    // Career relevance is the gap actually closed, not all levels an event adds.
+    const usefulGain = Math.min(change.gain, remainingGap)
+    total += usefulGain * (skill.critical ? CRITICAL_WEIGHT : ORDINARY_WEIGHT)
   }
   return total
 }
@@ -94,7 +99,9 @@ export function rankBaseline(
 
     if (a.duration_hours !== b.duration_hours) return a.duration_hours - b.duration_hours
 
-    return a.event_id.localeCompare(b.event_id)
+    if (a.action !== b.action) return a.action === 'continue' ? -1 : 1
+    const eventOrder = a.event_id.localeCompare(b.event_id)
+    return eventOrder || a.candidate_id.localeCompare(b.candidate_id)
   })
 }
 
@@ -109,15 +116,11 @@ const CATEGORY_PRIORITY = [
 ] as const
 
 function pickReasonFactIds(candidate: Candidate): Id[] {
-  const firstPerCategory = new Map<string, Id>()
-  for (const fact of candidate.facts) {
-    if (!firstPerCategory.has(fact.category)) firstPerCategory.set(fact.category, fact.fact_id)
-  }
-  const ordered = CATEGORY_PRIORITY.flatMap((category) => {
-    const factId = firstPerCategory.get(category)
-    return factId ? [factId] : []
-  })
-  return ordered.length > 0 ? ordered : candidate.facts.slice(0, 4).map((f) => f.fact_id)
+  // Several facts in one category can be essential: a target requirement and
+  // the conditional benefit of unlocking it must both survive the fallback.
+  return CATEGORY_PRIORITY.flatMap((category) => candidate.facts
+    .filter((fact) => fact.category === category)
+    .map((fact) => fact.fact_id))
 }
 
 /** The cards returned with mode=rules_fallback. No alternative: nothing chose one. */
@@ -125,6 +128,8 @@ export function baselineCards(
   input: AiRankingInput,
   signals: BaselineSignals = NO_SIGNALS,
 ): RecommendationCard[] {
+  // Validate all candidates, including those a model could choose beyond the top N.
+  for (const candidate of input.candidates) assertCandidateEvidence(candidate)
   return rankBaseline(input, signals)
     .slice(0, input.limit)
     .map((candidate, index) => ({
