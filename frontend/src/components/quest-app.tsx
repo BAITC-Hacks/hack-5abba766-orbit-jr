@@ -19,6 +19,23 @@ export default function QuestApp({
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const sessionRequest = useRef<AbortController | null>(null);
+  const acceptSession = useCallback((value: SessionView) => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      const allowed = value.role === "hr"
+        ? path === "/hr"
+        : path === "/employee" || path === "/employee/profile";
+      if (!allowed) {
+        // A verified account determines its workspace, including after Back or
+        // login on the other role's page. Replace the document so stale route
+        // props and the previous account's component state cannot survive.
+        setSession(undefined);
+        window.location.replace(value.role === "hr" ? "/hr" : "/employee");
+        return;
+      }
+    }
+    setSession(value);
+  }, []);
   const onError = useCallback((error: unknown) => {
     if (error instanceof ApiFailure && error.status === 401) {
       sessionRequest.current?.abort();
@@ -37,7 +54,7 @@ export default function QuestApp({
       setBusy(false);
       apiRequest<SessionView>(endpoints.session, { signal: controller.signal })
         .then((result) => {
-          if (!controller.signal.aborted) setSession(result.data);
+          if (!controller.signal.aborted) acceptSession(result.data);
         })
         .catch((error) => {
           if (!controller.signal.aborted) {
@@ -73,7 +90,7 @@ export default function QuestApp({
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("popstate", checkSession);
     };
-  }, [attempt]);
+  }, [attempt, acceptSession]);
   if (session === undefined)
     return (
       <main className="login-page">
@@ -102,7 +119,7 @@ export default function QuestApp({
           onLogin={(value) => {
             sessionRequest.current?.abort();
             setError(undefined);
-            setSession(value);
+            acceptSession(value);
           }}
         />
       </>

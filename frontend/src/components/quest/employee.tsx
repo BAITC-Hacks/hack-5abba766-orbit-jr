@@ -374,7 +374,7 @@ export function Employee({
               </div>
               <div className="course-grid catalog-grid">
                 {filteredEvents.map((e) => (
-                    <article className="course-card" key={e.event_id}>
+                    <article className="course-card" key={e.event_id} tabIndex={0} aria-label={e.title}>
                       <span className="catalog-row-icon" aria-hidden="true"><BookOpen size={22} /></span>
                       <div className="course-body">
                         <span className="outline-tag">
