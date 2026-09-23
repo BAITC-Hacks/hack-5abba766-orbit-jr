@@ -41,18 +41,15 @@ export function Login({
             setBusy(true);
             setError(undefined);
             try {
-              onLogin(
-                (
-                  await apiRequest<SessionView>(endpoints.login, {
-                    method: "POST",
-                    signal: request.signal,
-                    body: JSON.stringify({
-                      username: form.get("username"),
-                      password: form.get("password"),
-                    }),
-                  })
-                ).data,
-              );
+              const result = await apiRequest<SessionView>(endpoints.login, {
+                method: "POST",
+                signal: request.signal,
+                body: JSON.stringify({
+                  username: form.get("username"),
+                  password: form.get("password"),
+                }),
+              });
+              if (!request.signal.aborted) onLogin(result.data);
             } catch (error) {
               if (!request.signal.aborted) setError(error);
             } finally {
