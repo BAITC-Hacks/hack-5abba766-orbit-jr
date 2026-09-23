@@ -75,31 +75,41 @@ export function weightedDirectGain(candidate: Candidate, skills: Map<Id, SkillVi
   return total
 }
 
+/** Shared arithmetic for ordering and model context; missing domain signals are errors. */
+export function candidateRankingFactors(candidate: Candidate, skills: Map<Id, SkillView>, signals: BaselineSignals) {
+  const direct = weightedDirectGain(candidate, skills)
+  const unlocked = signalValue(signals.unlockedWeightedGain, candidate.candidate_id)
+  return {
+    closed_critical_gaps: closedCriticalGaps(candidate, skills),
+    weighted_direct_gain: direct,
+    best_unlocked_weighted_gain: unlocked,
+    weighted_target_value: direct + UNLOCKED_DISCOUNT * unlocked,
+    recent_negative_outcomes: signalValue(signals.negativeOutcomes, candidate.candidate_id),
+  }
+}
+
 export function rankBaseline(
   input: BaselineInput,
   signals: BaselineSignals,
 ): Candidate[] {
   assertRecommendationEvidence(input.candidates)
   const skills = skillIndex(input.profile.skills)
-  for (const candidate of input.candidates) {
-    signalValue(signals.unlockedWeightedGain, candidate.candidate_id)
-    signalValue(signals.negativeOutcomes, candidate.candidate_id)
-  }
+  const factors = new Map(input.candidates.map(candidate => [
+    candidate.candidate_id, candidateRankingFactors(candidate, skills, signals),
+  ]))
 
   return [...input.candidates].sort((a, b) => {
-    const criticalDiff = closedCriticalGaps(b, skills) - closedCriticalGaps(a, skills)
+    const aFactors = factors.get(a.candidate_id)!
+    const bFactors = factors.get(b.candidate_id)!
+    const criticalDiff = bFactors.closed_critical_gaps - aFactors.closed_critical_gaps
     if (criticalDiff !== 0) return criticalDiff
 
-    const gainA =
-      weightedDirectGain(a, skills) +
-      UNLOCKED_DISCOUNT * signalValue(signals.unlockedWeightedGain, a.candidate_id)
-    const gainB =
-      weightedDirectGain(b, skills) +
-      UNLOCKED_DISCOUNT * signalValue(signals.unlockedWeightedGain, b.candidate_id)
+    const gainA = aFactors.weighted_target_value
+    const gainB = bFactors.weighted_target_value
     if (gainA !== gainB) return gainB - gainA
 
-    const negA = signalValue(signals.negativeOutcomes, a.candidate_id)
-    const negB = signalValue(signals.negativeOutcomes, b.candidate_id)
+    const negA = aFactors.recent_negative_outcomes
+    const negB = bFactors.recent_negative_outcomes
     if (negA !== negB) return negA - negB
 
     if (a.duration_hours !== b.duration_hours) return a.duration_hours - b.duration_hours

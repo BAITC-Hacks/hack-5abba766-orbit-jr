@@ -44,7 +44,13 @@ official('official local dataset domain audit', () => {
           applied_as_of: snapshot.as_of_date, recorded_at: '2026-09-23T10:00:00.000Z', sequence: 1 }] }, employeeId);
         expect(skillChanges(employee, after)).toEqual(candidate.expected_skill_changes);
         expect(after.progress!.coverage - employee.progress!.coverage).toBeCloseTo(candidate.goal_coverage_delta, 12);
-        expect(candidate.facts).toHaveLength(6);
+        expect(candidate.facts).toHaveLength(6 + candidate.unlocks_event_ids.length);
+        for (const eventId of candidate.unlocks_event_ids) {
+          expect(candidate.facts).toContainEqual(expect.objectContaining({
+            fact_id: `${candidate.candidate_id}:unlock:${encodeURIComponent(eventId)}`,
+            category: 'target_requirement',
+          }));
+        }
         expect(snapshot.events.find(event => event.event_id === candidate.event_id)!.mandatory).toBe(false);
         checked++;
       }

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
 import { candidate, input } from './fixtures';
 import { getModel, getTimeoutMs, isAiConfigured, rankWithModel } from '../../src/ai/adapter';
 
 const fetchMock = vi.fn();
+const nativeFetch = globalThis.fetch;
 const snapshot = input([candidate({ candidate_id: 'C1' })]);
 const response = (content: string) => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
 beforeEach(() => {
@@ -34,6 +36,22 @@ describe('configuration', () => {
 });
 
 describe('rankWithModel', () => {
+  it.each(['gpt-6-sol', 'gpt-6-luna'])('uses low reasoning without temperature for %s', async model => {
+    vi.stubEnv('LLM_MODEL', model);
+    fetchMock.mockResolvedValue(response('{}'));
+    await rankWithModel(snapshot);
+    const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(payload.reasoning_effort).toBe('low');
+    expect(payload).not.toHaveProperty('temperature');
+  });
+  it.each(['gpt-4o-mini', 'gpt-4.1'])('uses deterministic sampling for %s', async model => {
+    vi.stubEnv('LLM_MODEL', model);
+    fetchMock.mockResolvedValue(response('{}'));
+    await rankWithModel(snapshot);
+    const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(payload.temperature).toBe(0);
+    expect(payload).not.toHaveProperty('reasoning_effort');
+  });
   it('reports missing_api_key without calling the provider', async () => {
     vi.stubEnv('LLM_API_KEY', '');
     expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'missing_api_key' });
@@ -57,6 +75,37 @@ describe('rankWithModel', () => {
     fetchMock.mockRejectedValue(new Error('503 service unavailable'));
     expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'provider_error' });
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+  it('closes an unfinished HTTP 503 body before returning fallback without reading it', async () => {
+    vi.stubGlobal('fetch', nativeFetch);
+    vi.stubEnv('LLM_TIMEOUT_MS', '8000');
+    let markClosed!: () => void;
+    const closed = new Promise<void>(resolve => { markClosed = resolve; });
+    const server = createServer((_request, response) => {
+      response.once('close', markClosed);
+      response.writeHead(503, { 'Content-Type': 'text/plain' });
+      response.write('Synthetic provider error body intentionally never ends');
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing local test server address');
+      vi.stubEnv('LLM_API_URL', `http://127.0.0.1:${address.port}/chat/completions`);
+      expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'provider_error' });
+      const released = await Promise.race([
+        closed.then(() => true),
+        new Promise<boolean>(resolve => { deadline = setTimeout(() => resolve(false), 500); }),
+      ]);
+      expect(released, 'The error-response socket must close after fallback, independently of its unfinished body').toBe(true);
+    } finally {
+      if (deadline) clearTimeout(deadline);
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
   });
   it('maps non-JSON content to invalid_response', async () => {
     fetchMock.mockResolvedValue(response('sorry, I cannot'));

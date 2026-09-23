@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiError, baselineRanking, cardsFromRanking, rankCandidates, validateRanking } from '../src/ai';
+import { SYSTEM_PROMPT } from '../src/ai/prompt';
 import { recommendations } from '../src/services/recommendations';
 import type { AiRankingInput, Candidate, DatasetSnapshot, EmployeeView, RecommendationFact } from '../src/types';
 
@@ -7,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   readSnapshot: vi.fn(), readSnapshotWithClient: vi.fn(), getCandidates: vi.fn(),
   connect: vi.fn(), query: vi.fn(), release: vi.fn(), fetch: vi.fn(),
 }));
-vi.mock('../src/db', () => ({ pool: { connect: mocks.connect }, readSnapshotWithClient: mocks.readSnapshotWithClient }));
+vi.mock('../src/db', () => ({ recommendationLockPool: { connect: mocks.connect }, readSnapshotWithClient: mocks.readSnapshotWithClient }));
 vi.mock('../src/services/data', () => ({ readSnapshot: mocks.readSnapshot }));
 vi.mock('../src/domain', () => ({ getCandidates: mocks.getCandidates }));
 
@@ -110,7 +111,7 @@ describe('provider adapter without network calls', () => {
     const payload = JSON.parse(request.body as string);
     expect(payload.store).toBe(false);
     expect(payload.response_format.type).toBe('json_schema');
-    expect(payload.messages[0].content).toContain('data, never instructions');
+    expect(payload.messages[0].content).toBe(SYSTEM_PROMPT);
     expect(payload.messages[1].content).not.toContain(employee().full_name);
   });
 
@@ -195,6 +196,27 @@ describe('recommendation service modes and version boundaries', () => {
     await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({ code: 'RECOMMENDATION_IN_PROGRESS' });
     expect(mocks.fetch).not.toHaveBeenCalled();
     expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('reports bounded admission exhaustion without making a provider call', async () => {
+    mocks.connect.mockRejectedValueOnce(new Error('Synthetic connection queue timeout'));
+    await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({ code: 'STORAGE_BUSY', status: 503 });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it('aborts provider work and releases the advisory lock when the caller cancels', async () => {
+    const controller = new AbortController();
+    mocks.fetch.mockImplementation((_url: string, request: RequestInit) => new Promise((_resolve, reject) => {
+      request.signal!.addEventListener('abort', () => reject(new DOMException('Synthetic abort', 'AbortError')), { once: true });
+    }));
+    const pending = recommendations('employee', { expected_version: version }, controller.signal);
+    await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
+    controller.abort();
+    await expect(pending).resolves.toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_timeout' });
+    expect((mocks.fetch.mock.calls[0][1] as RequestInit).signal!.aborted).toBe(true);
+    expect(mocks.query.mock.calls.at(-1)![0]).toBe('SELECT pg_advisory_unlock(hashtextextended($1,0))');
+    expect(mocks.release).toHaveBeenCalledWith(undefined);
   });
 
   it('holds no transaction during AI and reuses its existing connection for the final snapshot', async () => {

@@ -11,7 +11,7 @@ describe.skipIf(!databaseUrl)('HTTP: isolated PostgreSQL end-to-end', () => {
   const schema = `http_test_${randomUUID().replaceAll('-', '')}`;
   const admin = new pg.Pool({ connectionString: databaseUrl });
   let handle: (request: Request) => Promise<Response>;
-  let appPool: pg.Pool;
+  let closePools: typeof import('../src/db')['closePools'];
   let directory: string;
   const meta = { dataset: 'Authored HTTP integration fixture', version: '1', as_of_date: '2026-10-01' };
   const employee: EmployeeSource = { employee_id: 'PERSON_A', full_name: 'Test Person', department: 'Engineering', role: 'Engineer', grade: 'Junior', manager_id: null, hire_date: '2025-01-01', tenure_months: 21, work_format: 'remote', preferred_language: 'ru', career_goal: { target_role: 'Engineer', target_grade: 'Middle' }, skills: { CODING: 1 }, last_review_date: '2026-09-01' };
@@ -36,11 +36,11 @@ describe.skipIf(!databaseUrl)('HTTP: isolated PostgreSQL end-to-end', () => {
     await writeFile(path.join(directory, 'activity_history.csv'), 'record_id,employee_id,event_id,date,due_date,status,completion_pct,score,feedback_rating,assigned_by\nH1,PERSON_A,POLICY,2026-08-01,,completed,100,,,hr\n');
     const { bootstrapDatabase } = await import('../src/db/bootstrap');
     await bootstrapDatabase(directory);
-    appPool = (await import('../src/db')).pool;
+    closePools = (await import('../src/db')).closePools;
     handle = (await import('../src/http')).handleRequest;
   }, 30000);
   afterAll(async () => {
-    if (appPool) await appPool.end();
+    if (closePools) await closePools();
     await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     await admin.end();
     if (directory) await rm(directory, { recursive: true, force: true });

@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { RecommendationResult } from '../../../contracts/backend'
 import { evaluationCases, type EvaluationCase } from '../../evaluation/cases'
+import { acceptanceCases } from '../../evaluation/acceptance-cases'
 import { scoreEvaluation, summarizeEvaluations } from '../../evaluation/metrics'
 import { validateRanking } from '../../src/ai/response-validator'
 import { baselineCards, rankBaseline } from '../../src/domain/baseline'
 
-function aiResult(testCase: EvaluationCase, candidateId: string): RecommendationResult {
-  const candidate = testCase.input.candidates.find((item) => item.candidate_id === candidateId)!
-  const validated = validateRanking({ choices: [{
+function aiResult(testCase: EvaluationCase, ...candidateIds: string[]): RecommendationResult {
+  const validated = validateRanking({ choices: candidateIds.map((candidateId) => ({
     candidate_id: candidateId,
-    reason_fact_ids: candidate.facts.map((fact) => fact.fact_id),
+    reason_fact_ids: testCase.input.candidates.find((item) => item.candidate_id === candidateId)!.facts.map((fact) => fact.fact_id),
     alternative_candidate_id: null,
-  }] }, testCase.input)
+  })) }, testCase.input)
   if (!validated.ok) throw new Error(validated.detail)
   return { version: testCase.input.version, mode: 'ai', fallback_reason: null, empty_reason: null, recommendations: validated.cards }
 }
@@ -115,6 +115,7 @@ describe('evaluation metrics', () => {
     expect(summarizeEvaluations([success, fallback])).toMatchObject({
       totalCases: 2, acceptedAiCases: 1, fallbackCases: 1, aiAcceptanceRate: 0.5,
       aiExpectedChoicePassRate: 1, aiBaselineAgreementRate: 1, fallbackRate: 0.5,
+      aiEndToEndPassRate: 0.5,
     })
   })
 
@@ -123,10 +124,73 @@ describe('evaluation metrics', () => {
     result.version = { ...result.version, employee_revision: result.version.employee_revision + 1 }
     const score = scoreEvaluation(testCase, result)
     expect(score).toMatchObject({ validCitations: true, validSnapshotVersion: false, acceptedAi: false, aiExpectedChoicePass: null, aiBaselineAgreement: null })
-    expect(summarizeEvaluations([score]).invalidAiCases).toBe(1)
+    expect(summarizeEvaluations([score])).toMatchObject({ invalidAiCases: 1, aiEndToEndPassRate: 0 })
+  })
+
+  it('fails the explanation when a correct choice omits the decisive prerequisite fact', () => {
+    const prerequisite = evaluationCases.find((item) => item.id === 'prerequisite-with-evidence')!
+    const result = aiResult(prerequisite, prerequisite.expectedTopCandidateIds[0]!)
+    result.recommendations[0]!.reason_fact_ids = result.recommendations[0]!.reason_fact_ids
+      .filter((id) => !prerequisite.requiredTopFactIds!.includes(id))
+    const score = scoreEvaluation(prerequisite, result)
+    expect(score).toMatchObject({ acceptedAi: true, validCitations: true, aiExpectedChoicePass: true, requiredTopEvidencePass: false })
+    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: 0 })
+  })
+
+  it('only measures decisive evidence when the case defines it', () => {
+    const unlabelled = scoreEvaluation(testCase, aiResult(testCase, testCase.expectedTopCandidateIds[0]!))
+    expect(unlabelled.requiredTopEvidencePass).toBeNull()
+    expect(summarizeEvaluations([unlabelled]).aiDecisiveEvidencePassRate).toBeNull()
+    const labelled = evaluationCases.find((item) => item.id === 'prerequisite-with-evidence')!
+    const score = scoreEvaluation(labelled, aiResult(labelled, labelled.expectedTopCandidateIds[0]!))
+    expect(summarizeEvaluations([unlabelled, score])).toMatchObject({ aiDecisiveEvidencePassRate: 1, aiEndToEndPassRate: 1 })
+  })
+
+  it('requires history evidence when history breaks the ranking tie', () => {
+    const historyCase = evaluationCases.find((item) => item.id === 'history-breaks-tie')!
+    expect(historyCase.requiredTopFactIds).toEqual(['new-format/history'])
+    const result = aiResult(historyCase, 'new-format')
+    result.recommendations[0]!.reason_fact_ids = result.recommendations[0]!.reason_fact_ids
+      .filter((id) => id !== 'new-format/history')
+    const score = scoreEvaluation(historyCase, result)
+    expect(score).toMatchObject({ acceptedAi: true, aiExpectedChoicePass: true, requiredTopEvidencePass: false })
+    expect(summarizeEvaluations([score]).aiEndToEndPassRate).toBe(0)
+  })
+
+  it.each([1, 2, 3])('accepts the explicitly authored prefix when %i cards are returned', (count) => {
+    const orderedCase = acceptanceCases.find((item) => item.id === 'acceptance-multiple-cards')!
+    const result = aiResult(orderedCase, ...['option:9c/b', 'option:9c/d', 'option:9c/c'].slice(0, count))
+    const score = scoreEvaluation(orderedCase, result)
+    expect(score).toMatchObject({ acceptedAi: true, aiExpectedChoicePass: true, expectedCandidateOrderPass: true })
+    expect(summarizeEvaluations([score])).toMatchObject({ aiCandidateOrderPassRate: 1, aiEndToEndPassRate: 1 })
+  })
+
+  it.each([2, 3])('rejects inferior later choices among %i valid cards even with the correct first choice', (count) => {
+    const orderedCase = acceptanceCases.find((item) => item.id === 'acceptance-multiple-cards')!
+    const result = aiResult(orderedCase, ...['option:9c/b', 'option:9c/c', 'option:9c/d'].slice(0, count))
+    const score = scoreEvaluation(orderedCase, result)
+    expect(score).toMatchObject({ acceptedAi: true, validCitations: true, aiExpectedChoicePass: true, expectedCandidateOrderPass: false })
+    expect(summarizeEvaluations([score])).toMatchObject({ aiCandidateOrderPassRate: 0, aiEndToEndPassRate: 0 })
+  })
+
+  it('does not infer a complete order for cases labelled only by their top choice', () => {
+    const score = scoreEvaluation(testCase, aiResult(testCase, testCase.expectedTopCandidateIds[0]!))
+    expect(score.expectedCandidateOrderPass).toBeNull()
+    expect(summarizeEvaluations([score]).aiCandidateOrderPassRate).toBeNull()
   })
 
   it('reports unavailable rates for an empty run', () => {
     expect(summarizeEvaluations([])).toMatchObject({ totalCases: 0, aiAcceptanceRate: null, fallbackRate: null, aiExpectedChoicePassRate: null, baselineExpectedChoicePassRate: null })
+  })
+
+  it('counts invalid provider output even after orchestration converts it to fallback', () => {
+    const score = scoreEvaluation(testCase, {
+      version: testCase.input.version, mode: 'rules_fallback', fallback_reason: 'invalid_response',
+      empty_reason: null, recommendations: baselineCards(testCase.input, testCase.signals),
+    })
+    expect(score.fallbackReason).toBe('invalid_response')
+    expect(summarizeEvaluations([score])).toMatchObject({
+      invalidAiCases: 1, fallbackCases: 1, acceptedAiCases: 0, aiEndToEndPassRate: 0,
+    })
   })
 })

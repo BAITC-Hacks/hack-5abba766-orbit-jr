@@ -129,7 +129,7 @@ export async function handleRequest(request: Request): Promise<Response> {
       requireEmployee(actor, id);
       if (!match[2] && method === 'GET') return success(employeeView(snapshot, id));
       if (match[2] === 'goal' && method === 'PUT') return success(await updateGoal(actor, id, goalSchema.parse(await jsonBody(request))));
-      if (match[2] === 'recommendations' && method === 'POST') return success(await recommendations(id, recSchema.parse(await jsonBody(request))));
+      if (match[2] === 'recommendations' && method === 'POST') return success(await recommendations(id, recSchema.parse(await jsonBody(request)), request.signal));
       if (match[2] === 'completions' && method === 'POST') {
         const result = await completeActivity(actor, id, completionSchema.parse(await jsonBody(request)), idempotencyKey(request));
         return success(result.result, 200, result.replayed);
