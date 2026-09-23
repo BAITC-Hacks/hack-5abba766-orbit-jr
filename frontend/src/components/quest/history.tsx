@@ -176,10 +176,9 @@ export function History({
               )}
               <details className="activity-details">
                 <summary>Детали участия</summary>
-                <p>Запись: {row.participation_id}</p>
-                {row.superseded_by && (
-                  <p>Учтено участием: {row.superseded_by}</p>
-                )}
+                <p>Источник: {row.source_status ? "Загруженная история" : "Демонстрационный сценарий"}</p>
+                {row.source_status && <p>Исходный статус: {statuses[row.source_status]}</p>}
+                {row.applied_as_of && <p>Учтено в расчёте на {row.applied_as_of}</p>}
               </details>
             </div>
           </article>
