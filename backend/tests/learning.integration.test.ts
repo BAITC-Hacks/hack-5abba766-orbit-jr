@@ -197,6 +197,31 @@ describe.skipIf(!connectionString)('persistent learning and atomic grading', () 
     expect((await learning.getLearningAttempt(employee, 'E0001', attempt.id)).status).toBe('ready_for_quiz');
   });
 
+  it('reconciles a new learning target with participation imported while the lessons were open', async () => {
+    const request: StartLearningRequest = { module_id: course.id, expected_version: initialVersion,
+      target: { kind: 'new_participation', event_id: course.event_id, session_date: null } };
+    let attempt = await learning.startLearning(hr, 'E0002', request);
+    for (const lesson of course.lessons) attempt = await learning.completeLesson(hr, 'E0002', attempt.id, lesson.id);
+    await data.importData(hr, { dry_run: false, expected_dataset_revision: 1, history: [{
+      record_id: 'R_IMPORTED', employee_id: 'E0002', event_id: course.event_id, date: '2026-09-20',
+      due_date: null, status: 'in_progress', completion_pct: 50, score: null, feedback_rating: null, assigned_by: 'self',
+    }] }, 'learning-import');
+    const quiz = { expected_version: initialVersion, answers };
+    await expect(learning.submitQuiz(hr, 'E0002', attempt.id, quiz, 'before-import-refresh')).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+    const resumed = await learning.startLearning(hr, 'E0002', { ...request,
+      target: { kind: 'existing_participation', participation_id: 'R_IMPORTED' } });
+    expect(resumed.id).toBe(attempt.id);
+    const passed = await learning.submitQuiz(hr, 'E0002', attempt.id, { ...quiz, expected_version: resumed.employee_version }, 'after-import-refresh');
+    expect(passed.result.attempt).toMatchObject({ status: 'passed', quiz_attempts: 1,
+      target: { kind: 'existing_participation', participation_id: 'R_IMPORTED' } });
+    expect(passed.result.completion?.participation_id).toBe('R_IMPORTED');
+    const snapshot = await data.readSnapshot();
+    expect(snapshot.completions).toHaveLength(1);
+    expect(snapshot.completions[0].participation_id).toBe('R_IMPORTED');
+    expect(snapshot.employee_revisions.E0002).toBe(3);
+    expect(passed.result.completion?.skill_changes).toEqual([{ skill_id: 'SK_PYTHON', before: 2, after: 3, gain: 1 }]);
+  });
+
   it('enforces employee scopes, target/course matching and scheduled event dates', async () => {
     const attempt = await ready();
     await expect(learning.getLearningAttempt(employee, 'E0002', attempt.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });

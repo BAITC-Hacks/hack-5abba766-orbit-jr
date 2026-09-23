@@ -103,6 +103,7 @@ function domainInput(snapshot: DatasetSnapshot, employeeId: string, limit: 1 | 2
 /** Same source→domain→AI boundary as production, with authored expected event choices. */
 export function buildDomainEvaluation(snapshot: DatasetSnapshot, employeeId: string, options: {
   id: string; description: string; expectedTopEventIds: string[]; limit?: 1 | 2 | 3
+  requiredTopFactSuffixes?: string[]
 }): DomainEvaluationCase {
   const { input, signals, emptyReason } = domainInput(snapshot, employeeId, options.limit)
   if (emptyReason) throw new Error(`${options.id}: expected candidates, got ${emptyReason}`)
@@ -111,7 +112,16 @@ export function buildDomainEvaluation(snapshot: DatasetSnapshot, employeeId: str
     if (!candidate) throw new Error(`${options.id}: expected event ${eventId} is ineligible`)
     return candidate.candidate_id
   })
-  return { id: options.id, description: options.description, input, signals, expectedTopCandidateIds, snapshot, employeeId }
+  if (!expectedTopCandidateIds.length) throw new Error(`${options.id}: expected at least one top event`)
+  if (options.requiredTopFactSuffixes?.length && expectedTopCandidateIds.length !== 1) {
+    throw new Error(`${options.id}: decisive facts require a single authored top event`)
+  }
+  const requiredTopFactIds = options.requiredTopFactSuffixes?.map(suffix => `${expectedTopCandidateIds[0]}:${suffix}`)
+  const top = input.candidates.find(candidate => candidate.candidate_id === expectedTopCandidateIds[0])!
+  for (const factId of requiredTopFactIds ?? []) {
+    if (!top.facts.some(fact => fact.fact_id === factId)) throw new Error(`${options.id}: missing decisive fact ${factId}`)
+  }
+  return { id: options.id, description: options.description, input, signals, expectedTopCandidateIds, requiredTopFactIds, snapshot, employeeId }
 }
 
 const critical = sourceSnapshot({
@@ -167,8 +177,8 @@ const continuation = sourceSnapshot({
 export const domainEvaluationCases: DomainEvaluationCase[] = [
   buildDomainEvaluation(critical, personId, { id: 'domain-critical-gap', description: 'Domain eligibility excludes entirely irrelevant events; closing a critical gap beats large off-goal growth.', expectedTopEventIds: ['close-critical'] }),
   buildDomainEvaluation(imported, opaquePersonId, { id: 'domain-imported-identifiers', description: 'Validated source profiles, skills and activities accept new opaque Unicode IDs throughout the actual candidate pipeline.', expectedTopEventIds: ['judge:event/新-901'] }),
-  buildDomainEvaluation(formatHistory, personId, { id: 'domain-similar-format-history', description: 'Three negative outcomes on distinct similar online activities favor an equally useful alternative format.', expectedTopEventIds: ['new-self-paced-format'] }),
-  buildDomainEvaluation(prerequisite, personId, { id: 'domain-prerequisite-benefit', description: 'A preparation step has zero immediate coverage but unlocks a separate numeric future gain; it does not earn that gain now.', expectedTopEventIds: ['prepare-tooling'] }),
+  buildDomainEvaluation(formatHistory, personId, { id: 'domain-similar-format-history', description: 'Three negative outcomes on distinct similar online activities favor an equally useful alternative format.', expectedTopEventIds: ['new-self-paced-format'], requiredTopFactSuffixes: ['history'] }),
+  buildDomainEvaluation(prerequisite, personId, { id: 'domain-prerequisite-benefit', description: 'A preparation step has zero immediate coverage but unlocks a separate numeric future gain; it does not earn that gain now.', expectedTopEventIds: ['prepare-tooling'], requiredTopFactSuffixes: ['unlock:future-design-lab'] }),
   buildDomainEvaluation(switchRole, personId, { id: 'domain-role-switch-eligibility', description: 'A career switch does not bypass the current-role and current-grade audience of new activities.', expectedTopEventIds: ['current-role-bridge'] }),
   buildDomainEvaluation(continuation, personId, { id: 'domain-continue-identity', description: 'A past enrollment remains eligible after grade change and keeps its original participation and session identity.', expectedTopEventIds: ['old-enrollment'] }),
 ]

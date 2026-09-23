@@ -2,7 +2,7 @@ import pg, { type PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { readFile } from 'node:fs/promises';
 import { AppError } from '../errors';
-import type { DatasetSnapshot } from '../types';
+import type { DatasetSnapshot, DomainVersion } from '../types';
 import * as schema from './schema';
 
 const databaseSchema = process.env.DATABASE_SCHEMA;
@@ -76,4 +76,14 @@ export async function readSnapshotWithClient(client: PoolClient): Promise<Datase
     completions: completions.rows.map(r => ({ ...r, sequence: Number(r.sequence), recorded_at: new Date(r.recorded_at).toISOString() })),
     goals: Object.fromEntries(goals.rows.map(r => [r.employee_id, r.goal])), proficiency_scale: meta.proficiency_scale,
   };
+}
+
+/** One statement sees both revisions at the same MVCC boundary without loading company data. */
+export async function readDomainVersionWithClient(client: PoolClient, employeeId: string): Promise<Partial<DomainVersion>> {
+  const { rows } = await client.query(`SELECT m.dataset_revision,e.employee_revision
+    FROM app_meta m LEFT JOIN employees e ON e.employee_id=$1
+    WHERE m.id=1 AND m.seed_complete=true`, [employeeId]);
+  if (!rows.length) throw new AppError('NOT_READY', 'Датасет ещё не инициализирован', 503);
+  // A removed employee cannot match an in-flight version and must be rejected as stale.
+  return { dataset_revision: rows[0].dataset_revision, employee_revision: rows[0].employee_revision ?? undefined };
 }

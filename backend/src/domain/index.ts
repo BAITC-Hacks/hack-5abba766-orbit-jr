@@ -84,12 +84,51 @@ function progressFor(levels: SkillLevels, profile: RoleProfile | null): GoalProg
 const occurrenceKey = (event: EventView, sessionDate: string | null) => event.repeatable ? sessionDate! : 'once';
 const sameOccurrence = (event: EventView, date: string, sessionDate: string | null) => !event.repeatable || date === sessionDate;
 
+type EmployeeHistory = {
+  history: ParticipationSource[];
+  completions: RuntimeCompletion[];
+  completed: Map<string, Map<string, string>>;
+  active: Map<string, ParticipationSource[]>;
+};
+
+/** Request-local indexes: snapshots may be mutated by a transaction, so never memoize them globally. */
+function indexEmployeeHistory(snapshot: DatasetSnapshot, employeeId: string): EmployeeHistory {
+  const history = snapshot.history.filter(row => row.employee_id === employeeId);
+  const completions = snapshot.completions.filter(row => row.employee_id === employeeId);
+  const events = new Map(snapshot.events.map(event => [event.event_id, event]));
+  const latest = new Map<string, Map<string, ParticipationSource>>();
+  for (const row of history) {
+    if (row.status !== 'completed') continue;
+    const key = occurrenceKey(events.get(row.event_id)!, row.date);
+    const occurrences = latest.get(row.event_id) ?? new Map<string, ParticipationSource>();
+    const previous = occurrences.get(key);
+    if (!previous || byDateAndId(previous, row) < 0) occurrences.set(key, row);
+    latest.set(row.event_id, occurrences);
+  }
+  const completed = new Map([...latest].map(([eventId, rows]) => [eventId,
+    new Map([...rows].map(([key, row]) => [key, row.record_id]))]));
+  for (const row of completions) {
+    const occurrences = completed.get(row.event_id) ?? new Map<string, string>();
+    // Imported completions take precedence; otherwise preserve the first overlay.
+    if (!occurrences.has(row.occurrence_key)) occurrences.set(row.occurrence_key, row.participation_id ?? row.id);
+    completed.set(row.event_id, occurrences);
+  }
+  const context: EmployeeHistory = { history, completions, completed, active: new Map() };
+  for (const row of history) {
+    if (row.status !== 'in_progress') continue;
+    const event = events.get(row.event_id)!;
+    if (completedOccurrence(event, event.format === 'self_paced' ? null : row.date, context)) continue;
+    const rows = context.active.get(row.event_id) ?? [];
+    rows.push(row);
+    context.active.set(row.event_id, rows);
+  }
+  for (const rows of context.active.values()) rows.sort(byDateAndId);
+  return context;
+}
+
 /** A source completion is just as final as a local overlay, even when already in baseline. */
-function completedOccurrence(event: EventView, sessionDate: string | null, history: ParticipationSource[], completions: RuntimeCompletion[]): string | null {
-  const completed = history.filter(row => row.event_id === event.event_id && row.status === 'completed' && sameOccurrence(event, row.date, sessionDate)).sort(byDateAndId).at(-1);
-  if (completed) return completed.record_id;
-  const overlay = completions.find(row => row.event_id === event.event_id && row.occurrence_key === occurrenceKey(event, sessionDate));
-  return overlay ? overlay.participation_id ?? overlay.id : null;
+function completedOccurrence(event: EventView, sessionDate: string | null, context: EmployeeHistory): string | null {
+  return context.completed.get(event.event_id)?.get(occurrenceKey(event, sessionDate)) ?? null;
 }
 
 function levelChanges(before: SkillLevels, after: SkillLevels): SkillChange[] {
@@ -100,14 +139,15 @@ function levelChanges(before: SkillLevels, after: SkillLevels): SkillChange[] {
   });
 }
 
-function employeeHistory(snapshot: DatasetSnapshot, history: ParticipationSource[], completions: RuntimeCompletion[], levels: SkillLevels): ParticipationView[] {
+function employeeHistory(snapshot: DatasetSnapshot, context: EmployeeHistory, levels: SkillLevels): ParticipationView[] {
+  const { history, completions } = context;
   const events = new Map(snapshot.events.map(event => [event.event_id, event]));
   const overlays = new Map(completions.filter(row => row.participation_id !== null).map(row => [row.participation_id!, row]));
   const views: ParticipationView[] = history.map(row => {
     const event = events.get(row.event_id)!;
     const overlay = overlays.get(row.record_id);
     const session = event.format === 'self_paced' ? null : row.date;
-    const completedBy = completedOccurrence(event, session, history, completions);
+    const completedBy = completedOccurrence(event, session, context);
     // Mandatory assignments can recur; an earlier completion does not discharge a new assignment.
     const supersededBy = !event.mandatory && row.status === 'in_progress' && !overlay && completedBy && completedBy !== row.record_id ? completedBy : null;
     const actionable = row.status === 'in_progress' && !overlay && !supersededBy && !event.mandatory && levelChanges(levels, applyEvent(levels, event)).length > 0;
@@ -133,9 +173,12 @@ function employeeHistory(snapshot: DatasetSnapshot, history: ParticipationSource
 }
 
 export function employeeView(snapshot: DatasetSnapshot, employeeId: string): EmployeeView {
+  return projectEmployee(snapshot, employeeId, indexEmployeeHistory(snapshot, employeeId));
+}
+
+function projectEmployee(snapshot: DatasetSnapshot, employeeId: string, context: EmployeeHistory): EmployeeView {
   const employee = sourceEmployee(snapshot, employeeId);
-  const history = snapshot.history.filter(row => row.employee_id === employeeId);
-  const completions = snapshot.completions.filter(row => row.employee_id === employeeId);
+  const { history, completions } = context;
   const levels = projectSkills(snapshot, employee, history, completions);
   const goal = resolveGoal(snapshot, employee);
   const profile = targetProfile(snapshot, goal);
@@ -153,7 +196,7 @@ export function employeeView(snapshot: DatasetSnapshot, employeeId: string): Emp
         required_level: required, gap: required === null ? null : Math.max(0, required - current),
         critical: profile?.critical_skills.includes(skillId) ?? false };
     }),
-    history: employeeHistory(snapshot, history, completions, levels), has_simulated_progress: completions.length > 0,
+    history: employeeHistory(snapshot, context, levels), has_simulated_progress: completions.length > 0,
   };
 }
 
@@ -163,17 +206,15 @@ const matchesAudience = (event: EventView, employee: EmployeeView) => event.targ
 
 type AvailableAction = { event: EventView; action: 'start' | 'continue'; participation: ParticipationSource | null; session: string | null };
 
-function activeAttempts(event: EventView, history: ParticipationSource[], completions: RuntimeCompletion[]): ParticipationSource[] {
-  return history.filter(row => row.event_id === event.event_id && row.status === 'in_progress' && !completedOccurrence(event, event.format === 'self_paced' ? null : row.date, history, completions)).sort(byDateAndId);
+function activeAttempts(event: EventView, context: EmployeeHistory): ParticipationSource[] {
+  return context.active.get(event.event_id) ?? [];
 }
 
-function availableActions(snapshot: DatasetSnapshot, employee: EmployeeView, levels: SkillLevels): AvailableAction[] {
-  const history = snapshot.history.filter(row => row.employee_id === employee.employee_id);
-  const completions = snapshot.completions.filter(row => row.employee_id === employee.employee_id);
+function availableActions(snapshot: DatasetSnapshot, employee: EmployeeView, levels: SkillLevels, context: EmployeeHistory): AvailableAction[] {
   const result: AvailableAction[] = [];
   for (const event of snapshot.events) {
     if (event.mandatory) continue;
-    const active = activeAttempts(event, history, completions).at(-1);
+    const active = activeAttempts(event, context).at(-1);
     if (active) {
       // Enrollment was valid when it occurred. Do not reapply current grade or schedule.
       result.push({ event, action: 'continue', participation: active, session: event.format === 'self_paced' ? null : active.date });
@@ -181,9 +222,9 @@ function availableActions(snapshot: DatasetSnapshot, employee: EmployeeView, lev
     }
     if (!matchesAudience(event, employee) || !meetsPrerequisites(event, levels)) continue;
     if (event.format === 'self_paced') {
-      if (!completedOccurrence(event, null, history, completions)) result.push({ event, action: 'start', participation: null, session: null });
+      if (!completedOccurrence(event, null, context)) result.push({ event, action: 'start', participation: null, session: null });
     } else {
-      const session = [...event.upcoming_sessions].sort(compareText).find(date => date >= snapshot.as_of_date && !completedOccurrence(event, date, history, completions));
+      const session = [...event.upcoming_sessions].sort(compareText).find(date => date >= snapshot.as_of_date && !completedOccurrence(event, date, context));
       if (session) result.push({ event, action: 'start', participation: null, session });
     }
   }
@@ -199,20 +240,18 @@ function weightedGain(before: SkillLevels, after: SkillLevels, profile: RoleProf
 
 type UnlockedActivity = { event: EventView; weighted_gain: number; expected_skill_changes: SkillChange[] };
 
-function findUnlocked(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, before: SkillLevels, after: SkillLevels, profile: RoleProfile): UnlockedActivity[] {
-  const history = snapshot.history.filter(row => row.employee_id === employee.employee_id);
-  const completions = snapshot.completions.filter(row => row.employee_id === employee.employee_id);
+function findUnlocked(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, before: SkillLevels, after: SkillLevels, profile: RoleProfile, context: EmployeeHistory): UnlockedActivity[] {
   return snapshot.events.flatMap(event => {
     if (event.event_id === action.event.event_id || event.mandatory || !matchesAudience(event, employee)) return [];
     if (meetsPrerequisites(event, before) || !meetsPrerequisites(event, after)) return [];
     // An already enrolled event is not locked by today's prerequisites.
-    if (activeAttempts(event, history, completions).length) return [];
+    if (activeAttempts(event, context).length) return [];
     if (event.format === 'self_paced') {
-      if (completedOccurrence(event, null, history, completions)) return [];
+      if (completedOccurrence(event, null, context)) return [];
     } else {
       const hasLaterSession = event.upcoming_sessions.some(date => date >= snapshot.as_of_date
         && !(action.action === 'start' && action.session !== null && date <= action.session)
-        && !completedOccurrence(event, date, history, completions));
+        && !completedOccurrence(event, date, context));
       if (!hasLaterSession) return [];
     }
     const future = applyEvent(after, event);
@@ -227,7 +266,7 @@ function candidateId(action: AvailableAction): string {
 
 const numberText = (value: number) => String(Math.round(value * 100) / 100);
 
-function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, candidate: Omit<Candidate, 'facts'>, unlocked: UnlockedActivity[], recentOutcomes: readonly ParticipationSource[]): Candidate['facts'] {
+function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, candidate: Omit<Candidate, 'facts'>, unlocked: UnlockedActivity[], recentOutcomes: readonly ParticipationSource[], history: readonly ParticipationSource[]): Candidate['facts'] {
   const names = new Map(snapshot.skills.map(skill => [skill.skill_id, skill.name]));
   const label = (id: string) => names.get(id) ?? id;
   const changes = candidate.expected_skill_changes.map(change => `${label(change.skill_id)}: ${numberText(change.before)} → ${numberText(change.after)}`).join('; ');
@@ -239,7 +278,7 @@ function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, actio
     : `В исходной истории нет итоговых исходов этой активности на ${snapshot.as_of_date}; отказов, пропусков и прекращений: 0. Отсутствие истории не говорит о мотивации.`)
     + (action.participation ? ` Текущее участие от ${action.participation.date}: в процессе (${numberText(action.participation.completion_pct)}%); оно не входит в счётчик итоговых исходов.` : '');
   const similarHistory = historyEvidenceText(summarizeHistoryEvidence({ employeeId: employee.employee_id,
-    asOfDate: snapshot.as_of_date, event: action.event, events: snapshot.events, history: snapshot.history }), { includeExact: false });
+    asOfDate: snapshot.as_of_date, event: action.event, events: snapshot.events, history }), { includeExact: false });
   const requirements = gapChanges.map(change => {
     const skill = employee.skills.find(item => item.skill_id === change.skill_id)!;
     return `${label(change.skill_id)}: требуется ${numberText(skill.required_level!)}, сейчас ${numberText(skill.current_level)}${skill.critical ? ', критический навык' : ''}`;
@@ -271,16 +310,21 @@ function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, actio
 
 /** Deterministic baseline. Each card is an alternative from the same state, not step N. */
 export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { employee: EmployeeView; candidates: Candidate[]; emptyReason: EmptyReason | null; signals: BaselineSignals } {
-  const employee = employeeView(snapshot, employeeId);
-  const empty = (reason: EmptyReason) => ({ employee, candidates: [], emptyReason: reason, signals: { unlockedWeightedGain: new Map<string, number>(), negativeOutcomes: new Map<string, number>(), similarFormatPenalty: new Map<string, number>() } });
+  return evaluateCandidates(snapshot, employeeId, 'recommendations');
+}
+
+function evaluateCandidates(snapshot: DatasetSnapshot, employeeId: string, mode: 'recommendations' | 'availability'): ReturnType<typeof getCandidates> {
+  const context = indexEmployeeHistory(snapshot, employeeId);
+  const employee = projectEmployee(snapshot, employeeId, context);
+  const empty = (reason: EmptyReason | null) => ({ employee, candidates: [], emptyReason: reason, signals: { unlockedWeightedGain: new Map<string, number>(), negativeOutcomes: new Map<string, number>(), similarFormatPenalty: new Map<string, number>() } });
   if (!employee.goal.target || !employee.progress) return empty('GOAL_REQUIRED');
   if (employee.progress.gap_points <= 0) return empty('GOAL_REACHED');
   const profile = targetProfile(snapshot, employee.goal)!;
   const levels = levelsFrom(employee);
-  const actions = availableActions(snapshot, employee, levels);
+  const actions = availableActions(snapshot, employee, levels, context);
   if (!actions.length) return empty('NO_ELIGIBLE_EVENTS');
-  const recentOutcomes = latestTerminalHistoryByEvent(new Set(actions.map(action => action.event.event_id)), {
-    employeeId, asOfDate: snapshot.as_of_date, history: snapshot.history,
+  const recentOutcomes = mode === 'availability' ? new Map<string, ParticipationSource[]>() : latestTerminalHistoryByEvent(new Set(actions.map(action => action.event.event_id)), {
+    employeeId, asOfDate: snapshot.as_of_date, history: context.history,
   });
   let hasBenefit = false;
   const candidates: Candidate[] = [];
@@ -291,8 +335,12 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
     if (!changes.length) continue;
     hasBenefit = true;
     const direct = weightedGain(levels, after, profile);
-    const unlocked = findUnlocked(snapshot, employee, action, levels, after, profile);
+    // HR needs the empty-state reason only. Use these same admission/benefit
+    // rules, but stop once a next step exists instead of building every card.
+    if (mode === 'availability' && direct > 0) return empty(null);
+    const unlocked = findUnlocked(snapshot, employee, action, levels, after, profile, context);
     if (direct <= 0 && !unlocked.length) continue;
+    if (mode === 'availability') return empty(null);
     const base: Omit<Candidate, 'facts'> = {
       candidate_id: candidateId(action), event_id: action.event.event_id, title: action.event.title,
       event_type: action.event.type, format: action.event.format, duration_hours: action.event.duration_hours,
@@ -301,22 +349,22 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
       goal_coverage_delta: progressFor(after, profile)!.coverage - employee.progress.coverage,
       unlocks_event_ids: unlocked.map(item => item.event.event_id),
     };
-    candidates.push({ ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked, recentOutcomes.get(action.event.event_id) ?? []) });
+    candidates.push({ ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked, recentOutcomes.get(action.event.event_id) ?? [], context.history) });
     unlockedWeightedGain.set(base.candidate_id, Math.max(0, ...unlocked.map(item => item.weighted_gain)));
   }
   if (!candidates.length) return empty(hasBenefit ? 'NO_GOAL_RELEVANT_EVENTS' : 'NO_BENEFICIAL_EVENTS');
-  const signals = buildBaselineSignals(candidates, { employeeId, asOfDate: snapshot.as_of_date, history: snapshot.history, events: snapshot.events, unlockedWeightedGain });
+  const signals = buildBaselineSignals(candidates, { employeeId, asOfDate: snapshot.as_of_date, history: context.history, events: snapshot.events, unlockedWeightedGain });
   return { employee, candidates: rankBaseline({ profile: { skills: employee.skills }, candidates }, signals), emptyReason: null, signals };
 }
 
 export function assertCompletionAllowed(snapshot: DatasetSnapshot, employeeId: string, request: CompletionRequest): { event_id: string; participation_id: string | null; session_date: string | null; occurrence_key: string } {
-  const employee = employeeView(snapshot, employeeId);
+  const context = indexEmployeeHistory(snapshot, employeeId);
+  const employee = projectEmployee(snapshot, employeeId, context);
   invariant(request.simulation === true, 'INVALID_REQUEST', 'Допускается только явно обозначенная симуляция.');
   if (request.expected_version.dataset_revision !== employee.version.dataset_revision || request.expected_version.employee_revision !== employee.version.employee_revision) {
     throw new AppError('REVISION_CONFLICT', 'Профиль изменился. Обновите данные.', 409, { current_version: employee.version });
   }
-  const history = snapshot.history.filter(row => row.employee_id === employeeId);
-  const completions = snapshot.completions.filter(row => row.employee_id === employeeId);
+  const { history, completions } = context;
   const levels = levelsFrom(employee);
   let event: EventView | undefined;
   let participationId: string | null = null;
@@ -331,7 +379,7 @@ export function assertCompletionAllowed(snapshot: DatasetSnapshot, employeeId: s
     event = snapshot.events.find(item => item.event_id === row!.event_id);
     invariant(event, 'NOT_FOUND', 'Активность не найдена.', 404);
     sessionDate = event!.format === 'self_paced' ? null : row!.date;
-    if (completedOccurrence(event!, sessionDate, history, completions)) {
+    if (completedOccurrence(event!, sessionDate, context)) {
       throw new AppError(event!.repeatable ? 'SESSION_ALREADY_COMPLETED' : 'ALREADY_COMPLETED', 'Активность или выбранная сессия уже завершена.', 409);
     }
     invariant(row!.status === 'in_progress', 'INVALID_PARTICIPATION_STATE', 'Продолжить можно только начатое участие.', 409);
@@ -345,10 +393,10 @@ export function assertCompletionAllowed(snapshot: DatasetSnapshot, employeeId: s
     } else {
       invariant(sessionDate !== null && sessionDate >= snapshot.as_of_date && event!.upcoming_sessions.includes(sessionDate), 'INELIGIBLE_EVENT', 'Выберите существующую будущую сессию.', 422);
     }
-    if (completedOccurrence(event!, sessionDate, history, completions)) {
+    if (completedOccurrence(event!, sessionDate, context)) {
       throw new AppError(event!.repeatable ? 'SESSION_ALREADY_COMPLETED' : 'ALREADY_COMPLETED', 'Активность или выбранная сессия уже завершена.', 409);
     }
-    const active = activeAttempts(event!, history, completions).find(row => sameOccurrence(event!, row.date, sessionDate));
+    const active = activeAttempts(event!, context).find(row => sameOccurrence(event!, row.date, sessionDate));
     invariant(!active, 'USE_EXISTING_PARTICIPATION', 'Активность уже начата. Продолжите существующее участие.', 409);
     invariant(matchesAudience(event!, employee), 'INELIGIBLE_EVENT', 'Активность не соответствует текущей роли или грейду.', 422);
     invariant(meetsPrerequisites(event!, levels), 'INELIGIBLE_EVENT', 'Не выполнены предварительные требования активности.', 422);
@@ -405,7 +453,7 @@ export function hrOverview(snapshot: DatasetSnapshot): HrOverview {
     const employeeSnapshot = { ...snapshot, employees: [source],
       history: historyByEmployee.get(source.employee_id) ?? [],
       completions: completionsByEmployee.get(source.employee_id) ?? [] };
-    const { employee, emptyReason } = getCandidates(employeeSnapshot, source.employee_id);
+    const { employee, emptyReason } = evaluateCandidates(employeeSnapshot, source.employee_id, 'availability');
     employeeViews.push(employee);
     result.goals_by_source[employee.goal.source]++;
     if (emptyReason) result.no_next_step.push({ employee_id: employee.employee_id, full_name: employee.full_name, goal_source: employee.goal.source, reason: emptyReason });

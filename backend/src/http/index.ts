@@ -2,15 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
 import { AppError, invariant } from '../errors';
 import { login, logout, session, sessionCookie, requireEmployee, requireHr } from '../auth';
-import { readSnapshot, getHealth, updateGoal, completeActivity, importData } from '../services/data';
+import { readSnapshot, readDatasetDate, getHealth, updateGoal, completeActivity, importData } from '../services/data';
 import { recommendations } from '../services/recommendations';
 import { listLearningModules, getLearningModule, startLearning, getLearningAttempt, completeLesson, submitQuiz, startLearningSchema, completeLessonSchema, submitQuizSchema } from '../learning/service';
 import { employeeView, catalogView, hrOverview } from '../domain';
-import { parseEmployeeFile, parseHistoryCsv } from '../validation';
+import { parseEmployeeFile, parseHistoryCsv, storageTextSchema } from '../validation';
 import type { ImportCommand, RequestMeta } from '../types';
 
 const versionSchema = z.object({ dataset_revision: z.number().int().nonnegative(), employee_revision: z.number().int().nonnegative() }).strict();
-const idSchema = z.string().min(1).max(200);
+const idSchema = storageTextSchema.min(1).max(200);
 const grades = z.enum(['Junior', 'Middle', 'Senior', 'Lead']);
 const goalSchema = z.object({ expected_version: versionSchema, career_goal: z.object({ target_role: z.string().min(1).max(200), target_grade: grades }).strict().nullable() }).strict();
 const recSchema = z.object({ expected_version: versionSchema, limit: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional() }).strict();
@@ -92,24 +92,31 @@ export async function handleRequest(request: Request): Promise<Response> {
     const path = url.pathname.replace(/\/$/, '');
     if (method === 'GET' && path === '/api/health') {
       const health = await getHealth();
-      if (health.status === 'ok') asOf = (await readSnapshot()).as_of_date;
+      if (health.status === 'ok') asOf = await readDatasetDate();
       return success(health, health.status === 'ok' ? 200 : 503);
     }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) assertOrigin(request);
     if (path === '/api/auth/login' && method === 'POST') {
-      const input = z.object({ username: z.string().min(1).max(100), password: z.string().min(1).max(256) }).strict().parse(await jsonBody(request));
+      const input = z.object({ username: storageTextSchema.min(1).max(100), password: z.string().min(1).max(256) }).strict().parse(await jsonBody(request));
+      // Complete readiness checks before creating a session or issuing its cookie.
+      asOf = await readDatasetDate();
       const { actor, token } = await login(input.username, input.password);
       headers['Set-Cookie'] = sessionCookie(token);
-      asOf = (await readSnapshot()).as_of_date;
       return success(actor);
     }
-    const actor = await session(request);
-    const snapshot = await readSnapshot(); asOf = snapshot.as_of_date;
-    if (path === '/api/auth/session' && method === 'GET') return success(actor);
     if (path === '/api/auth/logout' && method === 'POST') {
+      // Revocation is idempotent and must survive expired sessions or unavailable dataset reads.
       await logout(request); headers['Set-Cookie'] = sessionCookie('', true);
+      try { asOf = await readDatasetDate(); }
+      catch (error) { if (!(error instanceof AppError && error.code === 'NOT_READY')) throw error; }
       return success({ logged_out: true });
     }
+    const actor = await session(request);
+    if (path === '/api/auth/session' && method === 'GET') {
+      asOf = await readDatasetDate();
+      return success(actor);
+    }
+    const snapshot = await readSnapshot(); asOf = snapshot.as_of_date;
     if (path === '/api/catalog' && method === 'GET') return success(catalogView(snapshot));
 
     if (path === '/api/learning/modules' && method === 'GET') return success(listLearningModules());

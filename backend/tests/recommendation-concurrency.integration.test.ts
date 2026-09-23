@@ -169,4 +169,57 @@ describe.skipIf(!databaseUrl)('recommendation concurrency on isolated PostgreSQL
       observer.release();
     }
   }, 15000);
+
+  it('rejects a committed profile change during AI and caches only the subsequent current result', async () => {
+    const fetch = delayedProvider();
+    const pending = recommend('PERSON_7', { expected_version: version });
+    const pendingCalls = [pending];
+    void pending.catch(() => undefined);
+    try {
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce(), { timeout: 3000 });
+      await db.withTransaction(async client => {
+        await client.query('SELECT id FROM app_meta WHERE id=1 FOR UPDATE');
+        await client.query("UPDATE employees SET employee_revision=2 WHERE employee_id='PERSON_7'");
+        await client.query('UPDATE app_meta SET global_revision=global_revision+1 WHERE id=1');
+      });
+      providerResponses.shift()!();
+      await expect(pending).rejects.toMatchObject({ code: 'STALE_RECOMMENDATION', status: 409,
+        details: { current_version: { dataset_revision: 1, employee_revision: 2 } } });
+      const currentVersion = { dataset_revision: 1, employee_revision: 2 };
+      const current = recommend('PERSON_7', { expected_version: currentVersion });
+      void current.catch(() => undefined);
+      pendingCalls.push(current);
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
+      providerResponses.shift()!();
+      const result = await current;
+      expect(result).toMatchObject({ mode: 'ai', version: currentVersion });
+      expect(await recommend('PERSON_7', { expected_version: currentVersion })).toEqual(result);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      providerResponses.splice(0).forEach(complete => complete());
+      await Promise.allSettled(pendingCalls);
+    }
+  }, 15000);
+
+  it('reads both revisions atomically and preserves unseeded and missing-employee boundaries', async () => {
+    const writer = await db.pool.connect();
+    const reader = await db.pool.connect();
+    try {
+      await writer.query('BEGIN');
+      await writer.query("UPDATE employees SET employee_revision=2 WHERE employee_id='PERSON_8'");
+      await writer.query('UPDATE app_meta SET dataset_revision=2 WHERE id=1');
+      expect(await db.readDomainVersionWithClient(writer, 'PERSON_8')).toEqual({ dataset_revision: 2, employee_revision: 2 });
+      expect(await db.readDomainVersionWithClient(reader, 'PERSON_8')).toEqual(version);
+      await writer.query('ROLLBACK');
+      expect(await db.readDomainVersionWithClient(reader, 'PERSON_8')).toEqual(version);
+      expect(await db.readDomainVersionWithClient(reader, 'MISSING_PERSON')).toEqual({ dataset_revision: 1, employee_revision: undefined });
+      await writer.query('BEGIN');
+      await writer.query('UPDATE app_meta SET seed_complete=false WHERE id=1');
+      await expect(db.readDomainVersionWithClient(writer, 'PERSON_8')).rejects.toMatchObject({ code: 'NOT_READY', status: 503 });
+    } finally {
+      await writer.query('ROLLBACK');
+      writer.release();
+      reader.release();
+    }
+  });
 });

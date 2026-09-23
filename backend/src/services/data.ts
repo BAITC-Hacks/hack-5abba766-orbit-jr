@@ -8,6 +8,11 @@ import { canonicalJson, sourceHash, validateRelations, employeeSchema, participa
 import type { DatasetSnapshot, SessionView, HealthView, GoalRequest, GoalResult, CompletionRequest, CompletionResult, ImportCommand, ImportResult, ImportIssue, EmployeeSource, ParticipationSource } from '../types';
 
 export async function readSnapshot(): Promise<DatasetSnapshot> { return withTransaction(readSnapshotWithClient, { readOnly: true }); }
+export async function readDatasetDate(): Promise<string> {
+  const { rows } = await pool.query('SELECT as_of_date FROM app_meta WHERE id=1 AND seed_complete=true');
+  if (!rows[0]) throw new AppError('NOT_READY', 'Датасет ещё не инициализирован', 503);
+  return rows[0].as_of_date;
+}
 export async function getHealth(): Promise<HealthView> {
   const base: HealthView = { status: 'not_ready', dataset_initialized: false, schema_version: null, ai_configured: isAiConfigured() };
   try {

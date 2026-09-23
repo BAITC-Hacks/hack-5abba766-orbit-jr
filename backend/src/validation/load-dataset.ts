@@ -24,11 +24,12 @@ export async function loadDataset(directory = process.env.DATASET_DIR || fileURL
   const skills = new Set(snapshot.skills.map(s => s.skill_id));
   const roles = new Set(snapshot.role_profiles.map(r => r.role));
   for (const role of snapshot.role_profiles) {
-    if (Object.keys(role.required_skills).some(s => !skills.has(s)) || role.critical_skills.some(s => !(s in role.required_skills))) throw new AppError('VALIDATION_ERROR', 'Некорректные навыки в требованиях роли');
+    if (Object.keys(role.required_skills).some(s => !skills.has(s)) || role.critical_skills.some(s => !Object.hasOwn(role.required_skills, s))) throw new AppError('VALIDATION_ERROR', 'Некорректные навыки в требованиях роли');
   }
   for (const event of snapshot.events) {
     if ([...Object.keys(event.prerequisites), ...event.develops_skills.map(s => s.skill_id)].some(s => !skills.has(s)) || event.target_roles.some(r => !roles.has(r))) throw new AppError('VALIDATION_ERROR', 'Некорректные ссылки в каталоге активностей');
     if (event.format === 'self_paced' && event.upcoming_sessions.length) throw new AppError('VALIDATION_ERROR', 'У самостоятельной активности не должно быть сессий');
+    if (event.repeatable && event.format === 'self_paced') throw new AppError('VALIDATION_ERROR', 'Повторяемая активность требует формата с датами сессий');
     if (new Set(event.develops_skills.map(s => s.skill_id)).size !== event.develops_skills.length) throw new AppError('VALIDATION_ERROR', 'Повторяющиеся эффекты одного навыка');
   }
   const issues = validateRelations(snapshot);

@@ -3,9 +3,9 @@
 **/.next
 **/*.tsbuildinfo
 **/.DS_Store
-.env
-.env.*
+**/.env
+**/.env.*
 data/source
-coverage
-test-results
-playwright-report
+**/coverage
+**/test-results
+**/playwright-report
