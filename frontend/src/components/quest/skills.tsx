@@ -45,18 +45,16 @@ export function Skills({
   return (
     <section className="skills-panel">
       <div className="skills-intro">
-        <span className="eyebrow">ВИДЕТЬ СВОЙ РОСТ</span>
-        <h2>
-          Ваш опыт.
-          <br />В новой перспективе.
-        </h2>
+        <h2>Навыки к цели</h2>
         <p>Сначала — навыки, которые приблизят вас к выбранной цели.</p>
         <small>Соответствие навыков не является гарантией повышения.</small>
         <button
           className="secondary skill-filter"
           aria-pressed={filteringGaps}
           disabled={!employee.goal.target}
-          onClick={() => setOnlyGaps((v) => !v)}
+          onClick={() => {
+            setOnlyGaps((v) => !v);
+          }}
         >
           {filteringGaps ? "Показать все навыки" : "Только навыки с разрывом"}
         </button>

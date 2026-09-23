@@ -62,7 +62,8 @@ export function Loading({
   children?: React.ReactNode;
 }) {
   return (
-    <p className="feedback" role="status">
+    <p className="feedback loading-feedback" role="status">
+      <span className="button-spinner" aria-hidden="true" />
       {children}
     </p>
   );

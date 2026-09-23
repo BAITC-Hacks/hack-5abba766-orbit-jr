@@ -8,6 +8,7 @@ import {
   isDefinitiveRejection,
 } from "@/lib/api";
 import { Failure } from "./feedback";
+import { FileJson, FileSpreadsheet, Upload, CheckCircle2, Database } from "lucide-react";
 export function ImportPanel({
   revision,
   onRefresh,
@@ -86,13 +87,16 @@ export function ImportPanel({
     <section className="panel import-panel">
       <span className="eyebrow">ДАННЫЕ ДЛЯ РАЗВИТИЯ</span>
       <h2>Импорт профилей и истории</h2>
-      <p>
-        JSON в формате {"{meta, employees}"} и CSV истории. Хотя бы один файл;
-        суммарно до 20 МиБ, до 1 000 профилей и 50 000 строк истории. Сервер
-        сохраняет весь пакет атомарно.
-      </p>
-      <label className="field-label">
-        Профили · JSON
+      <ol className="import-steps" aria-label="Этапы импорта">
+        <li className={employees || history ? "done" : "current"}><Upload size={20} /><span>Файлы</span></li>
+        <li className={result?.dry_run && !result.errors.length ? "done" : ""}><CheckCircle2 size={20} /><span>Проверка</span></li>
+        <li className={result?.applied ? "done" : ""}><Database size={20} /><span>Готово</span></li>
+      </ol>
+      <div className="import-file-grid">
+      <label className="field-label import-file-tile">
+        <FileJson size={30} aria-hidden="true" />
+        <strong>Профили · JSON</strong>
+        <span>{employees ? employees.name : "До 1 000 сотрудников"}</span>
         <input
           type="file"
           accept=".json,application/json"
@@ -104,8 +108,10 @@ export function ImportPanel({
           }}
         />
       </label>
-      <label className="field-label">
-        История · CSV
+      <label className="field-label import-file-tile">
+        <FileSpreadsheet size={30} aria-hidden="true" />
+        <strong>История · CSV</strong>
+        <span>{history ? history.name : "До 50 000 записей"}</span>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -117,15 +123,8 @@ export function ImportPanel({
           }}
         />
       </label>
-      <ul>
-        {[employees, history]
-          .filter((f): f is File => !!f)
-          .map((f) => (
-            <li key={f.name}>
-              {f.name} · {(f.size / 1024).toFixed(1)} КиБ
-            </li>
-          ))}
-      </ul>
+      </div>
+      <details className="import-format-help"><summary>Формат файлов · до 20 МиБ</summary><p>Профили: JSON {"{meta, employees}"}. История: CSV. Выберите хотя бы один файл. Весь пакет сохраняется целиком; одинаковые записи пропускаются.</p></details>
       <label className="import-preview-toggle">
         <input
           type="checkbox"

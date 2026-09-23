@@ -102,7 +102,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
       <div hidden={!!selected}>
         <header className="page-top hr-heading">
           <div>
-            <span className="eyebrow">КАБИНЕТ HR</span>
+            <span className="eyebrow">HALYK · PEOPLE & GROWTH</span>
             <h1 ref={heading} tabIndex={-1}>
               Развитие команды
             </h1>
@@ -297,9 +297,8 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
           )}
         </section>
         <div hidden={section !== "import"} className="hr-view">
-          <div className="import-guide">
-            <span className="eyebrow">ОБНОВЛЕНИЕ КОМАНДЫ</span>
-            <h2>Добавьте данные в три шага</h2>
+          <details className="import-format-help">
+            <summary>Как работает импорт</summary>
             <ol>
               <li>
                 <strong>Выберите файлы</strong>
@@ -320,7 +319,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               Новые записи добавятся, одинаковые будут пропущены. Конфликтующие
               изменения остановят весь импорт.
             </p>
-          </div>
+          </details>
           <Failure error={catalog.error} retry={catalog.reload} />
           {catalog.data && (
             <ImportPanel
@@ -353,6 +352,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             </p>
           </div>
           <Employee
+            viewer="hr"
             key={selected + "-" + revision}
             id={selected}
             onError={onError}

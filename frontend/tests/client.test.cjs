@@ -577,18 +577,18 @@ test("history status filtering keeps separate participations and their exact act
   try {
     await act(async () =>
       root.root
-        .findByType("select")
-        .props.onChange({ target: { value: "in_progress" } }),
+        .findAllByType("button").find(b => b.children[0] === "В процессе")
+        .props.onClick(),
     );
     assert.doesNotMatch(JSON.stringify(root.toJSON()), /First club/);
-    await act(async () => root.root.findByType("button").props.onClick());
+    await act(async () => root.root.findAllByType("button").find(b => b.props.className === "primary").props.onClick());
     assert.deepEqual(targets, [
       { kind: "existing_participation", participation_id: "b" },
     ]);
     await act(async () =>
       root.root
-        .findByType("select")
-        .props.onChange({ target: { value: "no_show" } }),
+        .findAllByType("button").find(b => b.children[0] === "Пропуск")
+        .props.onClick(),
     );
     assert.match(
       JSON.stringify(root.toJSON()),
@@ -913,5 +913,42 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
     assert.deepEqual(opened, ["done"]);
   } finally {
     await unmount(root);
+  }
+});
+
+test("HR goal action names the employee and writes only to the selected profile", async () => {
+  const previousDocument = global.document;
+  global.document = { activeElement: null, querySelector: () => null };
+  const profile = {
+    ...employee(1, "hr-selected"), full_name: "Анна Петровна Иванова",
+    department: "Разработка", role: "Engineer", grade: "Junior",
+    goal: { source: "missing", target: null }, progress: null,
+    tenure_months: 6, last_review_date: "2026-09-01", has_simulated_progress: false,
+  };
+  const writes = [];
+  let root;
+  global.fetch = async (url, options) => {
+    if (options.method === "PUT") {
+      writes.push({ url, body: JSON.parse(options.body) });
+      return reply({ employee: profile, changed: true, version: profile.version });
+    }
+    return reply(url === "/api/catalog"
+      ? { skills: [], events: [], role_profiles: [{ role: "Engineer", grade: "Senior" }] }
+      : url.endsWith("/recommendations") ? rec() : profile);
+  };
+  try {
+    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", onError })); });
+    assert.equal(root.root.findByType("h1").children.join(""), profile.full_name);
+    const actions = root.root.findByProps({ "aria-label": "Действия HR" });
+    await act(async () => actions.findAllByType("button")[0].props.onClick());
+    assert.equal(root.root.findByType("dialog").findByType("strong").children.join(""), profile.full_name);
+    await act(async () => root.root.findByType("select").props.onChange({ target: { value: "0" } }));
+    await act(async () => root.root.findByType("form").props.onSubmit({ preventDefault() {} }));
+    assert.deepEqual(writes, [{ url: "/api/employees/hr-selected/goal", body: {
+      expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Senior" },
+    } }]);
+  } finally {
+    if (root) await unmount(root);
+    global.document = previousDocument;
   }
 });
