@@ -13,10 +13,10 @@ async function call(route, method = 'GET', body, key) {
   return payload;
 }
 assert.equal((await call('/api/health')).data.status, 'ok');
-await call('/api/auth/login', 'POST', { username: 'hr', password: process.env.DEMO_HR_PASSWORD || 'hr-demo-2026' });
-const directory = (await call('/api/employees?limit=1')).data;
-assert.ok(directory.items.length);
-const id = directory.items[0].employee_id;
+const employeeSession = (await call('/api/auth/login', 'POST', { username: 'employee', password: process.env.DEMO_EMPLOYEE_PASSWORD || 'employee-demo-2026' })).data;
+assert.equal(employeeSession.role, 'employee');
+const id = employeeSession.employee_id;
+assert.ok(id, 'Employee account must have its own profile');
 const profilePath = `/api/employees/${encodeURIComponent(id)}`;
 let profile = (await call(profilePath)).data;
 const catalog = (await call('/api/catalog')).data;
@@ -41,6 +41,11 @@ if (process.env.SMOKE_RESTORE === 'true') {
   const saved = JSON.parse(await readFile(process.env.SMOKE_STATE_FILE, 'utf8'));
   assert.equal(id, saved.employee_id); assert.deepEqual(profile.version, saved.version); assert.deepEqual(profile.skills, saved.skills);
 }
+await call('/api/auth/logout', 'POST', {});
+await call('/api/auth/login', 'POST', { username: 'hr', password: process.env.DEMO_HR_PASSWORD || 'hr-demo-2026' });
+const directory = (await call('/api/employees?limit=1')).data;
+assert.ok(directory.items.length);
+assert.equal((await call(profilePath)).data.employee_id, id);
 const hr = (await call('/api/hr/overview')).data;
 assert.equal(hr.employee_count, directory.total);
 await call('/api/auth/logout', 'POST', {});

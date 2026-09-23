@@ -14,6 +14,7 @@ export function RecommendationCard({
   select,
   eventNames = {},
   actionLabel = "Подробнее",
+  readOnly = false,
 }: {
   card: Card;
   employee: EmployeeView;
@@ -21,9 +22,10 @@ export function RecommendationCard({
   select: () => void;
   eventNames?: Record<string, string>;
   actionLabel?: string;
+  readOnly?: boolean;
 }) {
   const explanationGroups: { label: string; categories: FactCategory[] }[] = [
-    { label: "Почему подходит вам", categories: ["grade", "eligibility", "effort"] },
+    { label: readOnly ? "Почему подходит сотруднику" : "Почему подходит вам", categories: ["grade", "eligibility", "effort"] },
     { label: "Как приближает к цели", categories: ["skill_gap", "target_requirement"] },
     { label: "Что учтено из истории", categories: ["history"] },
   ];

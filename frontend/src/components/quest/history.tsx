@@ -18,12 +18,14 @@ export function History({
   complete,
   moduleEventIds = [],
   learn,
+  readOnly = false,
 }: {
   rows: ParticipationView[];
   busy: boolean;
   complete: (target: CompletionRequest["target"]) => void;
   moduleEventIds?: string[];
   learn?: (row: ParticipationView) => void;
+  readOnly?: boolean;
 }) {
   const [status, setStatus] = useState("all");
   const visible = rows.filter(
@@ -40,7 +42,7 @@ export function History({
       <div className="section-heading">
         <div>
           <span className="eyebrow">ОБУЧЕНИЕ И РАЗВИТИЕ</span>
-          <h2 id="activity-title">Моя активность</h2>
+          <h2 id="activity-title">{readOnly ? "Активность сотрудника" : "Моя активность"}</h2>
         </div>
       </div>
       <div className="activity-stats" aria-label="Статистика участия">
@@ -74,7 +76,7 @@ export function History({
       {!rows.length && (
         <div className="empty-state">
           <BookOpen size={32} aria-hidden="true" />
-          <h3>Здесь появится ваше обучение</h3>
+          <h3>{readOnly ? "У сотрудника пока нет истории обучения" : "Здесь появится ваше обучение"}</h3>
           <p>Подходящие активности можно посмотреть в разделе «Обзор».</p>
         </div>
       )}
@@ -132,7 +134,7 @@ export function History({
               {row.superseded_by && <span>Учтено в другом участии</span>}
             </div>
             <div className="activity-card-footer">
-              {row.actionable ? (
+              {!readOnly && row.actionable ? (
                 <button
                   type="button"
                   className="primary"

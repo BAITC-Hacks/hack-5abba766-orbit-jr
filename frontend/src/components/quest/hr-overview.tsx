@@ -6,6 +6,7 @@ import { ArrowUpRight, Target, Users, Sparkles } from "lucide-react";
 import type { HrOverview as Overview } from "../../../../contracts/backend";
 import { emptyReasons, goalSources, statuses } from "@/lib/labels";
 import { CatalogGaps } from "./catalog-gaps";
+const hrEmptyReasons = { ...emptyReasons, GOAL_REQUIRED: "Цель пока не выбрана." };
 export function HrOverview({
   data,
   open,
@@ -169,7 +170,7 @@ export function HrOverview({
         </div>
         {!!data.no_next_step.length && (
           <CatalogSelect label="Причина" value={reason} onChange={(value) => { setReason(value); setAllPeople(false); }}
-            options={[["all", "Все причины"], ...Object.entries(emptyReasons).filter(([key]) => key === reason || data.no_next_step.some((person) => person.reason === key))]} />
+            options={[["all", "Все причины"], ...Object.entries(hrEmptyReasons).filter(([key]) => key === reason || data.no_next_step.some((person) => person.reason === key))]} />
         )}
         <div className="attention-list" id="hr-attention-list">
           {available.slice(0, allPeople ? undefined : 8).map((p) => (
@@ -182,7 +183,7 @@ export function HrOverview({
                 <strong>{p.full_name}</strong>
                 <small>{goalSources[p.goal_source]}</small>
               </span>
-              <span>{emptyReasons[p.reason]}</span>
+              <span>{hrEmptyReasons[p.reason]}</span>
               <ArrowUpRight size={19} aria-hidden="true" />
             </button>
           ))}

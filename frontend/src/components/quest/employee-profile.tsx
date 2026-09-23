@@ -6,11 +6,12 @@ import { Skills } from "./skills";
 const workFormats = { office: "В офисе", hybrid: "Гибридный", remote: "Удалённо" };
 const languages = { ru: "Русский", kk: "Қазақша", en: "English" };
 
-export function EmployeeProfile({ employee: p, names, onGoal, disabled }: {
+export function EmployeeProfile({ employee: p, names, onGoal, disabled, readOnly = false }: {
   employee: EmployeeView;
   names: Record<string, string>;
   onGoal: () => void;
   disabled: boolean;
+  readOnly?: boolean;
 }) {
   const completed = p.history.filter(row => row.effective_status === "completed").length;
   const active = p.history.filter(row => row.effective_status === "in_progress").length;
@@ -28,9 +29,9 @@ export function EmployeeProfile({ employee: p, names, onGoal, disabled }: {
         <div className="profile-card-heading"><Target size={20} aria-hidden="true" /><h2 id="profile-goal">Направление развития</h2></div>
         <span className="profile-goal-source">{goalSources[p.goal.source]}</span>
         <h3>{p.goal.target ? `${p.goal.target.target_grade} ${p.goal.target.target_role}` : "Следующий шаг начинается с цели"}</h3>
-        <p>{p.goal.target ? "Навыки и обучение на пути к выбранной роли." : "Выберите роль, чтобы увидеть требования и подходящее обучение."}</p>
+        <p>{p.goal.target ? "Навыки и обучение на пути к выбранной роли." : readOnly ? "Сотрудник пока не выбрал направление развития." : "Выберите роль, чтобы увидеть требования и подходящее обучение."}</p>
         {p.progress && <div className="profile-coverage"><div><span>Соответствие цели</span><strong>{Math.round(p.progress.coverage * 100)}%</strong></div><progress max={100} value={Math.round(p.progress.coverage * 100)} aria-label="Соответствие цели" /></div>}
-        <button className="secondary" onClick={onGoal} disabled={disabled}>{p.goal.target ? "Изменить цель" : "Выбрать цель"}<ArrowUpRight size={16} aria-hidden="true" /></button>
+        {!readOnly && <button className="secondary" onClick={onGoal} disabled={disabled}>{p.goal.target ? "Изменить цель" : "Выбрать цель"}<ArrowUpRight size={16} aria-hidden="true" /></button>}
       </section>
     </div>
     <dl className="profile-statistics" aria-label="Обучение и навыки">
@@ -38,6 +39,6 @@ export function EmployeeProfile({ employee: p, names, onGoal, disabled }: {
       <div><dt>Завершено активностей</dt><dd>{completed}</dd></div>
       <div><dt>В процессе обучения</dt><dd>{active}</dd></div>
     </dl>
-    <Skills employee={p} names={names} />
+    <Skills employee={p} names={names} readOnly={readOnly} />
   </div>;
 }

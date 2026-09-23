@@ -155,7 +155,6 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
           <div className="section-heading">
             <div>
               <h2 id="directory-title">Сотрудники</h2>
-
             </div>
           </div>
           <div className="toolbar directory-filters">
@@ -337,11 +336,12 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               Вернуться {section === "people" ? "к сотрудникам" : "к обзору"}
             </button>
             <p>
-Изменения сохраняются в этом профиле.
+              Просмотр HR. Цель и обучение выбирает сотрудник.
             </p>
           </div>
           <Employee
             viewer="hr"
+            readOnly
             initialTab="profile"
             key={selected + "-" + revision}
             id={selected}

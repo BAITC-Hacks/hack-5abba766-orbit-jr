@@ -45,14 +45,17 @@ export function Employee({
   onError,
   onChanged,
   viewer = "employee",
+  readOnly: requestedReadOnly = false,
   initialTab = "overview",
 }: {
   id: string;
   onError: (error: unknown) => void;
   onChanged?: () => void;
   viewer?: "employee" | "hr";
+  readOnly?: boolean;
   initialTab?: "overview" | "profile";
 }) {
+  const readOnly = requestedReadOnly || viewer === "hr";
   const state = useEmployee(id, onError, onChanged);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
   const modules = useResource<{ modules: LearningModuleSummary[] }>(endpoints.learningModules, onError);
@@ -85,6 +88,7 @@ export function Employee({
   const disabled = state.busy || !!state.pendingTarget;
   const isHr = viewer === "hr";
   function openGoal() {
+    if (readOnly) return;
     const index = catalog.data?.role_profiles.findIndex(
       (g) => g.role === p?.goal.target?.target_role && g.grade === p?.goal.target?.target_grade,
     ) ?? -1;
@@ -93,7 +97,7 @@ export function Employee({
   }
   function openLearning(moduleId: string, eventId: string, target?: CompletionRequest["target"]) {
     const event = catalog.data?.events.find(item => item.event_id === eventId);
-    if (!event || !p || disabled) return;
+    if (readOnly || !event || !p || disabled) return;
     const active = p.history.find(item => item.event_id === eventId && item.actionable);
     const selectedTarget = target ?? (active
       ? { kind: "existing_participation" as const, participation_id: active.participation_id }
@@ -108,10 +112,10 @@ export function Employee({
   }
   function chooseCard(card: Card) {
     const module = moduleFor(card.event_id);
-    if (module) openLearning(module.id, card.event_id, cardTarget(card));
+    if (module && !readOnly) openLearning(module.id, card.event_id, cardTarget(card));
     else setSelected(card);
   }
-  if (learning && p) return <LearningPlayer key={`${id}:${learning.moduleId}`} employee={p} moduleId={learning.moduleId} event={learning.event} target={learning.target} names={names} onError={onError}
+  if (!readOnly && learning && p) return <LearningPlayer key={`${id}:${learning.moduleId}`} employee={p} moduleId={learning.moduleId} event={learning.event} target={learning.target} names={names} onError={onError}
     onClose={() => setLearning(undefined)} onCompleted={(result, previousProgress) => {
       setLearning(undefined);
       setTab("overview");
@@ -122,20 +126,20 @@ export function Employee({
       {state.loading && <Loading>Загрузка профиля…</Loading>}
       {state.busy && !state.loading && <Loading>Сохраняем изменения…</Loading>}
       <Failure error={state.error} retry={() => void state.refresh()} />
-      <Failure
+      {!readOnly && <Failure
         error={state.mutationError}
         retry={
           state.pendingTarget && !state.busy
             ? () => void state.retryCompletion()
             : undefined
         }
-      />
-      {state.notice && (
+      />}
+      {!readOnly && state.notice && (
         <p className="feedback success" role="status">
           {state.notice}
         </p>
       )}
-      {state.pendingTarget && !state.busy && (
+      {!readOnly && state.pendingTarget && !state.busy && (
         <p className="feedback">
           Результат пока не подтверждён. Повторите завершение — повторного начисления не будет.
         </p>
@@ -162,7 +166,7 @@ export function Employee({
               ["overview", "Обзор"],
               ["history", isHr ? "Активность сотрудника" : "Моя активность"],
               ["catalog", "Каталог"],
-              ["learning", "Учебная мастерская"],
+              ["learning", readOnly ? "Учебные модули" : "Учебная мастерская"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -181,26 +185,26 @@ export function Employee({
               </button>
             ))}
           </nav>
-          {tab === "profile" && <EmployeeProfile employee={p} names={names} onGoal={openGoal} disabled={disabled || !catalog.data} />}
+          {tab === "profile" && <EmployeeProfile employee={p} names={names} onGoal={openGoal} disabled={disabled || !catalog.data} readOnly={readOnly} />}
           {tab === "overview" && (
             <>
               <section className="goal-summary" aria-label="Карьерная цель">
                 <div className="goal-summary-copy">
                   <span className="goal-label">Карьерная цель</span>
-                  <h2>{p.goal.target ? `${p.goal.target.target_grade} ${p.goal.target.target_role}` : "Выберите направление развития"}</h2>
+                  <h2>{p.goal.target ? `${p.goal.target.target_grade} ${p.goal.target.target_role}` : readOnly ? "Направление пока не выбрано" : "Выберите направление развития"}</h2>
                   <p>{goalSources[p.goal.source]}{p.has_simulated_progress ? " · Включает симуляции" : ""}</p>
                 </div>
                 <div className="goal-summary-progress">
                   <div><span>Соответствие навыков</span><strong>{p.progress ? `${Math.round(p.progress.coverage * 100)}%` : "—"}</strong></div>
                   <progress max={100} value={p.progress ? Math.round(p.progress.coverage * 100) : 0} aria-label="Соответствие навыков цели" />
                 </div>
-                  <button
+                  {!readOnly && <button
                     className="secondary"
                     disabled={disabled || !catalog.data}
                     onClick={openGoal}
                   >
                     {p.goal.target ? "Изменить цель" : "Выбрать цель"}
-                  </button>
+                  </button>}
               </section>
               <section
                 className="growth-dashboard"
@@ -246,13 +250,13 @@ export function Employee({
                     <span>активностей в процессе</span>
                   </div>
                   <small>
-                    Продолжить обучение{" "}
+                    {readOnly ? "Посмотреть активность" : "Продолжить обучение"}{" "}
                     <ArrowUpRight size={15} aria-hidden="true" />
                   </small>
                 </button>
               </section>
-              {state.completion && <CompletionResultPanel result={state.completion.result} previousProgress={state.completion.previousProgress} names={names} onClose={state.dismissCompletion} />}
-              <CareerJourney employee={p} recommendations={state.recommendations} names={names} eventNames={eventNames} onSelect={chooseCard} />
+              {!readOnly && state.completion && <CompletionResultPanel result={state.completion.result} previousProgress={state.completion.previousProgress} names={names} onClose={state.dismissCompletion} />}
+              <CareerJourney employee={p} recommendations={state.recommendations} names={names} eventNames={eventNames} onSelect={chooseCard} readOnly={readOnly} />
               <div className="employee-workspace">
               <section className="recommendations-section">
                 <div className="section-heading">
@@ -283,7 +287,9 @@ export function Employee({
                           ? "AI-подборка"
                           : state.recommendations.mode === "rules_fallback"
                             ? "Подборка по правилам"
-                            : emptyReasons[state.recommendations.empty_reason]}
+                            : readOnly && state.recommendations.empty_reason === "GOAL_REQUIRED"
+                              ? "Сотрудник пока не выбрал цель."
+                              : emptyReasons[state.recommendations.empty_reason]}
                       </p>
                     </div>
 
@@ -298,7 +304,8 @@ export function Employee({
                           employee={p}
                           names={names}
                           eventNames={eventNames}
-                          actionLabel={moduleFor(card.event_id) ? "Открыть уроки" : "Подробнее о шаге"}
+                          actionLabel={!readOnly && moduleFor(card.event_id) ? "Открыть уроки" : "Подробнее о шаге"}
+                          readOnly={readOnly}
                           select={() => chooseCard(card)}
                         />
                       ))}
@@ -306,7 +313,7 @@ export function Employee({
                   </>
                 )}
               </section>
-              <Skills employee={p} names={names} />
+              <Skills employee={p} names={names} readOnly={readOnly} />
               </div>
             </>
           )}
@@ -314,7 +321,8 @@ export function Employee({
             <History
               rows={p.history}
               busy={disabled}
-              complete={(target) => void state.complete(target)}
+              readOnly={readOnly}
+              complete={(target) => { if (!readOnly) void state.complete(target); }}
               moduleEventIds={learningModules.map(module => module.event_id)}
               learn={row => {
                 const module = moduleFor(row.event_id);
@@ -364,7 +372,9 @@ export function Employee({
                           <summary>{[...e.upcoming_sessions].sort()[0]}{e.upcoming_sessions.length > 1 && <span> +{e.upcoming_sessions.length - 1} даты</span>}</summary>
                           <div className="compact-meta">{[...e.upcoming_sessions].sort().map(date => <span key={date}>{date}</span>)}</div>
                         </details> : e.format !== "self_paced" && <p>Даты уточняются</p>}
-                        {moduleFor(e.event_id) && <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>}
+                        {moduleFor(e.event_id) && (readOnly
+                          ? <span className="outline-tag">Есть демомодуль</span>
+                          : <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>)}
                       </div>
                     </article>
                   ))}
@@ -387,14 +397,14 @@ export function Employee({
             </>
           )}
           {tab === "learning" && <section className="learning-library">
-            <span className="eyebrow">ОТ ПРОЧИТАННОГО К ПОНЯТНОМУ</span><h2>Учебная мастерская</h2>
+            <span className="eyebrow">ОТ ПРОЧИТАННОГО К ПОНЯТНОМУ</span><h2>{readOnly ? "Учебные модули" : "Учебная мастерская"}</h2>
             <div className="compact-meta"><span>Демомодули</span><span>Короткие уроки</span><span>Мини-тесты</span></div>
             {modules.loading && <Loading>Загрузка учебных модулей…</Loading>}
             <Failure error={modules.error} retry={modules.reload} />
             {!modules.loading && !modules.error && modules.data && learningModules.length === 0 && <p className="empty">Учебных модулей пока нет. Другие программы доступны в каталоге.</p>}
             <div className="learning-library-grid">{learningModules.map(module => <article className="learning-library-card" key={module.id}>
               <span>{module.estimated_minutes} минут · {module.lesson_count} урока · мини-тест</span><h3>{module.title}</h3><details className="compact-details"><summary>О модуле</summary><p>{module.summary}</p></details>
-              <button className="secondary" disabled={disabled || !catalog.data?.events.some(event => event.event_id === module.event_id)} onClick={() => openLearning(module.id, module.event_id)}>Открыть модуль →</button>
+              {!readOnly && <button className="secondary" disabled={disabled || !catalog.data?.events.some(event => event.event_id === module.event_id)} onClick={() => openLearning(module.id, module.event_id)}>Открыть модуль →</button>}
             </article>)}</div>
           </section>}
           {selected &&
@@ -441,7 +451,7 @@ export function Employee({
                     </ul>
                   </>
                 )}
-                <p className="fine-print">
+                {!readOnly && <><p className="fine-print">
                   Отметка покажет расчётный результат выполнения в этом демо. Она не подтверждает посещение внешнего мероприятия.
                 </p>
                 <button
@@ -457,10 +467,10 @@ export function Employee({
                   }}
                 >
                   Отметить активность выполненной
-                </button>
+                </button></>}
               </Modal>
             )}
-          {goalOpen && (
+          {!readOnly && goalOpen && (
             <Modal title={isHr ? "Карьерная цель сотрудника" : "Ваше направление"} close={() => setGoalOpen(false)}>
               {isHr && <p className="modal-employee">Сотрудник: <strong>{p.full_name}</strong></p>}
               <form

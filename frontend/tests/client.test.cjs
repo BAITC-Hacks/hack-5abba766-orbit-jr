@@ -916,7 +916,7 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
   }
 });
 
-test("HR goal action names the employee and writes only to the selected profile", async () => {
+test("HR read-only profile names the selected employee and only reads their data", async () => {
   const previousDocument = global.document;
   global.document = { activeElement: null, documentElement: { style: { overflow: "" } }, querySelector: () => null };
   const profile = {
@@ -925,28 +925,25 @@ test("HR goal action names the employee and writes only to the selected profile"
     goal: { source: "missing", target: null }, progress: null,
     tenure_months: 6, last_review_date: "2026-09-01", has_simulated_progress: false,
   };
-  const writes = [];
+  const requests = [];
   let root;
   global.fetch = async (url, options) => {
-    if (options.method === "PUT") {
-      writes.push({ url, body: JSON.parse(options.body) });
-      return reply({ employee: profile, changed: true, version: profile.version });
-    }
+    requests.push({ url, method: options.method ?? "GET" });
     return reply(url === "/api/catalog"
       ? { skills: [], events: [], role_profiles: [{ role: "Engineer", grade: "Senior" }] }
       : url.endsWith("/recommendations") ? rec() : profile);
   };
   try {
-    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", onError })); });
+    await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", readOnly: true, onError })); });
     assert.equal(root.root.findByType("h1").children.join(""), profile.full_name);
-    const goalButton = root.root.findAllByType("button").find(button => button.children.includes("Выбрать цель"));
-    await act(async () => goalButton.props.onClick());
-    assert.equal(root.root.findByType("dialog").findByType("strong").children.join(""), profile.full_name);
-    await act(async () => root.root.findByProps({ label: "Профессия и грейд" }).props.onChange("0"));
-    await act(async () => root.root.findByType("form").props.onSubmit({ preventDefault() {} }));
-    assert.deepEqual(writes, [{ url: "/api/employees/hr-selected/goal", body: {
-      expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Senior" },
-    } }]);
+    assert.equal(root.root.findAllByType("dialog").length, 0);
+    const renderedButtons = root.root.findAllByType("button").map(node => node.children.filter(child => typeof child === "string").join(""));
+    assert.equal(renderedButtons.some(label => /Выбрать цель|Назначить цель|Изменить цель|Убрать явную цель/.test(label)), false);
+    assert.ok(requests.some(request => request.url === "/api/employees/hr-selected"));
+    assert.ok(requests.some(request => request.url === "/api/employees/hr-selected/recommendations"));
+    assert.ok(requests.every(request => request.method === "GET" || (
+      request.method === "POST" && request.url === "/api/employees/hr-selected/recommendations"
+    )));
   } finally {
     if (root) await unmount(root);
     global.document = previousDocument;
