@@ -80,6 +80,12 @@ npm 11.16.0. Node 22 и Linux/Docker нужно проверить отдель�
 
 Remote: `https://github.com/BAITC-Hacks/hack-5abba766-orbit-jr.git`.
 В этом checkout проверены имя автора `ka1nyy` и GitHub-аккаунт `ka1nyy`.
+Локальная Git-почта для следующих коммитов: `252775473+ka1nyy@users.noreply.github.com`.
+Ранее настроенная почта не связала коммит `9b577ec` с профилем через GitHub API:
+имя автора сохранено, но `author.login` был null. Историю общей main не переписывали.
+Для старого коммита привязку можно восстановить подтверждением прежней почты в аккаунте;
+эта операция требует доступа владельца к почтовому ящику.
+[Правила привязки GitHub](https://docs.github.com/en/account-and-profile/how-tos/email-preferences/setting-your-commit-email-address).
 Push использует существующий Windows Credential Manager. Не менять креденшалы,
 не добавлять фиктивных соавторов и не публиковать секреты.
 
