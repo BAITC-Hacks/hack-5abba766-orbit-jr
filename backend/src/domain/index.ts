@@ -1,4 +1,5 @@
 import { rankBaseline, type BaselineSignals } from './baseline';
+import { buildBaselineSignals } from './baseline-signals';
 import { AppError, invariant } from '../errors';
 import type {
   Candidate, CatalogView, CompletionRequest, DatasetSnapshot, EmployeeSource,
@@ -9,7 +10,6 @@ import type {
 
 export const GRADES: Grade[] = ['Junior', 'Middle', 'Senior', 'Lead'];
 const STATUSES: ParticipationStatus[] = ['completed', 'in_progress', 'dropped', 'no_show', 'declined', 'overdue'];
-const terminalStatuses = new Set<ParticipationStatus>(['completed', 'dropped', 'no_show', 'declined']);
 const compareText = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const byDateAndId = (a: ParticipationSource, b: ParticipationSource) => compareText(a.date, b.date) || compareText(a.record_id, b.record_id);
 
@@ -247,9 +247,9 @@ function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, actio
 }
 
 /** Deterministic baseline. Each card is an alternative from the same state, not step N. */
-export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { employee: EmployeeView; candidates: Candidate[]; emptyReason: EmptyReason | null } {
+export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { employee: EmployeeView; candidates: Candidate[]; emptyReason: EmptyReason | null; signals: BaselineSignals } {
   const employee = employeeView(snapshot, employeeId);
-  const empty = (reason: EmptyReason) => ({ employee, candidates: [], emptyReason: reason });
+  const empty = (reason: EmptyReason) => ({ employee, candidates: [], emptyReason: reason, signals: { unlockedWeightedGain: new Map<string, number>(), negativeOutcomes: new Map<string, number>() } });
   if (!employee.goal.target || !employee.progress) return empty('GOAL_REQUIRED');
   if (employee.progress.gap_points <= 0) return empty('GOAL_REACHED');
   const profile = targetProfile(snapshot, employee.goal)!;
@@ -259,7 +259,6 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
   let hasBenefit = false;
   const candidates: Candidate[] = [];
   const unlockedWeightedGain = new Map<string, number>();
-  const negativeOutcomes = new Map<string, number>();
   for (const action of actions) {
     const after = applyEvent(levels, action.event);
     const changes = levelChanges(levels, after);
@@ -276,14 +275,12 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
       goal_coverage_delta: progressFor(after, profile)!.coverage - employee.progress.coverage,
       unlocks_event_ids: unlocked.map(item => item.event.event_id),
     };
-    const recent = snapshot.history.filter(row => row.employee_id === employeeId && row.event_id === action.event.event_id && terminalStatuses.has(row.status)).sort(byDateAndId).slice(-3);
     candidates.push({ ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked) });
     unlockedWeightedGain.set(base.candidate_id, Math.max(0, ...unlocked.map(item => item.weighted_gain)));
-    negativeOutcomes.set(base.candidate_id, recent.filter(row => row.status !== 'completed').length);
   }
   if (!candidates.length) return empty(hasBenefit ? 'NO_GOAL_RELEVANT_EVENTS' : 'NO_BENEFICIAL_EVENTS');
-  const signals: BaselineSignals = { unlockedWeightedGain, negativeOutcomes };
-  return { employee, candidates: rankBaseline({ profile: { skills: employee.skills }, candidates }, signals), emptyReason: null };
+  const signals = buildBaselineSignals(candidates, { employeeId, asOfDate: snapshot.as_of_date, history: snapshot.history, unlockedWeightedGain });
+  return { employee, candidates: rankBaseline({ profile: { skills: employee.skills }, candidates }, signals), emptyReason: null, signals };
 }
 
 export function assertCompletionAllowed(snapshot: DatasetSnapshot, employeeId: string, request: CompletionRequest): { event_id: string; participation_id: string | null; session_date: string | null; occurrence_key: string } {

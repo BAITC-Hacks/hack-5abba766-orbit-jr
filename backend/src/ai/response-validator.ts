@@ -1,3 +1,4 @@
+import { REQUIRED_FACT_CATEGORIES, MIN_REQUIRED_FACT_CATEGORIES, assertRecommendationEvidence } from '../domain/recommendation-evidence'
 import { z } from 'zod'
 import type {
   AiRankingInput,
@@ -28,9 +29,6 @@ export const AiRankingOutputSchema = z.object({
     .min(1).max(3),
 }).strict()
 
-/** Contract: cited facts must cover at least three of these four categories. */
-const REQUIRED_CATEGORIES = new Set(['grade', 'skill_gap', 'history', 'target_requirement'])
-const MIN_CATEGORY_COVERAGE = 3
 
 export type ValidationResult =
   | { ok: true; cards: RecommendationCard[]; output: AiRankingOutput }
@@ -46,6 +44,8 @@ function alternativeOf(candidate: Candidate): NonNullable<RecommendationCard['al
 }
 
 export function validateRanking(raw: unknown, input: AiRankingInput): ValidationResult {
+  try { assertRecommendationEvidence(input.candidates) }
+  catch (error) { return { ok: false, detail: error instanceof Error ? error.message : 'Invalid candidate evidence' } }
   const parsed = AiRankingOutputSchema.safeParse(raw)
   if (!parsed.success) {
     return { ok: false, detail: `schema: ${parsed.error.issues[0]?.message ?? 'invalid'}` }
@@ -83,13 +83,13 @@ export function validateRanking(raw: unknown, input: AiRankingInput): Validation
       }
       if (factIds.includes(factId)) return { ok: false, detail: 'duplicate reason_fact_id' }
       factIds.push(factId)
-      if (REQUIRED_CATEGORIES.has(fact.category)) categories.add(fact.category)
+      if (REQUIRED_FACT_CATEGORIES.has(fact.category)) categories.add(fact.category)
     }
 
-    if (categories.size < MIN_CATEGORY_COVERAGE) {
+    if (categories.size < MIN_REQUIRED_FACT_CATEGORIES) {
       return {
         ok: false,
-        detail: `${choice.candidate_id} covers ${categories.size} required fact categories, needs ${MIN_CATEGORY_COVERAGE}`,
+        detail: `${choice.candidate_id} covers ${categories.size} required fact categories, needs ${MIN_REQUIRED_FACT_CATEGORIES}`,
       }
     }
 
@@ -119,6 +119,7 @@ export function validateRanking(raw: unknown, input: AiRankingInput): Validation
 
 /** Build only from validated server IDs, including the deterministic ordered fallback. */
 export function cardsFromRanking(output: AiRankingOutput, candidates: Candidate[]): RecommendationCard[] {
+  assertRecommendationEvidence(candidates)
   const byId = new Map(candidates.map(candidate => [candidate.candidate_id, candidate]))
   return output.choices.map((choice, index) => {
     const candidate = byId.get(choice.candidate_id)

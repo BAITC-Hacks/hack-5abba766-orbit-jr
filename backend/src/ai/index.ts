@@ -1,3 +1,4 @@
+import { assertRecommendationEvidence } from '../domain/recommendation-evidence';
 import { rankWithModel } from './adapter';
 import { validateRanking as checkRanking, cardsFromRanking } from './response-validator';
 import { pickReasonFactIds } from '../domain/baseline';
@@ -14,11 +15,13 @@ export function validateRanking(value: unknown, input: AiRankingInput): AiRankin
 }
 /** The domain already ranked with complete history/unlock signals; never sort again here. */
 export function baselineRanking(input: AiRankingInput): AiRankingOutput {
+  assertRecommendationEvidence(input.candidates);
   return { choices: input.candidates.slice(0, input.limit).map(candidate => ({
     candidate_id: candidate.candidate_id, reason_fact_ids: pickReasonFactIds(candidate),
   })) };
 }
 export async function rankCandidates(input: AiRankingInput, signal?: AbortSignal): Promise<AiRankingOutput> {
+  assertRecommendationEvidence(input.candidates);
   const attempt = await rankWithModel(input, signal);
   if (!attempt.ok) throw new AiError(attempt.reason);
   return validateRanking(attempt.output, input);

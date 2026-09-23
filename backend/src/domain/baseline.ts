@@ -1,3 +1,4 @@
+import { assertRecommendationEvidence, assertCandidateEvidence } from './recommendation-evidence'
 import type {
   AiRankingInput,
   Candidate,
@@ -14,7 +15,7 @@ import type {
  *   2. higher weighted_direct_gain + 0.5 * weighted_unlocked_gain (critical weight 2)
  *   3. fewer negative outcomes across the last three participations of the same event
  *   4. lower effort
- *   5. event_id
+ *   5. continue an equivalent existing attempt, then stable event and candidate IDs
  *
  * This is a product heuristic for comparison, not a trained metric and not a
  * claimed probability of success. It is also what mode=rules_fallback returns,
@@ -78,6 +79,7 @@ export function rankBaseline(
   input: BaselineInput,
   signals: BaselineSignals,
 ): Candidate[] {
+  assertRecommendationEvidence(input.candidates)
   const skills = skillIndex(input.profile.skills)
   for (const candidate of input.candidates) {
     signalValue(signals.unlockedWeightedGain, candidate.candidate_id)
@@ -102,6 +104,7 @@ export function rankBaseline(
 
     if (a.duration_hours !== b.duration_hours) return a.duration_hours - b.duration_hours
 
+    if (a.action !== b.action) return a.action === 'continue' ? -1 : 1
     const compare = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
     return compare(a.event_id, b.event_id) || compare(a.candidate_id, b.candidate_id)
   })
@@ -118,15 +121,10 @@ const CATEGORY_PRIORITY = [
 ] as const
 
 export function pickReasonFactIds(candidate: Candidate): Id[] {
-  const firstPerCategory = new Map<string, Id>()
-  for (const fact of candidate.facts) {
-    if (!firstPerCategory.has(fact.category)) firstPerCategory.set(fact.category, fact.fact_id)
-  }
-  const ordered = CATEGORY_PRIORITY.flatMap((category) => {
-    const factId = firstPerCategory.get(category)
-    return factId ? [factId] : []
-  })
-  return ordered.length > 0 ? ordered : candidate.facts.slice(0, 4).map((f) => f.fact_id)
+  assertCandidateEvidence(candidate)
+  // Retain multiple relevant facts in a category, e.g. requirement and conditional unlock.
+  return CATEGORY_PRIORITY.flatMap(category => candidate.facts
+    .filter(fact => fact.category === category).map(fact => fact.fact_id))
 }
 
 /** The cards returned with mode=rules_fallback. No alternative: nothing chose one. */

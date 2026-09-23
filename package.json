@@ -8,7 +8,9 @@
     "start": "node --env-file-if-exists=.env scripts/serve.mjs start",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test -w backend && npm run test:client -w frontend",
-    "test:integration": "node scripts/integration.mjs"
+    "test:integration": "node scripts/integration.mjs",
+    "eval:ai": "npm run eval:ai -w backend --",
+    "smoke:ai": "npm run smoke:ai -w backend"
   },
   "engines": {"node": ">=24 <25"}
 }

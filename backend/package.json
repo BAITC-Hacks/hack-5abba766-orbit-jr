@@ -10,7 +10,9 @@
     "bootstrap": "tsx --env-file-if-exists=../.env scripts/bootstrap.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "eval:ai": "tsx --env-file-if-exists=../.env scripts/evaluate-ai.ts",
+    "smoke:ai": "npm run eval:ai -- --live --smoke"
   },
   "dependencies": {
     "csv-parse": "^7.0.2",

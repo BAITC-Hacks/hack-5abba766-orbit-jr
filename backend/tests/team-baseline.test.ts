@@ -1,3 +1,4 @@
+import { InvalidRecommendationEvidenceError } from '../src/domain/recommendation-evidence'
 import { describe, expect, it } from 'vitest'
 import { baselineCards as buildBaselineCards, rankBaseline as orderBaseline, weightedDirectGain, type BaselineSignals } from '../src/domain/baseline'
 import { candidate, change, fact, input, skill } from './team-ai/fixtures'
@@ -128,10 +129,20 @@ describe('baselineCards', () => {
     expect(cards.every((c) => c.alternative === null && c.alternative_candidate_id === null)).toBe(true)
   })
 
-  it('falls back to any facts when the preferred categories are missing', () => {
+  it('rejects incomplete evidence instead of presenting an unsupported fallback', () => {
     const odd = candidate({ candidate_id: 'X', facts: [fact('X-e', 'effort')] })
-    const cards = baselineCards(input([odd]))
-    expect(cards[0]?.reason_fact_ids).toEqual(['X-e'])
+    expect(() => baselineCards(input([odd]))).toThrow(InvalidRecommendationEvidenceError)
+  })
+
+  it('rejects ambiguous duplicate fact IDs', () => {
+    const ambiguous = candidate({ candidate_id: 'X', facts: [fact('same', 'grade'), fact('same', 'skill_gap'), fact('third', 'history')] })
+    expect(() => baselineCards(input([ambiguous]))).toThrow('duplicate fact')
+  })
+
+  it('retains multiple verified facts in the same category', () => {
+    const c = candidate({ candidate_id: 'X' })
+    c.facts.push(fact('conditional-unlock', 'target_requirement'))
+    expect(baselineCards(input([c]))[0].reason_fact_ids).toContain('conditional-unlock')
   })
 })
 
@@ -152,5 +163,44 @@ describe('baseline integration invariants', () => {
     const a = candidate({ candidate_id: 'action-A', event_id: 'same-event' })
     const b = candidate({ candidate_id: 'action-B', event_id: 'same-event' })
     expect(order(rankBaseline(input([b, a])))).toEqual(['action-A', 'action-B'])
+  })
+})
+
+describe('goal relevance', () => {
+  const skills = [
+    skill('TARGET', { current_level: 0, baseline_level: 0, required_level: 5, gap: 5 }),
+    skill('OFF', { current_level: 0, baseline_level: 0, required_level: null, gap: null }),
+  ]
+
+  it('does not let a large off-goal gain outrank greater target progress', () => {
+    const noisy = candidate({ candidate_id: 'NOISY', expected_skill_changes: [change('TARGET', 0, 1), change('OFF', 0, 5)] })
+    const useful = candidate({ candidate_id: 'USEFUL', expected_skill_changes: [change('TARGET', 0, 2)] })
+    expect(order(rankBaseline(input([noisy, useful], { skills })))[0]).toBe('USEFUL')
+  })
+
+  it('caps usefulness at the remaining gap without changing the actual gain', () => {
+    const s = skill('TARGET', { current_level: 2, required_level: 3, gap: 1 })
+    const c = candidate({ candidate_id: 'C', expected_skill_changes: [change('TARGET', 2, 5)] })
+    expect(weightedDirectGain(c, new Map([['TARGET', s]]))).toBe(1)
+    expect(c.expected_skill_changes[0]?.gain).toBe(3)
+  })
+
+  it('does not reward growth above an already achieved requirement', () => {
+    const s = skill('TARGET', { current_level: 3, required_level: 3, gap: 0 })
+    const c = candidate({ candidate_id: 'C', expected_skill_changes: [change('TARGET', 3, 5)] })
+    expect(weightedDirectGain(c, new Map([['TARGET', s]]))).toBe(0)
+  })
+
+  it('resolves equivalent attempts of the same event by stable candidate ID', () => {
+    const a = candidate({ candidate_id: 'ATTEMPT_A', event_id: 'SAME' })
+    const b = candidate({ candidate_id: 'ATTEMPT_B', event_id: 'SAME' })
+    expect(order(rankBaseline(input([b, a])))).toEqual(['ATTEMPT_A', 'ATTEMPT_B'])
+    expect(order(rankBaseline(input([a, b])))).toEqual(['ATTEMPT_A', 'ATTEMPT_B'])
+  })
+
+  it('prefers continuing an equally useful and equally costly activity', () => {
+    const fresh = candidate({ candidate_id: 'A', action: 'start' })
+    const ongoing = candidate({ candidate_id: 'Z', action: 'continue', participation_id: 'ATTEMPT' })
+    expect(order(rankBaseline(input([fresh, ongoing])))[0]).toBe('Z')
   })
 })

@@ -22,6 +22,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run eval:ai
       - run: npm run test:integration
         env:
           TEST_DATABASE_URL: postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest

@@ -12,7 +12,7 @@ scripts/       запуск приложения и проверки
 compose.yaml   приложение + PostgreSQL
 ```
 
-[Бэкенд и его модули](backend/README.md) · [Архитектура](docs/ARCHITECTURE.md) · [Правила и API](docs/BACKEND.md)
+[Бэкенд и его модули](backend/README.md) · [Архитектура](docs/ARCHITECTURE.md) · [Правила и API](docs/BACKEND.md) · [AI и оценка качества](docs/AI.md)
 
 ## Запуск всего проекта через Docker
 
@@ -88,9 +88,12 @@ npm test
 # Изолированные временные PostgreSQL-схемы; live-демо не очищается:
 TEST_DATABASE_URL=postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest npm run test:integration
 npm run build
+npm run eval:ai
 ```
 
 Для PowerShell сначала задайте `$env:TEST_DATABASE_URL="postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest"`, затем `npm run test:integration`.
+
+`npm run eval:ai` проверяет ранжирование по правилам на авторских синтетических случаях без сети. `npm run smoke:ai` и `npm run eval:ai -- --live` используют провайдера и требуют ключ и модель в корневом `.env`. Результат offline-проверки не доказывает качество живой модели; детали метрик — в [AI.md](docs/AI.md).
 
 `npm test` запускает unit-тесты backend и клиентские тесты frontend. Они проверяют начисления, границы уровней, цели, prerequisites, повторы, проверку AI и взаимодействие интерфейса с API. Интеграционные тесты проверяют HTTP, сессии/права, конкурентные изменения, идемпотентность, атомарность импорта и сохранение при рестарте. Интеграционный запуск требует `TEST_DATABASE_URL`; без неё он явно завершается ошибкой. CI использует самостоятельно созданные fixtures. Дополнительный аудит официального набора запускается unit-тестами, если файлы есть локально.
 

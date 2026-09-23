@@ -78,3 +78,74 @@ describe('rankWithModel', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('provider deadline and evidence regressions', () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+  it.each(['5000ms', '1e3', '1.5', '-1', '0', 'Infinity', '0x20', ''])('rejects malformed timeout %s', configured => {
+    vi.stubEnv('LLM_TIMEOUT_MS', configured); expect(getTimeoutMs()).toBe(8000);
+  });
+  it('settles even when the transport ignores abort and cleans the timer', async () => {
+    vi.useFakeTimers(); vi.stubEnv('LLM_TIMEOUT_MS', '100');
+    fetchMock.mockReturnValue(new Promise(() => {}));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout', ms: 100 });
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('bounds a stalled response body as well as initial response headers', async () => {
+    vi.useFakeTimers(); vi.stubEnv('LLM_TIMEOUT_MS', '100');
+    fetchMock.mockResolvedValue({ ok: true, json: () => new Promise(() => {}) });
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout' });
+  });
+  it('settles on caller cancellation and observes late provider rejection', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    let rejectProvider!: (error: Error) => void;
+    fetchMock.mockReturnValue(new Promise((_resolve, reject) => { rejectProvider = reject; }));
+    const pending = rankWithModel(snapshot, controller.signal);
+    controller.abort(new Error('private caller details'));
+    expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout', detail: 'Request cancelled' });
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    rejectProvider(new Error('late private provider error'));
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  it.each(['success', 'failure'])('cleans caller listeners after %s', async outcome => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const addListener = vi.spyOn(controller.signal, 'addEventListener');
+    const removeListener = vi.spyOn(controller.signal, 'removeEventListener');
+    if (outcome === 'success') fetchMock.mockResolvedValue(response('{"choices":[]}'));
+    else fetchMock.mockRejectedValue(new Error('secret key and provider error'));
+    const result = await rankWithModel(snapshot, controller.signal);
+    expect(JSON.stringify(result)).not.toContain('secret');
+    expect(removeListener).toHaveBeenCalledWith('abort', addListener.mock.calls[0][1]);
+    expect(vi.getTimerCount()).toBe(0);
+    controller.abort();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(false);
+  });
+  it.each([{}, null, { choices: [{}] }, { choices: [{ message: { content: ' ' } }] }, { choices: [{ message: { content: {} } }] }])('rejects malformed provider envelope %#', async body => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify(body)));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+  });
+  it.each(['length', 'content_filter', 'tool_calls'])('rejects finish_reason=%s despite valid JSON', async finish_reason => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ finish_reason, message: { content: '{"choices":[]}' } }] })));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+  });
+  it('never exposes provider refusal text', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { refusal: 'private refusal', content: '{}' } }] })));
+    const result = await rankWithModel(snapshot);
+    expect(result).toMatchObject({ ok: false, reason: 'invalid_response' });
+    expect(JSON.stringify(result)).not.toContain('private refusal');
+  });
+  it('uses a changed key on the next request without cached credentials', async () => {
+    fetchMock.mockImplementation(async () => response('{}'));
+    vi.stubEnv('LLM_API_KEY', ' first-key '); await rankWithModel(snapshot);
+    vi.stubEnv('LLM_API_KEY', ' second-key '); await rankWithModel(snapshot);
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer first-key');
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer second-key');
+  });
+});

@@ -132,6 +132,18 @@ describe('validateRanking', () => {
   it('rejects an empty choice list', () => {
     expect(validateRanking({ choices: [] }, base)).toMatchObject({ ok: false })
   })
+
+  it('rejects model prose or invented fields on a choice', () => {
+    expect(validateRanking({ choices: [choice({ explanation: 'Trust this unsupported claim' })] }, base))
+      .toMatchObject({ ok: false })
+    expect(validateRanking({ choices: [choice({ goal_coverage_delta: 1 })] }, base))
+      .toMatchObject({ ok: false })
+  })
+
+  it('rejects fields outside the ranking contract at the root', () => {
+    expect(validateRanking({ choices: [choice()], summary: 'Unsupported summary' }, base))
+      .toMatchObject({ ok: false })
+  })
 })
 
 

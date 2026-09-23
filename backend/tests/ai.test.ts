@@ -15,7 +15,7 @@ function candidate(id: string): Candidate {
   const categories: RecommendationFact['category'][] = ['grade', 'skill_gap', 'history', 'target_requirement', 'eligibility', 'effort'];
   return {
     candidate_id: id, event_id: `event-${id}`, title: `Synthetic ${id}`, event_type: 'course', format: 'self_paced',
-    duration_hours: 4, action: 'start', participation_id: null, session_date: null, relevance: 'direct',
+    duration_hours: ['first', 'second', 'third', 'fourth'].indexOf(id) + 1 || 4, action: 'start', participation_id: null, session_date: null, relevance: 'direct',
     expected_skill_changes: [{ skill_id: 'A', before: 1, after: 2, gain: 1 }], goal_coverage_delta: 0.25, unlocks_event_ids: [],
     facts: categories.map(category => ({ fact_id: `${id}:${category}`, category, text: `Verified synthetic ${category}` })),
   };
@@ -58,7 +58,7 @@ beforeEach(() => {
   const snapshot = { as_of_date: '2026-10-01', dataset_revision: 1, employee_revisions: { employee: 0 } } as unknown as DatasetSnapshot;
   mocks.readSnapshot.mockResolvedValue(snapshot);
   mocks.readSnapshotWithClient.mockResolvedValue(snapshot);
-  mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: input().candidates, emptyReason: null });
+  mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: input().candidates, emptyReason: null, signals: { unlockedWeightedGain: new Map(input().candidates.map(c => [c.candidate_id, 0])), negativeOutcomes: new Map(input().candidates.map(c => [c.candidate_id, 0])) } });
   mocks.query.mockResolvedValue({ rows: [{ acquired: true }] });
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
 });
@@ -171,7 +171,7 @@ describe('recommendation service modes and version boundaries', () => {
   });
 
   it('does not acquire a connection or call the provider for an empty candidate set', async () => {
-    mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: [], emptyReason: 'GOAL_REQUIRED' });
+    mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: [], emptyReason: 'GOAL_REQUIRED', signals: { unlockedWeightedGain: new Map(), negativeOutcomes: new Map() } });
     await expect(recommendations('employee', { expected_version: version })).resolves.toEqual({ version, mode: 'no_candidates', empty_reason: 'GOAL_REQUIRED', recommendations: [], fallback_reason: null });
     expect(mocks.connect).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
