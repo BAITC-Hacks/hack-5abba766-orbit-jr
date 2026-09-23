@@ -36,12 +36,12 @@ describe('configuration', () => {
 });
 
 describe('rankWithModel', () => {
-  it.each(['gpt-6-sol', 'gpt-6-luna'])('uses low reasoning without temperature for %s', async model => {
+  it.each([['gpt-6-sol', 'low'], ['gpt-6-luna', 'xhigh']])('uses %s with %s reasoning without temperature', async (model, effort) => {
     vi.stubEnv('LLM_MODEL', model);
     fetchMock.mockResolvedValue(response('{}'));
     await rankWithModel(snapshot);
     const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(payload.reasoning_effort).toBe('low');
+    expect(payload.reasoning_effort).toBe(effort);
     expect(payload).not.toHaveProperty('temperature');
   });
   it.each(['gpt-4o-mini', 'gpt-4.1'])('uses deterministic sampling for %s', async model => {

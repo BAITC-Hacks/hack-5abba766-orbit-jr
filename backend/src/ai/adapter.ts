@@ -81,7 +81,7 @@ export async function rankWithModel(input: AiRankingInput, externalSignal?: Abor
       const response = await fetch(process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: controller.signal,
         body: JSON.stringify({ model, store: false, max_completion_tokens: 1400,
-          ...(['gpt-6-sol', 'gpt-6-luna'].includes(model) ? { reasoning_effort: 'low' } : {}),
+          ...(model === 'gpt-6-luna' ? { reasoning_effort: 'xhigh' } : model === 'gpt-6-sol' ? { reasoning_effort: 'low' } : {}),
           ...(/^(gpt-4o|gpt-4\.1)(-|$)/.test(model) ? { temperature: 0 } : {}),
           messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(input, signals) }],
           response_format: { type: 'json_schema', json_schema: RANKING_JSON_SCHEMA },
