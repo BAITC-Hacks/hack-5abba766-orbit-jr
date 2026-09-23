@@ -12,7 +12,8 @@ if (process.argv.includes('--demo')) {
   const demo = parseEnv(readFileSync(new URL('../.env.demo', import.meta.url), 'utf8'));
   if (!/^cq_demo_[a-f0-9]{32}$/.test(demo.DATABASE_SCHEMA ?? '') ||
       path.resolve(demo.DATASET_DIR ?? '') !== path.join(root, 'test-results', 'demo', demo.DATABASE_SCHEMA) ||
-      demo.PORT !== '3210' || demo.APP_ORIGIN !== 'http://localhost:3210') {
+      !/^\d+$/.test(demo.PORT ?? '') || Number(demo.PORT) < 1 || Number(demo.PORT) > 65535 ||
+      demo.APP_ORIGIN !== `http://localhost:${Number(demo.PORT)}`) {
     throw new Error('Invalid rehearsal configuration. Run npm run demo:prepare first.');
   }
   // Explicitly override an inherited schema so rehearsals cannot touch live data.

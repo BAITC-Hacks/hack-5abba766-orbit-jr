@@ -377,6 +377,17 @@ export function Employee({
                         </span>
                         <h3>{e.title}</h3>
                         <details className="catalog-description"><summary>Описание программы</summary><p>{e.description}</p></details>
+                        <details className="catalog-description">
+                          <summary>Условия участия</summary>
+                          <p>Роли: {e.target_roles.join(", ") || "Не указаны"}.</p>
+                          <p>Грейды: {e.target_grades.join(", ") || "Не указаны"}.</p>
+                          {Object.keys(e.prerequisites).length ? (
+                            <ul>{Object.entries(e.prerequisites).map(([skillId, level]) => (
+                              <li key={skillId}>{names[skillId] ?? skillId}: уровень не ниже {level}</li>
+                            ))}</ul>
+                          ) : <p>Предварительные навыки не требуются.</p>}
+                          <p>Персональный допуск также учитывает историю участия и дату занятия.</p>
+                        </details>
                         <div className="compact-meta"><span>{formats[e.format]}</span><span>{e.duration_hours} ч.</span>{e.mandatory && <span className="required-tag">Обязательное</span>}</div>
                         {e.upcoming_sessions.length > 0 ? <details className="catalog-dates">
                           <summary>{[...e.upcoming_sessions].sort()[0]}{e.upcoming_sessions.length > 1 && <span> +{e.upcoming_sessions.length - 1} даты</span>}</summary>

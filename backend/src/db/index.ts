@@ -4,12 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { AppError } from '../errors';
 import type { DatasetSnapshot, DomainVersion } from '../types';
 import * as schema from './schema';
+import { databaseConnectionConfig } from './config';
 
 const databaseSchema = process.env.DATABASE_SCHEMA;
 if (databaseSchema && !/^[a-z][a-z0-9_]*$/.test(databaseSchema)) throw new Error('DATABASE_SCHEMA must be a lowercase SQL identifier');
 /** Constructing pools is lazy: build/import never opens a database connection. */
 const connectionOptions = {
-  connectionString: process.env.DATABASE_URL || 'postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest',
+  ...databaseConnectionConfig(),
   max: 10, connectionTimeoutMillis: 3000, idleTimeoutMillis: 30000,
   ...(databaseSchema ? { options: `-c search_path=${databaseSchema}` } : {}),
 };

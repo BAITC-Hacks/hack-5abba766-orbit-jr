@@ -4,15 +4,19 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import pg from 'pg';
 import { writeAiFlowFixture } from '../tests/fixtures/ai-flow';
+import { databaseConnectionConfig } from '../src/db/config';
 
 // Reuse the authored two-step fixture exercised by the PostgreSQL/AI flow suite.
 // Each rehearsal gets new data; never reset the shared demo or a previous run.
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const schema = `cq_demo_${randomUUID().replaceAll('-', '')}`;
 const directory = path.join(root, 'test-results', 'demo', schema);
-const port = 3210;
+const args = process.argv.slice(2);
+if (args.length > 1 || args.some(arg => !/^--port=\d+$/.test(arg))) throw new Error('Usage: demo:prepare [--port=3210]');
+const port = args.length ? Number(args[0].slice('--port='.length)) : 3210;
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Demo port must be between 1 and 65535');
 const admin = new pg.Pool({
-  connectionString: process.env.DATABASE_URL || (process.env.PGHOST ? undefined : 'postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest'),
+  ...databaseConnectionConfig(),
   connectionTimeoutMillis: 3000,
 });
 try {
