@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2, Clock3, GraduationCap, LockKeyhole } from "lucide-react";
 import type { CompletionRequest, CompletionResult, EmployeeView, EventView, GoalProgress } from "../../../../contracts/backend";
 import type { LessonBlock } from "../../../../contracts/learning";
@@ -22,6 +22,8 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
 }) {
   const state = useLearning(employee.employee_id, moduleId, target, employee.version, onError);
   const [active, setActive] = useState<number | null>(null);
+  const reader = useRef<HTMLDivElement>(null);
+  const focusRequested = useRef(false);
   const course = state.module;
   const attempt = state.attempt;
   const completed = attempt?.completed_lesson_ids.length ?? 0;
@@ -35,7 +37,24 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
     if (passed && completion) onCompleted(completion, previousProgress);
     else onClose();
   };
-  const move = (next: number) => { setActive(next); document.getElementById("learning-content")?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const focusReader = () => {
+    const heading = reader.current?.querySelector("h2");
+    heading?.focus({ preventScroll: true });
+    reader.current?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  };
+  const move = (next: number) => {
+    if (next === active) {
+      focusReader();
+      return;
+    }
+    focusRequested.current = true;
+    setActive(next);
+  };
+  useEffect(() => {
+    if (!focusRequested.current) return;
+    focusRequested.current = false;
+    focusReader();
+  }, [active]);
 
   return <section className="learning-shell" aria-label="Учебный модуль">
     <div className="learning-topbar">
@@ -68,11 +87,11 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
             const locked = !!attempt && i > completed;
             return <li key={item.id}><button className={`${i === index && !passed ? "active" : ""} ${done ? "done" : ""}`} aria-current={i === index && !passed ? "step" : undefined} disabled={locked || state.busy || state.pending} onClick={() => move(i)}><span className="learning-step-number">{done ? <Check size={16} /> : locked ? <LockKeyhole size={13} /> : i + 1}</span><span>{lessonTitle(item.title)}</span></button></li>;
           })}
-          <li><button className={isQuiz && !passed ? "active" : passed ? "done" : ""} disabled={!attempt || completed !== course.lesson_count || state.busy || state.pending} onClick={() => move(course.lesson_count)}><span className="learning-step-number">{passed ? <Check size={16} /> : <GraduationCap size={16} />}</span><span>Проверка понимания</span></button></li>
+          <li><button className={isQuiz && !passed ? "active" : passed ? "done" : ""} aria-current={isQuiz && !passed ? "step" : undefined} disabled={!attempt || completed !== course.lesson_count || state.busy || state.pending} onClick={() => move(course.lesson_count)}><span className="learning-step-number">{passed ? <Check size={16} /> : <GraduationCap size={16} />}</span><span>Проверка понимания</span></button></li>
         </ol>
         <p className="learning-save-note">{attempt ? "Прогресс сохранён · продолжите позже." : "Режим ознакомления · без сохранения прогресса."}</p>
       </aside>
-      <div className="learning-reader" id="learning-content">
+      <div className="learning-reader" id="learning-content" ref={reader}>
         {passed ? <section className="learning-celebration" aria-live="polite">
           <div className="learning-success-mark"><CheckCircle2 size={45} /></div>
           <span className="eyebrow">ЕЩЁ ОДИН ШАГ СДЕЛАН</span><h2>Знания проверены.<br />Теперь виден результат.</h2>
@@ -83,7 +102,7 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
           <button className="primary" onClick={returnToProfile}>Посмотреть мой следующий шаг <ArrowRight size={17} /></button>
           <p className="learning-save-note">{completion ? "Показан результат этого демопрохождения. " : "Проверка знаний сохранена. "}Актуальный профиль и рекомендации обновятся при возвращении.</p>
         </section> : lesson ? <article className="learning-lesson">
-          <span className="eyebrow">УРОК {index + 1} ИЗ {course.lesson_count}</span><h2>{lessonTitle(lesson.title)}</h2>
+          <span className="eyebrow">УРОК {index + 1} ИЗ {course.lesson_count}</span><h2 tabIndex={-1}>{lessonTitle(lesson.title)}</h2>
           {lesson.blocks.map((block, i) => <Block block={block} key={`${lesson.id}:${i}`} />)}
           <div className="learning-lesson-actions">
             {index > 0 && <button className="secondary" disabled={state.busy || state.pending} onClick={() => move(index - 1)}>Назад</button>}
@@ -92,7 +111,7 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
             }}>{state.busy ? "Сохраняем…" : index === course.lesson_count - 1 ? "Перейти к проверке" : "Изучено, следующий урок"}<ArrowRight size={16} /></button>
           </div>
         </article> : <section className="learning-quiz">
-          <h2>Проверим понимание</h2><div className="compact-meta"><span>Нужны все верные ответы</span><span>Можно повторить</span></div>
+          <h2 tabIndex={-1}>Проверим понимание</h2><div className="compact-meta"><span>Нужны все верные ответы</span><span>Можно повторить</span></div>
           {state.result && !state.result.completion && <div className="learning-score" role="status">Верно {state.result.feedback.filter(item => item.correct).length} из {course.question_count}. Разберите пояснения и попробуйте ещё раз. Навыки пока не изменились.</div>}
           <form onSubmit={e => { e.preventDefault(); void state.submitQuiz(); }}>
             {course.questions.map((question, q) => {

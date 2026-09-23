@@ -58,6 +58,13 @@ html[data-theme] .demo-strip { padding-inline: 20px; flex-wrap: wrap; line-heigh
   html[data-theme] .learning-layout { grid-template-columns: minmax(0, 1fr); }
   html[data-theme] .learning-sidebar { position: static; }
 }
+/* Fixed rail tabs otherwise collapse or overlap the account controls in landscape. */
+@media (min-width: 761px) and (max-height: 600px) {
+  html[data-theme] .connected-main > .subnav,
+  html[data-theme] .hr-sections { position: static; width: 100%; max-width: 100%; max-height: none; flex-direction: row; flex-wrap: wrap; overflow: visible; margin-block: 16px; }
+  html[data-theme] .connected-main > .subnav button,
+  html[data-theme] .hr-sections button { min-height: 44px; white-space: normal; }
+}
 @media (max-width: 760px) {
   html[data-theme] .global-nav:not(.connected-nav) .nav-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 16px; height: auto; width: 100%; }
   html[data-theme] .global-nav:not(.connected-nav) .nav-inner > nav { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 12px; height: auto; }
@@ -66,7 +73,8 @@ html[data-theme] .demo-strip { padding-inline: 20px; flex-wrap: wrap; line-heigh
   html[data-theme] .global-nav:not(.connected-nav) .halyk-mark { width: 30px; height: 30px; }
   html[data-theme] .connected-main { padding-top: 16px; }
   html[data-theme] .connected-main .subnav { width: 100%; flex-wrap: wrap; overflow: visible; gap: 4px; }
-  html[data-theme] .connected-main .subnav button { flex: 1 1 auto; min-height: 40px; white-space: normal; }
+  html[data-theme] .connected-main .subnav button { flex: 1 1 auto; min-height: 44px; white-space: normal; }
+  html[data-theme] .connected-nav :is(.account-avatar, .nav-logout) { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
   html[data-theme] .hr-sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
   html[data-theme] .hr-sections button { flex-direction: column; white-space: normal; padding: 10px 6px; min-height: 64px; }
   html[data-theme] .hr-sections button strong { line-height: 1.5; }

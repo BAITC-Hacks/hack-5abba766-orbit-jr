@@ -3,8 +3,9 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { readSnapshotWithClient, withTransaction } from '../db';
 import { AppError, invariant } from '../errors';
+import { requireEmployeeRead, requireEmployeeWrite } from '../auth';
 import { assertCompletionAllowed, employeeView } from '../domain';
-import { audit, checkVersion, completeActivityInTransaction, ensureKey, lockDataset, receipt, saveReceipt, scope } from '../services/data';
+import { audit, checkVersion, completeActivityInTransaction, ensureKey, lockDataset, receipt, saveReceipt } from '../services/data';
 import { sourceHash, idSchema } from '../validation';
 import { learningCourses } from './content';
 import type { CompletionRequest, CompletionResult, DatasetSnapshot, GoalProgress, SessionView } from '../types';
@@ -77,7 +78,7 @@ function learningOccurrence(snapshot: DatasetSnapshot, employeeId: string, cours
 }
 
 export async function startLearning(actor: SessionView, employeeId: string, rawRequest: StartLearningRequest): Promise<LearningAttempt> {
-  scope(actor, employeeId);
+  requireEmployeeWrite(actor, employeeId);
   const request = startLearningSchema.parse(rawRequest);
   const course = courseById(request.module_id);
   return withTransaction(async client => {
@@ -98,7 +99,7 @@ export async function startLearning(actor: SessionView, employeeId: string, rawR
   });
 }
 export async function getLearningAttempt(actor: SessionView, employeeId: string, attemptId: string): Promise<LearningAttempt> {
-  scope(actor, employeeId);
+  requireEmployeeRead(actor, employeeId);
   return withTransaction(async client => {
     const row = await findAttempt(client, employeeId, attemptId);
     const snapshot = await readSnapshotWithClient(client);
@@ -106,7 +107,7 @@ export async function getLearningAttempt(actor: SessionView, employeeId: string,
   }, { readOnly: true });
 }
 export async function completeLesson(actor: SessionView, employeeId: string, attemptId: string, lessonId: string): Promise<LearningAttempt> {
-  scope(actor, employeeId);
+  requireEmployeeWrite(actor, employeeId);
   completeLessonSchema.parse({ lesson_id: lessonId });
   return withTransaction(async client => {
     await lockDataset(client);
@@ -137,7 +138,7 @@ export function gradeQuiz(course: CourseDefinition, answers: Record<string, stri
   return { score: Math.round(correct / course.questions.length * 100), passed: correct === course.questions.length, feedback };
 }
 export async function submitQuiz(actor: SessionView, employeeId: string, attemptId: string, rawRequest: SubmitQuizRequest, key: string): Promise<{ result: SubmitQuizResult; replayed: boolean }> {
-  scope(actor, employeeId); ensureKey(key);
+  requireEmployeeWrite(actor, employeeId); ensureKey(key);
   const request = submitQuizSchema.parse(rawRequest);
   const operation = 'learning.quiz';
   const hash = sourceHash({ operation, employee_id: employeeId, attempt_id: attemptId, body: request });

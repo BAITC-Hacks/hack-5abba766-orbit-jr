@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
 import { AppError, invariant } from '../errors';
-import { login, logout, session, sessionCookie, requireEmployee, requireHr } from '../auth';
+import { login, logout, session, sessionCookie, requireEmployeeRead, requireEmployeeWrite, requireHr } from '../auth';
 import { readSnapshot, readDatasetDate, getHealth, updateGoal, completeActivity, importData } from '../services/data';
 import { recommendations } from '../services/recommendations';
 import { listLearningModules, getLearningModule, startLearning, getLearningAttempt, completeLesson, submitQuiz, startLearningSchema, completeLessonSchema, submitQuizSchema } from '../learning/service';
@@ -136,14 +136,19 @@ export async function handleRequest(request: Request): Promise<Response> {
         employeeId = idSchema.parse(decodeURIComponent(learningMatch[1]));
         attemptId = learningMatch[2] ? idSchema.parse(decodeURIComponent(learningMatch[2])) : undefined;
       } catch { throw new AppError('VALIDATION_ERROR', 'Некорректный идентификатор учебной попытки'); }
-      requireEmployee(actor, employeeId);
-      if (!attemptId && method === 'POST') return success(await startLearning(actor, employeeId, startLearningSchema.parse(await jsonBody(request))));
+      requireEmployeeRead(actor, employeeId);
+      if (!attemptId && method === 'POST') {
+        requireEmployeeWrite(actor, employeeId);
+        return success(await startLearning(actor, employeeId, startLearningSchema.parse(await jsonBody(request))));
+      }
       if (attemptId && !learningMatch[3] && method === 'GET') return success(await getLearningAttempt(actor, employeeId, attemptId));
       if (attemptId && learningMatch[3] === 'lessons' && method === 'POST') {
+        requireEmployeeWrite(actor, employeeId);
         const body = completeLessonSchema.parse(await jsonBody(request));
         return success(await completeLesson(actor, employeeId, attemptId, body.lesson_id));
       }
       if (attemptId && learningMatch[3] === 'quiz' && method === 'POST') {
+        requireEmployeeWrite(actor, employeeId);
         const result = await submitQuiz(actor, employeeId, attemptId, submitQuizSchema.parse(await jsonBody(request)), idempotencyKey(request));
         return success(result.result, 200, result.replayed);
       }
@@ -166,11 +171,15 @@ export async function handleRequest(request: Request): Promise<Response> {
     if (match) {
       let id: string;
       try { id = idSchema.parse(decodeURIComponent(match[1])); } catch { throw new AppError('VALIDATION_ERROR', 'Некорректный идентификатор сотрудника.'); }
-      requireEmployee(actor, id);
+      requireEmployeeRead(actor, id);
       if (!match[2] && method === 'GET') return success(employeeView(await readSnapshot(), id));
-      if (match[2] === 'goal' && method === 'PUT') return success(await updateGoal(actor, id, goalSchema.parse(await jsonBody(request))));
+      if (match[2] === 'goal' && method === 'PUT') {
+        requireEmployeeWrite(actor, id);
+        return success(await updateGoal(actor, id, goalSchema.parse(await jsonBody(request))));
+      }
       if (match[2] === 'recommendations' && method === 'POST') return success(await recommendations(id, recSchema.parse(await jsonBody(request)), request.signal));
       if (match[2] === 'completions' && method === 'POST') {
+        requireEmployeeWrite(actor, id);
         const result = await completeActivity(actor, id, completionSchema.parse(await jsonBody(request)), idempotencyKey(request));
         return success(result.result, 200, result.replayed);
       }

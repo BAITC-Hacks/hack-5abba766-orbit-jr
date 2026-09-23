@@ -18,12 +18,14 @@ export function History({
   complete,
   moduleEventIds = [],
   learn,
+  readOnly = false,
 }: {
   rows: ParticipationView[];
   busy: boolean;
   complete: (target: CompletionRequest["target"]) => void;
   moduleEventIds?: string[];
   learn?: (row: ParticipationView) => void;
+  readOnly?: boolean;
 }) {
   const [status, setStatus] = useState("all");
   const visible = rows.filter(
@@ -40,7 +42,7 @@ export function History({
       <div className="section-heading">
         <div>
           <span className="eyebrow">ОБУЧЕНИЕ И РАЗВИТИЕ</span>
-          <h2 id="activity-title">Моя активность</h2>
+          <h2 id="activity-title">{readOnly ? "Активность сотрудника" : "Моя активность"}</h2>
         </div>
       </div>
       <div className="activity-stats" aria-label="Статистика участия">
@@ -61,7 +63,7 @@ export function History({
         </div>
       </div>
       {!!rows.length && <div className="activity-distribution" role="img" aria-label={`Всего ${rows.length}: ${Object.entries(statuses).map(([key, label]) => `${label} ${rows.filter(row => row.effective_status === key).length}`).join(", ")}`}>
-        {Object.keys(statuses).map(key => <span key={key} className={`distribution-${key}`} style={{ flexGrow: rows.filter(row => row.effective_status === key).length }} />)}
+        {Object.keys(statuses).filter(key => rows.some(row => row.effective_status === key)).map(key => <span key={key} className={`distribution-${key}`} style={{ flexGrow: rows.filter(row => row.effective_status === key).length }} />)}
       </div>}
       {!!rows.length && (
         <div className="history-filter">
@@ -74,7 +76,7 @@ export function History({
       {!rows.length && (
         <div className="empty-state">
           <BookOpen size={32} aria-hidden="true" />
-          <h3>Здесь появится ваше обучение</h3>
+          <h3>{readOnly ? "У сотрудника пока нет истории обучения" : "Здесь появится ваше обучение"}</h3>
           <p>Подходящие активности можно посмотреть в разделе «Обзор».</p>
         </div>
       )}
@@ -132,10 +134,12 @@ export function History({
               {row.superseded_by && <span>Учтено в другом участии</span>}
             </div>
             <div className="activity-card-footer">
-              {row.actionable ? (
+              {!readOnly && row.actionable ? (
                 <button
+                  type="button"
                   className="primary"
                   disabled={busy}
+                  aria-label={`${learn && moduleEventIds.includes(row.event_id) ? "Продолжить уроки" : "Отметить выполненной"}: ${row.event_title}`}
                   onClick={() =>
                     learn && moduleEventIds.includes(row.event_id)
                       ? learn(row)
@@ -152,7 +156,7 @@ export function History({
                 </button>
               ) : null}
               <details className="activity-details">
-                <summary>Детали</summary>
+                <summary aria-label={`Детали: ${row.event_title}`}>Детали</summary>
                 {row.completion_origin === "simulation" && <p>Деморезультат не подтверждает посещение.</p>}
                 <p>Источник: {row.source_status ? "Загруженная история" : "Демонстрационный сценарий"}</p>
                 {row.source_status && <p>Исходный статус: {statuses[row.source_status]}</p>}

@@ -33,7 +33,7 @@ html[data-theme] .modal-content :is(.primary, .secondary, .text-button) { align-
 html[data-theme] .modal-content > .text-button { padding: 10px 0; }
 html[data-theme] .modal-content > .fine-print { padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.65; }
 html[data-theme] .modal-content .field-label { margin: 0; display: grid; gap: 10px; }
-html[data-theme] dialog > .close { top: 20px; right: 20px; width: 36px; height: 36px; z-index: 2; border-radius: 10px; color: var(--muted); background: var(--surface-raised); }
+html[data-theme] dialog > .close { top: 20px; right: 20px; width: 44px; height: 44px; z-index: 2; border-radius: 10px; color: var(--muted); background: var(--surface-raised); }
 html[data-theme] .modal-content li + li { margin-top: 10px; }
 html[data-theme] .modal-content .skill-outcomes { padding: 16px; border-radius: 12px; background: var(--surface-raised); }
 html[data-theme] .catalog-select { min-width: 0; width: 100%; }
@@ -53,8 +53,11 @@ html[data-theme] .toolbar > label { display: grid; gap: 10px; min-width: 0; }
 html[data-theme] .toolbar input { min-height: 46px; padding: 12px 14px; border-radius: 10px; }
 html[data-theme] .section-heading { gap: 20px; flex-wrap: wrap; }
 html[data-theme] .hr-surface > .catalog-select { max-width: 360px; margin: 20px 0; }
-html[data-theme] :is(button, input, textarea, summary, a):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+html[data-theme] :is(button, input, select, textarea, summary, a):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 html[data-theme] :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--blue); }
+html[data-theme] .theme-control button { width: 44px; height: 44px; }
+html[data-theme] .import-preview-toggle { min-height: 44px; color: var(--ink); background: var(--surface-raised); border-color: var(--line); }
+html[data-theme] .import-file-tile > strong { color: var(--ink); }
 html[data-theme] .table-scroll { scrollbar-gutter: stable; overscroll-behavior-x: contain; padding-bottom: 8px; }
 @media (max-width: 680px) {
   html[data-theme] .modal-content { padding: 24px 20px; gap: 20px; }
