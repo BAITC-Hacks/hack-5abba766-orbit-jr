@@ -35,6 +35,17 @@ describe('recommendation boundary', () => {
     },
   )
 
+  it('keeps AI choices when only their optional comparisons point to selected cards', async () => {
+    rankWithModel.mockResolvedValue({ ok: true, ms: 20, output: { choices: ['OTHER', 'NEW_JUDGE_ID'].map((id, index) => ({
+      candidate_id: id, reason_fact_ids: [`${id}-gap`, `${id}-req`, `${id}-grade`],
+      alternative_candidate_id: ['NEW_JUDGE_ID', 'OTHER'][index],
+    })) } })
+    const result = await recommend(snapshot(), options)
+    expect(result).toMatchObject({ mode: 'ai', fallback_reason: null })
+    expect(result.recommendations.map((card) => card.candidate_id)).toEqual(['OTHER', 'NEW_JUDGE_ID'])
+    expect(result.recommendations.map((card) => card.alternative)).toEqual([null, null])
+  })
+
   it('falls back if an otherwise valid model response invents a candidate', async () => {
     rankWithModel.mockResolvedValue({ ok: true, ms: 20, output: { choices: [{
       candidate_id: 'INVENTED', reason_fact_ids: ['OTHER-gap', 'OTHER-req', 'OTHER-grade'],

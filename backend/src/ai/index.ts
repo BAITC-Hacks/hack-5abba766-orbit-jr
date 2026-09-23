@@ -1,6 +1,6 @@
 import { assertRecommendationEvidence } from '../domain/recommendation-evidence';
 import { rankWithModel } from './adapter';
-import { validateRanking as checkRanking, cardsFromRanking } from './response-validator';
+import { validateRanking as checkRanking, validateProviderRanking, cardsFromRanking } from './response-validator';
 import { pickReasonFactIds } from '../domain/baseline';
 import type { AiRankingInput, AiRankingOutput, FallbackReason } from '../types';
 export { cardsFromRanking };
@@ -24,5 +24,7 @@ export async function rankCandidates(input: AiRankingInput, signal?: AbortSignal
   assertRecommendationEvidence(input.candidates);
   const attempt = await rankWithModel(input, signal);
   if (!attempt.ok) throw new AiError(attempt.reason);
-  return validateRanking(attempt.output, input);
+  const checked = validateProviderRanking(attempt.output, input);
+  if (!checked.ok) throw new AiError('invalid_response');
+  return checked.output;
 }
