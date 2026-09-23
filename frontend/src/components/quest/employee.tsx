@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   CatalogView,
   CompletionRequest,
@@ -8,7 +8,13 @@ import type {
 } from "../../../../contracts/backend";
 import type { LearningModuleSummary } from "../../../../contracts/learning";
 import { endpoints } from "@/lib/api";
-import { formats, eventTypes, emptyReasons, goalSources } from "@/lib/labels";
+import {
+  formats,
+  eventTypes,
+  emptyReasons,
+  goalSources,
+  activityDate,
+} from "@/lib/labels";
 import { useEmployee } from "@/hooks/use-employee";
 import { useResource } from "@/hooks/use-resource";
 import { Failure, Loading } from "./feedback";
@@ -45,6 +51,7 @@ export function Employee({
   const [goalOpen, setGoalOpen] = useState(false);
   const [goalIndex, setGoalIndex] = useState("");
   const [query, setQuery] = useState("");
+  const searchInput = useRef<HTMLInputElement>(null);
   const [type, setType] = useState("all");
   const p = state.profile;
   const names = Object.fromEntries(
@@ -87,7 +94,9 @@ export function Employee({
       <Failure
         error={state.mutationError}
         retry={
-          state.pendingTarget ? () => void state.retryCompletion() : undefined
+          state.pendingTarget && !state.busy
+            ? () => void state.retryCompletion()
+            : undefined
         }
       />
       {state.notice && (
@@ -122,7 +131,7 @@ export function Employee({
               Обновить профиль
             </button>
           </div>
-          <div className="subnav">
+          <nav className="subnav" aria-label="Разделы профиля">
             {[
               ["overview", "Обзор"],
               ["history", "Моя активность"],
@@ -132,12 +141,13 @@ export function Employee({
               <button
                 key={key}
                 className={tab === key ? "selected" : ""}
+                aria-current={tab === key ? "page" : undefined}
                 onClick={() => setTab(key)}
               >
                 {label}
               </button>
             ))}
-          </div>
+          </nav>
           {tab === "overview" && (
             <>
               <section className="hero">
@@ -161,7 +171,13 @@ export function Employee({
                     className="primary"
                     disabled={disabled || !catalog.data}
                     onClick={() => {
-                      setGoalIndex("");
+                      const index =
+                        catalog.data?.role_profiles.findIndex(
+                          (g) =>
+                            g.role === p.goal.target?.target_role &&
+                            g.grade === p.goal.target?.target_grade,
+                        ) ?? -1;
+                      setGoalIndex(index < 0 ? "" : String(index));
                       setGoalOpen(true);
                     }}
                   >
@@ -215,7 +231,11 @@ export function Employee({
                 )}
                 <Failure
                   error={state.recError}
-                  retry={state.retryRecommendations}
+                  retry={
+                    !disabled && !state.recLoading
+                      ? state.retryRecommendations
+                      : undefined
+                  }
                 />
                 {state.recommendations && (
                   <>
@@ -270,6 +290,7 @@ export function Employee({
                   Поиск
                   <input
                     aria-label="Поиск по каталогу"
+                    ref={searchInput}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
@@ -290,8 +311,9 @@ export function Employee({
                 </label>
               </div>
               <p className="fine-print">
-                Здесь собраны все активности компании. Подходящие именно вам шаги — в обзоре.
-                Для некоторых курсов доступны короткие учебные демомодули.
+                Здесь собраны все активности компании. Подходящие вам шаги —
+                в разделе «Обзор». Для некоторых курсов доступны короткие
+                учебные демомодули.
               </p>
               <div className="course-grid">
                 {catalog.data?.events
@@ -336,7 +358,21 @@ export function Employee({
                     `${e.title} ${e.description}`
                       .toLowerCase()
                       .includes(query.toLowerCase()),
-                ) && <p className="empty">Ничего не найдено.</p>}
+                ) && (
+                  <div className="empty">
+                    <p>Ничего не найдено.</p>
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setType("all");
+                        searchInput.current?.focus();
+                      }}
+                    >
+                      Сбросить фильтры
+                    </button>
+                  </div>
+                )}
             </>
           )}
           {tab === "learning" && <section className="learning-library">
@@ -359,7 +395,7 @@ export function Employee({
               >
                 <p>
                   {formats[selected.format]} · {selected.duration_hours} ч. ·{" "}
-                  {selected.session_date ?? "В своём темпе"}
+                  {activityDate(selected.format, selected.session_date)}
                 </p>
                 <ul className="verified-facts">
                   {selected.facts
@@ -368,6 +404,20 @@ export function Employee({
                       <li key={f.fact_id}>{f.text}</li>
                     ))}
                 </ul>
+                <div className="skill-outcomes">
+                  {selected.expected_skill_changes.map((change) => (
+                    <p key={change.skill_id}>
+                      <strong>
+                        {names[change.skill_id] ?? change.skill_id}
+                      </strong>
+                      <span>
+                        {change.before} → {change.after} · цель{" "}
+                        {p.skills.find((s) => s.skill_id === change.skill_id)
+                          ?.required_level ?? "—"}
+                      </span>
+                    </p>
+                  ))}
+                </div>
                 {selected.alternative && (
                   <>
                     <h3>Сравнение: {selected.alternative.title}</h3>

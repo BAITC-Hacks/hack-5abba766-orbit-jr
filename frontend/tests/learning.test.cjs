@@ -98,6 +98,26 @@ test('an ambiguous quiz response retries the exact body and key and freezes answ
   } finally { await close(root); }
 });
 
+for (const status of [408, 429]) test(`quiz HTTP ${status} keeps the original receipt until the outcome is known`, async () => {
+  const calls = [];
+  global.fetch = async (url, options) => {
+    if (!url.endsWith('/quiz')) return initial(url);
+    calls.push({ body: options.body, key: options.headers.get('Idempotency-Key') });
+    return calls.length === 1
+      ? Response.json({ error: { code: 'HTTP_ERROR', message: 'Authored retryable response' } }, { status })
+      : reply(quizResult());
+  };
+  const root = await mount();
+  try {
+    await act(async () => state.answer('question', 'b'));
+    await act(async () => state.submitQuiz());
+    assert.equal(state.pending, true);
+    await act(async () => state.submitQuiz());
+    assert.deepEqual(calls[0], calls[1]);
+    assert.equal(state.attempt.status, 'passed');
+  } finally { await close(root); }
+});
+
 test('a definite version conflict keeps answers and requires refreshed state with a new submission key', async () => {
   const calls = [];
   global.fetch = async (url, options) => {

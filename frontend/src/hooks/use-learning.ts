@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CompletionRequest, DomainVersion, EmployeeView } from "../../../contracts/backend";
 import type { LearningAttempt, LearningModuleView, SubmitQuizRequest, SubmitQuizResult } from "../../../contracts/learning";
-import { apiRequest, ApiFailure, endpoints } from "@/lib/api";
+import { apiRequest, ApiFailure, endpoints, isDefinitiveRejection } from "@/lib/api";
 
 export function useLearning(employeeId: string, moduleId: string, target: CompletionRequest["target"], initialVersion: DomainVersion, onError: (error: unknown) => void) {
   const [module, setModule] = useState<LearningModuleView>();
@@ -104,7 +104,7 @@ export function useLearning(employeeId: string, moduleId: string, target: Comple
       setPending(false);
     } catch (value) {
       if (!signal.aborted) {
-        if (value instanceof ApiFailure && value.status >= 400 && value.status < 500) {
+        if (isDefinitiveRejection(value)) {
           receipt.current = null;
           setPending(false);
         }

@@ -48,8 +48,8 @@ export default function QuestApp({
             <>
               <Failure error={error} retry={() => setAttempt((n) => n + 1)} />
               <p>
-                Для рабочего режима нужны серверные API-обработчики в этом
-                приложении.
+                Не удалось подключиться к сервису. Повторите попытку через
+                несколько секунд.
               </p>
               <a href="/demo">Открыть отдельный UI-демо</a>
             </>
@@ -62,8 +62,8 @@ export default function QuestApp({
   if (!session)
     return (
       <>
-        <Failure error={error} />
         <Login
+          notice={error}
           onLogin={(value) => {
             setError(undefined);
             setSession(value);
@@ -73,6 +73,9 @@ export default function QuestApp({
     );
   return (
     <>
+      <a className="skip-link" href="#main-content">
+        Перейти к содержимому
+      </a>
       <Navigation
         session={session}
         busy={busy}
@@ -91,7 +94,7 @@ export default function QuestApp({
           }
         }}
       />
-      <main>
+      <main id="main-content" tabIndex={-1} className="connected-main">
         <Failure error={error} />
         {initialView === "hr" && session.role !== "hr" ? (
           <Failure error={new Error("Нет доступа к HR-данным.")} />

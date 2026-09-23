@@ -18,10 +18,12 @@ export function Modal({
     return () => {
       dialog?.close();
       if (trigger?.isConnected) trigger.focus();
-      else
-        document
-          .querySelector<HTMLButtonElement>("main button:not([disabled])")
-          ?.focus();
+      else {
+        const fallback =
+          document.querySelector<HTMLElement>("main button:not([disabled])") ??
+          document.querySelector<HTMLElement>("main[tabindex]");
+        fallback?.focus();
+      }
     };
   }, []);
   return (

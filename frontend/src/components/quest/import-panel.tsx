@@ -1,7 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { ImportResult } from "../../../../contracts/backend";
-import { apiRequest, ApiFailure, endpoints } from "@/lib/api";
+import {
+  apiRequest,
+  ApiFailure,
+  endpoints,
+  isDefinitiveRejection,
+} from "@/lib/api";
 import { Failure } from "./feedback";
 export function ImportPanel({
   revision,
@@ -66,11 +71,7 @@ export function ImportPanel({
       if (!controller.signal.aborted) {
         setError(error);
         onError(error);
-        if (
-          error instanceof ApiFailure &&
-          error.status >= 400 &&
-          error.status < 500
-        ) {
+        if (isDefinitiveRejection(error)) {
           request.current = null;
           setPending(false);
           if (error.code === "REVISION_CONFLICT") onRefresh();

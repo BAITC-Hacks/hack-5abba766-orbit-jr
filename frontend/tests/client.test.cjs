@@ -457,7 +457,9 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
     let root;
     global.fetch = async (url) =>
       reply(
-        url === "/api/catalog"
+        url === api.endpoints.learningModules
+          ? { modules: [] }
+          : url === "/api/catalog"
           ? { skills: [], role_profiles: [], events: [] }
           : url.endsWith("/recommendations")
             ? {
@@ -483,6 +485,155 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
       await unmount(root);
     }
   }
+});
+
+test("408 and 429 preserve completion receipts and replay the same key", async () => {
+  for (const status of [408, 429]) {
+    const requests = [];
+    global.fetch = async (url, options) => {
+      if (url.endsWith("/completions")) {
+        requests.push({
+          body: options.body,
+          key: options.headers.get("Idempotency-Key"),
+        });
+        if (requests.length === 1)
+          return Response.json(
+            { error: { code: "HTTP_ERROR", message: "Unknown write outcome" } },
+            { status },
+          );
+        return reply({ skill_changes: [] }, { replayed: true });
+      }
+      return reply(url.endsWith("/recommendations") ? rec() : employee());
+    };
+    const root = await mount();
+    try {
+      await act(async () =>
+        value.complete({
+          kind: "existing_participation",
+          participation_id: "retry-timeout",
+        }),
+      );
+      assert.ok(value.pendingTarget);
+      await act(async () => value.retryCompletion());
+      assert.deepEqual(requests[0], requests[1]);
+      assert.match(value.notice, /повторно не начислены/);
+    } finally {
+      await unmount(root);
+    }
+  }
+});
+
+test("login failure distinguishes invalid credentials from an expired session", async () => {
+  global.fetch = async () =>
+    Response.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  await assert.rejects(api.apiRequest(api.endpoints.login), (e) =>
+    /Неверный логин или пароль/.test(e.message),
+  );
+  await assert.rejects(api.apiRequest(api.endpoints.employee("E1")), (e) =>
+    /Сессия истекла/.test(e.message),
+  );
+});
+
+test("null successful payload is rejected before components dereference it", async () => {
+  global.fetch = async () => reply(null);
+  await assert.rejects(
+    api.apiRequest(api.endpoints.session),
+    (e) => e.code === "INVALID_RESPONSE",
+  );
+});
+
+const labels = load("src/lib/labels.ts");
+const { History } = load("src/components/quest/history.tsx");
+test("history status filtering keeps separate participations and their exact action targets", async () => {
+  let root;
+  const targets = [];
+  const rows = [
+    {
+      participation_id: "a",
+      event_id: "EV_036",
+      event_title: "First club",
+      effective_status: "completed",
+      completion_pct: 100,
+      actionable: false,
+    },
+    {
+      participation_id: "b",
+      event_id: "EV_036",
+      event_title: "Second club",
+      effective_status: "in_progress",
+      completion_pct: 20,
+      actionable: true,
+    },
+  ];
+  await act(async () => {
+    root = create(
+      React.createElement(History, {
+        rows,
+        busy: false,
+        complete: (t) => targets.push(t),
+      }),
+    );
+  });
+  try {
+    await act(async () =>
+      root.root
+        .findByType("select")
+        .props.onChange({ target: { value: "in_progress" } }),
+    );
+    assert.doesNotMatch(JSON.stringify(root.toJSON()), /First club/);
+    await act(async () => root.root.findByType("button").props.onClick());
+    assert.deepEqual(targets, [
+      { kind: "existing_participation", participation_id: "b" },
+    ]);
+    await act(async () =>
+      root.root
+        .findByType("select")
+        .props.onChange({ target: { value: "no_show" } }),
+    );
+    assert.match(
+      JSON.stringify(root.toJSON()),
+      /Пока нет активностей с таким статусом/,
+    );
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("skill filter uses remaining server gaps, keeping above-target levels intact", async () => {
+  const { Skills } = load("src/components/quest/skills.tsx");
+  let root;
+  const profile = {
+    goal: { target: {} },
+    skills: [
+      { skill_id: "above", current_level: 5, required_level: 3, gap: 0 },
+      { skill_id: "gap", current_level: 2, required_level: 4, gap: 2 },
+    ],
+  };
+  await act(async () => {
+    root = create(
+      React.createElement(Skills, {
+        employee: profile,
+        names: { above: "Already covered", gap: "Needs development" },
+      }),
+    );
+  });
+  try {
+    await act(async () => root.root.findByType("button").props.onClick());
+    const content = JSON.stringify(root.toJSON());
+    assert.doesNotMatch(content, /Already covered/);
+    assert.match(content, /Needs development/);
+    await act(async () => root.root.findByType("button").props.onClick());
+    assert.match(JSON.stringify(root.toJSON()), /Already covered/);
+    assert.equal(profile.skills[0].current_level, 5);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("scheduled activity with no date is never presented as self-paced", () => {
+  assert.equal(labels.activityDate("offline", null), "Дата не указана");
+  assert.equal(labels.activityDate("online", null), "Дата не указана");
+  assert.equal(labels.activityDate("self_paced", null), "В своём темпе");
 });
 
 test("login failure keeps authentication message instead of claiming an expired session", async () => {
@@ -537,11 +688,9 @@ test("import preview sends dry_run and never refreshes persisted data", async ()
   });
   try {
     await act(async () => {
-      root.root
-        .findAllByType("input")[0]
-        .props.onChange({
-          target: { files: [new File(["{}"], "employees.json")] },
-        });
+      root.root.findAllByType("input")[0].props.onChange({
+        target: { files: [new File(["{}"], "employees.json")] },
+      });
       root.root
         .findAllByType("input")
         .find((input) => input.props.type === "checkbox")
@@ -587,6 +736,179 @@ test("a skill outside an active goal is not labeled as missing career goal", asy
     const text = JSON.stringify(root.toJSON());
     assert.match(text, /Не входит в требования выбранной цели/);
     assert.doesNotMatch(text, /[Цц]ель не выбрана/);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("HR sections preserve selected import files and keep panels separate", async () => {
+  const { Hr } = load("src/components/quest/hr.tsx");
+  const counts = Object.fromEntries(
+    [
+      "completed",
+      "in_progress",
+      "dropped",
+      "no_show",
+      "declined",
+      "overdue",
+    ].map((s) => [s, 0]),
+  );
+  global.fetch = async (path) => {
+    if (path === api.endpoints.hr)
+      return reply({
+        employee_count: 1,
+        goals_by_source: { selected: 1, imported: 0, suggested: 0, missing: 0 },
+        skill_gaps: [],
+        no_next_step: [],
+        participation: {
+          actual_by_status: counts,
+          effective_by_status: counts,
+          simulated_completions: 0,
+          superseded_attempts: 0,
+          by_activity: [],
+        },
+      });
+    if (path === api.endpoints.catalog)
+      return reply({
+        dataset_revision: 1,
+        skills: [],
+        role_profiles: [],
+        events: [],
+      });
+    if (path.startsWith(api.endpoints.employees + "?")) {
+      assert.equal(
+        new URL(path, "http://test").searchParams.get("limit"),
+        "24",
+      );
+      return reply({ items: [], total: 0 });
+    }
+    throw new Error("Unexpected request " + path);
+  };
+  let root;
+  await act(async () => {
+    root = create(React.createElement(Hr, { onError }));
+  });
+  try {
+    const nav = root.root.findByProps({ "aria-label": "Разделы HR" });
+    const panels = () =>
+      root.root.findAll(
+        (n) =>
+          typeof n.props.className === "string" &&
+          n.props.className.split(" ").includes("hr-view"),
+      );
+    assert.deepEqual(
+      panels().map((n) => n.props.hidden),
+      [false, true, true],
+    );
+    await act(async () => nav.findAllByType("button")[2].props.onClick());
+    const input = root.root
+      .findAllByType("input")
+      .find((n) => n.props.type === "file");
+    await act(async () =>
+      input.props.onChange({
+        target: { files: [new File(["{}"], "qa-selected.json")] },
+      }),
+    );
+    await act(async () => nav.findAllByType("button")[1].props.onClick());
+    assert.deepEqual(
+      panels().map((n) => n.props.hidden),
+      [true, false, true],
+    );
+    await act(async () => nav.findAllByType("button")[2].props.onClick());
+    assert.match(JSON.stringify(root.toJSON()), /qa-selected.json/);
+    assert.deepEqual(
+      panels().map((n) => n.props.hidden),
+      [true, true, false],
+    );
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("HR skill totals retain denominators and distinguish reached goals from missing goals", async () => {
+  const { HrOverview } = load("src/components/quest/hr-overview.tsx");
+  const counts = Object.fromEntries(
+    [
+      "completed",
+      "in_progress",
+      "dropped",
+      "no_show",
+      "declined",
+      "overdue",
+    ].map((s) => [s, 0]),
+  );
+  const opened = [];
+  let root;
+  await act(async () => {
+    root = create(
+      React.createElement(HrOverview, {
+        open: (id) => opened.push(id),
+        names: { s: "Архитектура" },
+        data: {
+          employee_count: 5,
+          goals_by_source: {
+            selected: 2,
+            imported: 3,
+            suggested: 0,
+            missing: 0,
+          },
+          skill_gaps: [
+            {
+              skill_id: "s",
+              goal_source: "selected",
+              employees_with_gap: 1,
+              denominator: 2,
+              total_gap_points: 1,
+            },
+            {
+              skill_id: "s",
+              goal_source: "imported",
+              employees_with_gap: 2,
+              denominator: 3,
+              total_gap_points: 4,
+            },
+          ],
+          no_next_step: [
+            {
+              employee_id: "done",
+              full_name: "Goal reached",
+              goal_source: "selected",
+              reason: "GOAL_REACHED",
+            },
+            {
+              employee_id: "blocked",
+              full_name: "No course",
+              goal_source: "imported",
+              reason: "NO_ELIGIBLE_EVENTS",
+            },
+          ],
+          participation: {
+            actual_by_status: counts,
+            effective_by_status: counts,
+            simulated_completions: 0,
+            superseded_attempts: 0,
+            by_activity: [],
+          },
+        },
+      }),
+    );
+  });
+  try {
+    const bar = root.root.findByProps({
+      "aria-label": "Сотрудники с разрывом: Архитектура",
+    });
+    assert.equal(bar.props.value, 3);
+    assert.equal(bar.props.max, 5);
+    await act(async () =>
+      root.root
+        .findByType("select")
+        .props.onChange({ target: { value: "GOAL_REACHED" } }),
+    );
+    assert.doesNotMatch(JSON.stringify(root.toJSON()), /No course/);
+    await act(async () =>
+      root.root.findByProps({ className: "attention-row" }).props.onClick(),
+    );
+    assert.deepEqual(opened, ["done"]);
   } finally {
     await unmount(root);
   }

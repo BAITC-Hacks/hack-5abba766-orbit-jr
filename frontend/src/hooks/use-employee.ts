@@ -9,7 +9,13 @@ import type {
   GoalProgress,
   RecommendationResult,
 } from "../../../contracts/backend";
-import { apiRequest, ApiFailure, endpoints, sameVersion } from "@/lib/api";
+import {
+  apiRequest,
+  ApiFailure,
+  endpoints,
+  sameVersion,
+  isDefinitiveRejection,
+} from "@/lib/api";
 
 export function useEmployee(
   id: string,
@@ -171,11 +177,7 @@ export function useEmployee(
       if (!controller.signal.aborted) {
         setMutationError(error);
         onError(error);
-        if (
-          error instanceof ApiFailure &&
-          error.status >= 400 &&
-          error.status < 500
-        ) {
+        if (isDefinitiveRejection(error)) {
           receipt.current = null;
           setPendingTarget(null);
           await refresh();
