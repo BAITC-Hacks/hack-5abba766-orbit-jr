@@ -31,11 +31,13 @@ export function EmployeeProfile({ employee: p, names, onGoal, disabled, readOnly
         <h3>{p.goal.target ? `${p.goal.target.target_grade} ${p.goal.target.target_role}` : "Следующий шаг начинается с цели"}</h3>
         <p>{p.goal.target ? "Навыки и обучение на пути к выбранной роли." : readOnly ? "Сотрудник пока не выбрал направление развития." : "Выберите роль, чтобы увидеть требования и подходящее обучение."}</p>
         {p.progress && <div className="profile-coverage"><div><span>Соответствие цели</span><strong>{Math.round(p.progress.coverage * 100)}%</strong></div><progress max={100} value={Math.round(p.progress.coverage * 100)} aria-label="Соответствие цели" /></div>}
+        {p.goal.target && <p className="fine-print">Соответствие навыков требованиям роли не означает повышение.</p>}
         {!readOnly && <button className="secondary" onClick={onGoal} disabled={disabled}>{p.goal.target ? "Изменить цель" : "Выбрать цель"}<ArrowUpRight size={16} aria-hidden="true" /></button>}
       </section>
     </div>
+    {p.has_simulated_progress && <p className="fine-print">Показатели включают расчётные демопрохождения и не подтверждают посещение внешнего обучения.</p>}
     <dl className="profile-statistics" aria-label="Обучение и навыки">
-      <div><dt>Навыков в профиле</dt><dd>{p.skills.length}</dd></div>
+      <div><dt>Навыков в каталоге</dt><dd>{p.skills.length}</dd></div>
       <div><dt>Завершено активностей</dt><dd>{completed}</dd></div>
       <div><dt>В процессе обучения</dt><dd>{active}</dd></div>
     </dl>

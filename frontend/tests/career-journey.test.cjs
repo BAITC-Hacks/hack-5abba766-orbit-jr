@@ -64,6 +64,24 @@ test("employee profile renders source details and handles a missing goal without
   assert.doesNotMatch(html, /<progress/);
 });
 
+test("standalone profile discloses simulated indicators without implying earned skills or promotion", () => {
+  const profile = { ...employee, department: "Development", tenure_months: 5,
+    work_format: "remote", preferred_language: "ru", last_review_date: "2026-09-11",
+    history: [], has_simulated_progress: true };
+  const props = { employee: profile, names, onGoal: noop, disabled: false };
+  const html = render(EmployeeProfile, props);
+  assert.match(html, /Показатели включают расчётные демопрохождения/);
+  assert.match(html, /не подтверждают посещение внешнего обучения/);
+  assert.match(html, /Соответствие навыков требованиям роли не означает повышение/);
+  assert.match(html, /<dt>Навыков в каталоге<\/dt><dd>4<\/dd>/);
+  assert.doesNotMatch(html, /Навыков в профиле/);
+  const withoutSimulation = render(EmployeeProfile, { ...props, employee: { ...profile, has_simulated_progress: false } });
+  assert.doesNotMatch(withoutSimulation, /расчётные демопрохождения/);
+  const withoutGoal = render(EmployeeProfile, { ...props, employee: { ...profile, goal: { source: "missing", target: null }, progress: null } });
+  assert.match(withoutGoal, /расчётные демопрохождения/);
+  assert.doesNotMatch(withoutGoal, /не означает повышение/);
+});
+
 test("journey hides stale choices and names prerequisite activities in the current snapshot", () => {
   const result = { version, mode: "rules_fallback", recommendations: [card] };
   const props = { employee, recommendations: result, names, eventNames: { advanced: "Advanced course" }, onSelect: noop };
