@@ -1,0 +1,18 @@
+
+> verify:ai-flow
+> npm run verify:ai-flow -w backend -- --live
+
+
+> @career-quest/backend@1.0.0 verify:ai-flow
+> tsx --env-file-if-exists=../.env scripts/verify-ai-flow.ts --live
+
+Checking authenticated handlers with real PostgreSQL and authored synthetic data; live LLM: true.
+
+ RUN  v4.1.11 <repository>/backend
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  16:25:11
+   Duration  50.97s (transform 1.33s, setup 0ms, import 6.17s, tests 42.28s, environment 0ms)
+

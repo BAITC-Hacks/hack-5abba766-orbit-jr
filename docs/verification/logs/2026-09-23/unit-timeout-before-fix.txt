@@ -1,0 +1,45 @@
+
+> test
+> npm run test -w backend && npm run test:client -w frontend
+
+
+> @career-quest/backend@1.0.0 test
+> vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.11 <repository>/backend
+
+stdout | tests/domain-scaling.test.ts > domain scaling on authored synthetic history > keeps full-company recommendations identical to each employee history scope at 1000 employees and 50000 records
+{"employees":1000,"history":50000,"candidates":19994,"recommendationsMs":11577,"hrMs":701}
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/domain-scaling.test.ts > domain scaling on authored synthetic history > keeps full-company recommendations identical to each employee history scope at 1000 employees and 50000 records
+Error: Test timed out in 20000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/domain-scaling.test.ts:30:3
+
+ ❯ tests/domain-scaling.test.ts (4 tests | 1 failed) 33209ms
+     × keeps full-company recommendations identical to each employee history scope at 1000 employees and 50000 records 28889ms
+     28|   }, 15000);
+     29|
+     30|   it('keeps full-company recommendations identical to each employee hi…
+       |   ^
+     31|     const snapshot = scalingSnapshot();
+     32|     const histories = new Map<string, typeof snapshot.history>();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 19 passed (20)
+      Tests  1 failed | 430 passed (431)
+   Start at  16:25:11
+   Duration  38.59s (transform 29.22s, setup 0ms, import 44.49s, tests 56.10s, environment 6ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path <repository>\backend
+npm error workspace @career-quest/backend@1.0.0
+npm error location <repository>\backend
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vitest run --config vitest.config.ts

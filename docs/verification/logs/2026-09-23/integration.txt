@@ -1,0 +1,13 @@
+
+> test:integration
+> node scripts/integration.mjs
+
+
+ RUN  v4.1.11 <repository>/backend
+
+
+ Test Files  6 passed (6)
+      Tests  54 passed | 1 skipped (55)
+   Start at  16:19:57
+   Duration  22.78s (transform 1.28s, setup 0ms, import 1.24s, tests 81.93s, environment 1ms)
+
