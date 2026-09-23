@@ -1,5 +1,5 @@
 import type { AiRankingInput, EmptyReason, RecommendationResult } from '../types'
-import { baselineCards, type BaselineSignals } from '../domain/baseline'
+import { baselineCards, candidateRankingFactors, comparePolicyPriority, type BaselineSignals } from '../domain/baseline'
 import { rankWithModel } from './adapter'
 import { validateProviderRanking } from './response-validator'
 
@@ -46,9 +46,25 @@ export async function recommend(
   if (attempt.ok) {
     const checked = validateProviderRanking(attempt.output, input)
     if (checked.ok) {
-      return {
-        version, mode: 'ai', fallback_reason: null,
-        recommendations: checked.cards, empty_reason: null,
+      const skills = new Map(input.profile.skills.map(skill => [skill.skill_id, skill]))
+      const factors = new Map(input.candidates.map(candidate => [
+        candidate.candidate_id, candidateRankingFactors(candidate, skills, options.signals),
+      ]))
+      const remaining = new Map(input.candidates.map(candidate => [candidate.candidate_id, candidate]))
+      // Reject the whole response if any selected card skips a better remaining
+      // activity. Never repair the AI order or force arbitrary ID tie-breaks.
+      const followsPolicy = checked.cards.every(card => {
+        remaining.delete(card.candidate_id)
+        for (const other of remaining.values()) {
+          if (comparePolicyPriority(other, card, factors) < 0) return false
+        }
+        return true
+      })
+      if (followsPolicy) {
+        return {
+          version, mode: 'ai', fallback_reason: null,
+          recommendations: checked.cards, empty_reason: null,
+        }
       }
     }
   }

@@ -93,6 +93,18 @@ export function validateRanking(raw: unknown, input: AiRankingInput): Validation
       }
     }
 
+    // Require the available comparison evidence without inferring why the model
+    // ranked this candidate or parsing opaque fact IDs. Conditional benefit may
+    // share target_requirement with ordinary target facts, so retain both.
+    const cited = new Set(factIds)
+    const missingEvidence = candidate.facts.find(fact => (
+      fact.category === 'history' || fact.category === 'effort' ||
+      (candidate.unlocks_event_ids.length > 0 && fact.category === 'target_requirement')
+    ) && !cited.has(fact.fact_id))
+    if (missingEvidence) {
+      return { ok: false, detail: `${choice.candidate_id} omits required ${missingEvidence.category} evidence` }
+    }
+
     const altId = choice.alternative_candidate_id ?? null
     let alternative: RecommendationCard['alternative'] = null
     if (altId !== null) {

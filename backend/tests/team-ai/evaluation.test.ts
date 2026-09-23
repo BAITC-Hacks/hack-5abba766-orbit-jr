@@ -161,8 +161,8 @@ describe('evaluation metrics', () => {
     result.recommendations[0]!.reason_fact_ids = result.recommendations[0]!.reason_fact_ids
       .filter((id) => !prerequisite.requiredTopFactIds!.includes(id))
     const score = scoreEvaluation(prerequisite, result)
-    expect(score).toMatchObject({ acceptedAi: true, validCitations: true, aiExpectedChoicePass: true, requiredTopEvidencePass: false })
-    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: 0 })
+    expect(score).toMatchObject({ acceptedAi: false, validCitations: false, aiExpectedChoicePass: null, requiredTopEvidencePass: false })
+    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: null, invalidAiCases: 1 })
   })
 
   it('only measures decisive evidence when the case defines it', () => {
@@ -181,7 +181,7 @@ describe('evaluation metrics', () => {
     result.recommendations[0]!.reason_fact_ids = result.recommendations[0]!.reason_fact_ids
       .filter((id) => id !== 'new-format/history')
     const score = scoreEvaluation(historyCase, result)
-    expect(score).toMatchObject({ acceptedAi: true, aiExpectedChoicePass: true, requiredTopEvidencePass: false })
+    expect(score).toMatchObject({ acceptedAi: false, validCitations: false, aiExpectedChoicePass: null, requiredTopEvidencePass: false })
     expect(summarizeEvaluations([score]).aiEndToEndPassRate).toBe(0)
   })
 

@@ -44,7 +44,7 @@ function input(): AiRankingInput {
 }
 
 function choice(id = 'first', alternative?: string | null) {
-  return { candidate_id: id, reason_fact_ids: [`${id}:grade`, `${id}:skill_gap`, `${id}:history`],
+  return { candidate_id: id, reason_fact_ids: [`${id}:grade`, `${id}:skill_gap`, `${id}:history`, `${id}:effort`],
     ...(alternative === undefined ? {} : { alternative_candidate_id: alternative }) };
 }
 
@@ -254,10 +254,10 @@ describe('recommendation service modes and version boundaries', () => {
 
   it('returns grounded AI recommendations after a transient failure while holding one advisory lock', async () => {
     mocks.fetch.mockResolvedValueOnce(new Response('Unavailable', { status: 503 }));
-    mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('second')] }));
+    mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('first')] }));
     const result = await recommendations('employee', { expected_version: version });
     expect(result).toMatchObject({ mode: 'ai', fallback_reason: null });
-    expect(result.recommendations[0]).toMatchObject({ candidate_id: 'second', expected_skill_changes: candidate('second').expected_skill_changes });
+    expect(result.recommendations[0]).toMatchObject({ candidate_id: 'first', expected_skill_changes: candidate('first').expected_skill_changes });
     expect(mocks.fetch).toHaveBeenCalledTimes(2);
     expect(mocks.connect).toHaveBeenCalledOnce();
     expect(mocks.readDomainVersionWithClient).toHaveBeenCalledOnce();

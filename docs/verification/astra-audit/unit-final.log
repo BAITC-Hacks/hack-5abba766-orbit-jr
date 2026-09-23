@@ -1,0 +1,12 @@
+
+> @career-quest/backend@1.0.0 test
+> vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.11 D:/Projects/baitc_hackathon/orbit-jr/backend
+
+
+ Test Files  22 passed (22)
+      Tests  451 passed (451)
+   Start at  17:20:51
+   Duration  11.36s (transform 7.72s, setup 0ms, import 13.57s, tests 23.40s, environment 3ms)

@@ -19,8 +19,8 @@ import type {
  *
  * This is a product heuristic for comparison, not a trained metric and not a
  * claimed probability of success. It is also what mode=rules_fallback returns,
- * and the yardstick the AI path has to beat - so it is a real attempt at a good
- * answer, not a strawman.
+ * and the substantive ordering policy enforced at the AI boundary. Agreement
+ * with this heuristic is policy compliance, not evidence of model uplift.
  */
 
 /**
@@ -93,6 +93,19 @@ export function candidateRankingFactors(candidate: Candidate, skills: Map<Id, Sk
   }
 }
 
+/** Hard product priorities; exact policy ties deliberately exclude arbitrary IDs. */
+export function comparePolicyPriority(a: Candidate, b: Candidate,
+  factors: ReadonlyMap<Id, ReturnType<typeof candidateRankingFactors>>): number {
+  const aFactors = factors.get(a.candidate_id)!
+  const bFactors = factors.get(b.candidate_id)!
+  return bFactors.closed_critical_gaps - aFactors.closed_critical_gaps ||
+    bFactors.weighted_target_value - aFactors.weighted_target_value ||
+    aFactors.recent_negative_outcomes - bFactors.recent_negative_outcomes ||
+    aFactors.similar_format_penalty - bFactors.similar_format_penalty ||
+    a.duration_hours - b.duration_hours ||
+    (a.action === b.action ? 0 : a.action === 'continue' ? -1 : 1)
+}
+
 export function rankBaseline(
   input: BaselineInput,
   signals: BaselineSignals,
@@ -104,26 +117,8 @@ export function rankBaseline(
   ]))
 
   return [...input.candidates].sort((a, b) => {
-    const aFactors = factors.get(a.candidate_id)!
-    const bFactors = factors.get(b.candidate_id)!
-    const criticalDiff = bFactors.closed_critical_gaps - aFactors.closed_critical_gaps
-    if (criticalDiff !== 0) return criticalDiff
-
-    const gainA = aFactors.weighted_target_value
-    const gainB = bFactors.weighted_target_value
-    if (gainA !== gainB) return gainB - gainA
-
-    const negA = aFactors.recent_negative_outcomes
-    const negB = bFactors.recent_negative_outcomes
-    if (negA !== negB) return negA - negB
-
-    const formatA = aFactors.similar_format_penalty
-    const formatB = bFactors.similar_format_penalty
-    if (formatA !== formatB) return formatA - formatB
-
-    if (a.duration_hours !== b.duration_hours) return a.duration_hours - b.duration_hours
-
-    if (a.action !== b.action) return a.action === 'continue' ? -1 : 1
+    const priority = comparePolicyPriority(a, b, factors)
+    if (priority !== 0) return priority
     const compare = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
     return compare(a.event_id, b.event_id) || compare(a.candidate_id, b.candidate_id)
   })

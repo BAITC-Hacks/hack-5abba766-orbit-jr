@@ -162,7 +162,8 @@ describe('evaluation execution and exit status', () => {
     const wrong = testCase.input.candidates.find((candidate) => !testCase.expectedTopCandidateIds.includes(candidate.candidate_id))!
     respondWith(choiceFor(wrong.candidate_id))
     expect(await evaluateAi(['--live', '--smoke', '--json'])).toBe(1)
-    expect(report().summary).toMatchObject({ acceptedAiCases: 1, invalidAiCases: 0, aiExpectedChoicePassRate: 0, aiEndToEndPassRate: 0 })
+    expect(report().summary).toMatchObject({ acceptedAiCases: 0, invalidAiCases: 1, fallbackCases: 1, aiExpectedChoicePassRate: null, aiEndToEndPassRate: 0 })
+    expect(report().cases[0]).toMatchObject({ mode: 'rules_fallback', fallbackReason: 'invalid_response', topCandidateId: testCase.expectedTopCandidateIds[0] })
   })
 
   it('fails invalid provider output even when fallback chooses the expected activity', async () => {
@@ -189,8 +190,8 @@ describe('evaluation execution and exit status', () => {
     expect(await evaluateAi(['--live', '--suite=acceptance', '--json'])).toBe(1)
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(report().summary).toMatchObject({
-      acceptedAiCases: 2, aiExpectedChoicePassRate: 1, aiCandidateOrderPassRate: 0, aiEndToEndPassRate: 0.5,
+      acceptedAiCases: 1, invalidAiCases: 1, fallbackCases: 1, aiExpectedChoicePassRate: 1, aiCandidateOrderPassRate: null, aiEndToEndPassRate: 0.5,
     })
-    expect(report().cases[1]).toMatchObject({ validCitations: true, aiExpectedChoicePass: true, expectedCandidateOrderPass: false })
+    expect(report().cases[1]).toMatchObject({ mode: 'rules_fallback', fallbackReason: 'invalid_response', validCitations: true, aiExpectedChoicePass: null, expectedCandidateOrderPass: true })
   })
 })

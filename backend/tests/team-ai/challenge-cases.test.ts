@@ -143,7 +143,7 @@ describe('independently authored challenge scenarios', () => {
     expect(testCase.expectedTopCandidateIds).not.toContain(attacker.candidate_id)
   })
 
-  it('the prerequisite needs its unlock citation even though three ordinary categories validate', () => {
+  it('rejects a prerequisite without its unlock citation despite three ordinary categories', () => {
     const testCase = challengeCases[5]!
     const top = baselineCards(testCase.input, testCase.signals)[0]!
     expect(top.goal_coverage_delta).toBe(0)
@@ -151,7 +151,7 @@ describe('independently authored challenge scenarios', () => {
     expect(testCase.signals.unlockedWeightedGain.get(top.candidate_id)).toBe(8)
     expect(top.facts.find((fact) => fact.fact_id.endsWith('/unlock'))!.text).toContain('adding 4 covered goal points (weighted gain 8)')
     const ordinaryFacts = [`${top.candidate_id}/grade`, `${top.candidate_id}/gap`, `${top.candidate_id}/target`]
-    expect(validateRanking({ choices: [{ candidate_id: top.candidate_id, reason_fact_ids: ordinaryFacts }] }, testCase.input).ok).toBe(true)
+    expect(validateRanking({ choices: [{ candidate_id: top.candidate_id, reason_fact_ids: ordinaryFacts }] }, testCase.input).ok).toBe(false)
     expect(testCase.requiredTopFactIds).toContain(`${top.candidate_id}/unlock`)
     expect(testCase.requiredTopFactIds!.every((id) => ordinaryFacts.includes(id))).toBe(false)
   })
@@ -184,7 +184,7 @@ describe('independently authored challenge scenarios', () => {
     result.recommendations[0]!.reason_fact_ids = result.recommendations[0]!.reason_fact_ids
       .filter((id) => id !== 'step:mixed/b/unlock')
     const score = scoreEvaluation(testCase, result)
-    expect(score).toMatchObject({ acceptedAi: true, aiExpectedChoicePass: true, requiredTopEvidencePass: false })
-    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: 0 })
+    expect(score).toMatchObject({ acceptedAi: false, validCitations: false, aiExpectedChoicePass: null, requiredTopEvidencePass: false })
+    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: null, invalidAiCases: 1 })
   })
 })

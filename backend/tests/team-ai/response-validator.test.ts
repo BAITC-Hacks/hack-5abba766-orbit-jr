@@ -10,7 +10,7 @@ const base = input([
 
 const choice = (overrides: Record<string, unknown> = {}) => ({
   candidate_id: 'C1',
-  reason_fact_ids: ['C1-gap', 'C1-req', 'C1-grade'],
+  reason_fact_ids: ['C1-gap', 'C1-req', 'C1-grade', 'C1-effort'],
   alternative_candidate_id: null,
   ...overrides,
 })
@@ -18,7 +18,7 @@ const choice = (overrides: Record<string, unknown> = {}) => ({
 describe('validateRanking', () => {
   it('accepts a well-formed ranking and numbers the ranks', () => {
     const result = validateRanking(
-      { choices: [choice(), choice({ candidate_id: 'C2', reason_fact_ids: ['C2-gap', 'C2-req', 'C2-grade'] })] },
+      { choices: [choice(), choice({ candidate_id: 'C2', reason_fact_ids: ['C2-gap', 'C2-req', 'C2-grade', 'C2-effort'] })] },
       base,
     )
     expect(result.ok).toBe(true)
@@ -114,7 +114,7 @@ describe('validateRanking', () => {
       {
         choices: [
           choice({ alternative_candidate_id: 'C2' }),
-          choice({ candidate_id: 'C2', reason_fact_ids: ['C2-gap', 'C2-req', 'C2-grade'] }),
+          choice({ candidate_id: 'C2', reason_fact_ids: ['C2-gap', 'C2-req', 'C2-grade', 'C2-effort'] }),
         ],
       },
       base,
@@ -162,7 +162,7 @@ describe('optional provider comparisons', () => {
     const state = input(['C1', 'C2', 'C3', 'C4'].map((candidate_id) => candidate({ candidate_id })))
     const raw = { choices: ['C1', 'C2', 'C3'].map((candidate_id, index) => choice({
       candidate_id,
-      reason_fact_ids: [`${candidate_id}-gap`, `${candidate_id}-req`, `${candidate_id}-grade`],
+      reason_fact_ids: [`${candidate_id}-gap`, `${candidate_id}-req`, `${candidate_id}-grade`, `${candidate_id}-effort`],
       alternative_candidate_id: ['C2', 'C3', 'C4'][index],
     })) }
     const before = structuredClone(raw)
