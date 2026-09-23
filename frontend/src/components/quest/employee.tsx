@@ -2,8 +2,11 @@
 import { useState } from "react";
 import type {
   CatalogView,
+  CompletionRequest,
+  EventView,
   RecommendationCard as Card,
 } from "../../../../contracts/backend";
+import type { LearningModuleSummary } from "../../../../contracts/learning";
 import { endpoints } from "@/lib/api";
 import { formats, eventTypes, emptyReasons, goalSources } from "@/lib/labels";
 import { useEmployee } from "@/hooks/use-employee";
@@ -13,6 +16,9 @@ import { Modal } from "./modal";
 import { Skills } from "./skills";
 import { History } from "./history";
 import { RecommendationCard } from "./recommendation-card";
+import { CareerJourney } from "./career-journey";
+import { CompletionResultPanel } from "./completion-result";
+import { LearningPlayer } from "./learning-player";
 
 export function Employee({
   id,
@@ -25,6 +31,8 @@ export function Employee({
 }) {
   const state = useEmployee(id, onError, onChanged);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
+  const modules = useResource<{ modules: LearningModuleSummary[] }>(endpoints.learningModules, onError);
+  const [learning, setLearning] = useState<{ moduleId: string; event: EventView; target: CompletionRequest["target"] }>();
   const [tab, setTab] = useState("overview");
   const [selection, setSelection] = useState<{
     card: Card;
@@ -42,7 +50,36 @@ export function Employee({
   const names = Object.fromEntries(
     catalog.data?.skills.map((s) => [s.skill_id, s.name]) ?? [],
   );
+  const eventNames = Object.fromEntries(catalog.data?.events.map(event => [event.event_id, event.title]) ?? []);
+  const learningModules = modules.data?.modules ?? [];
+  const moduleFor = (eventId: string) => learningModules.find(module => module.event_id === eventId);
   const disabled = state.busy || !!state.pendingTarget;
+  function openLearning(moduleId: string, eventId: string, target?: CompletionRequest["target"]) {
+    const event = catalog.data?.events.find(item => item.event_id === eventId);
+    if (!event || !p || disabled) return;
+    const active = p.history.find(item => item.event_id === eventId && item.actionable);
+    const selectedTarget = target ?? (active
+      ? { kind: "existing_participation" as const, participation_id: active.participation_id }
+      : { kind: "new_participation" as const, event_id: eventId, session_date: event.format === "self_paced" ? null : [...event.upcoming_sessions].sort().find(date => !state.asOfDate || date >= state.asOfDate) ?? null });
+    setSelected(undefined);
+    setLearning({ moduleId, event, target: selectedTarget });
+  }
+  function cardTarget(card: Card): CompletionRequest["target"] {
+    return card.action === "continue" && card.participation_id
+      ? { kind: "existing_participation", participation_id: card.participation_id }
+      : { kind: "new_participation", event_id: card.event_id, session_date: card.session_date };
+  }
+  function chooseCard(card: Card) {
+    const module = moduleFor(card.event_id);
+    if (module) openLearning(module.id, card.event_id, cardTarget(card));
+    else setSelected(card);
+  }
+  if (learning && p) return <LearningPlayer key={`${id}:${learning.moduleId}`} employee={p} moduleId={learning.moduleId} event={learning.event} target={learning.target} names={names} onError={onError}
+    onClose={() => setLearning(undefined)} onCompleted={(result, previousProgress) => {
+      setLearning(undefined);
+      setTab("overview");
+      void state.acceptLearningCompletion(result, previousProgress);
+    }} />;
   return (
     <>
       {state.loading && <Loading>Загрузка профиля…</Loading>}
@@ -60,8 +97,7 @@ export function Employee({
       )}
       {state.pendingTarget && !state.busy && (
         <p className="feedback">
-          Результат запроса не подтверждён. Повторите то же завершение; ключ
-          действия сохранён.
+          Результат пока не подтверждён. Повторите завершение — повторного начисления не будет.
         </p>
       )}
       {p && (
@@ -91,6 +127,7 @@ export function Employee({
               ["overview", "Обзор"],
               ["history", "Моя активность"],
               ["catalog", "Каталог"],
+              ["learning", "Учебная мастерская"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -144,7 +181,7 @@ export function Employee({
                       {p.progress ? Math.round(p.progress.coverage * 100) : "—"}
                       {p.progress && <small>%</small>}
                     </strong>
-                    <p>по расчёту сервера</p>
+                    <p>навыков для выбранной цели</p>
                   </div>
                 </div>
                 <div className="hero-foot">
@@ -153,11 +190,13 @@ export function Employee({
                   </span>
                   <span>
                     {p.has_simulated_progress
-                      ? "Включает симуляции"
-                      : "Рассчитанные навыки"}
+                      ? "С учётом демопрохождений"
+                      : "По оценке навыков и истории"}
                   </span>
                 </div>
               </section>
+              {state.completion && <CompletionResultPanel result={state.completion.result} previousProgress={state.completion.previousProgress} names={names} onClose={state.dismissCompletion} />}
+              <CareerJourney employee={p} recommendations={state.recommendations} names={names} eventNames={eventNames} onSelect={chooseCard} />
               <section>
                 <div className="section-heading">
                   <h2>Ваш следующий шаг</h2>
@@ -200,7 +239,9 @@ export function Employee({
                           card={card}
                           employee={p}
                           names={names}
-                          select={() => setSelected(card)}
+                          eventNames={eventNames}
+                          actionLabel={moduleFor(card.event_id) ? "Открыть уроки" : "Подробнее о шаге"}
+                          select={() => chooseCard(card)}
                         />
                       ))}
                     </div>
@@ -215,6 +256,11 @@ export function Employee({
               rows={p.history}
               busy={disabled}
               complete={(target) => void state.complete(target)}
+              moduleEventIds={learningModules.map(module => module.event_id)}
+              learn={row => {
+                const module = moduleFor(row.event_id);
+                if (module) openLearning(module.id, row.event_id, { kind: "existing_participation", participation_id: row.participation_id });
+              }}
             />
           )}
           {tab === "catalog" && (
@@ -244,9 +290,8 @@ export function Employee({
                 </label>
               </div>
               <p className="fine-print">
-                Справочник активностей. Каталог не содержит персонального
-                допуска и API зачисления; доступные действия находятся в
-                рекомендациях.
+                Здесь собраны все активности компании. Подходящие именно вам шаги — в обзоре.
+                Для некоторых курсов доступны короткие учебные демомодули.
               </p>
               <div className="course-grid">
                 {catalog.data?.events
@@ -279,6 +324,7 @@ export function Employee({
                             Обязательное обучение · не персональная рекомендация
                           </p>
                         )}
+                        {moduleFor(e.event_id) && <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>}
                       </div>
                     </article>
                   ))}
@@ -293,6 +339,16 @@ export function Employee({
                 ) && <p className="empty">Ничего не найдено.</p>}
             </>
           )}
+          {tab === "learning" && <section className="learning-library">
+            <span className="eyebrow">ОТ ПРОЧИТАННОГО К ПОНЯТНОМУ</span><h2>Учебная мастерская</h2>
+            <p>Короткие уроки, практические вопросы и сохранённый прогресс. Это демонстрационные фрагменты курсов; перед началом проверим доступность активности для вашего профиля.</p>
+            {modules.loading && <Loading>Загрузка учебных модулей…</Loading>}
+            <Failure error={modules.error} retry={modules.reload} />
+            <div className="learning-library-grid">{learningModules.map(module => <article className="learning-library-card" key={module.id}>
+              <span>{module.estimated_minutes} минут · {module.lesson_count} урока · мини-тест</span><h3>{module.title}</h3><p>{module.summary}</p>
+              <button className="secondary" disabled={disabled || !catalog.data} onClick={() => openLearning(module.id, module.event_id)}>Открыть модуль →</button>
+            </article>)}</div>
+          </section>}
           {selected &&
             state.recommendations?.recommendations.some(
               (c) => c.candidate_id === selected.candidate_id,
@@ -323,8 +379,7 @@ export function Employee({
                   </>
                 )}
                 <p className="fine-print">
-                  Завершение — симуляция сценария, не подтверждение фактического
-                  посещения. Навыки обновятся после ответа сервера.
+                  Отметка покажет расчётный результат выполнения в этом демо. Она не подтверждает посещение внешнего мероприятия.
                 </p>
                 <button
                   className="primary"
@@ -334,23 +389,11 @@ export function Employee({
                       !selected.participation_id)
                   }
                   onClick={() => {
-                    void state.complete(
-                      selected.action === "continue" &&
-                        selected.participation_id
-                        ? {
-                            kind: "existing_participation",
-                            participation_id: selected.participation_id,
-                          }
-                        : {
-                            kind: "new_participation",
-                            event_id: selected.event_id,
-                            session_date: selected.session_date,
-                          },
-                    );
+                    void state.complete(cardTarget(selected));
                     setSelected(undefined);
                   }}
                 >
-                  Симулировать завершение
+                  Отметить активность выполненной
                 </button>
               </Modal>
             )}

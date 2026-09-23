@@ -201,7 +201,7 @@ test("completion retries use identical body/key and no optimistic skill update; 
     assert.deepEqual(requests[0], requests[1]);
     assert.equal(value.profile.version.employee_revision, 3);
     assert.equal(value.recommendations.version.employee_revision, 3);
-    assert.match(value.notice, /Повторный запрос/);
+    assert.match(value.notice, /повторно не начислены/);
   } finally {
     await unmount(root);
   }

@@ -6,6 +6,7 @@ import type {
   EmployeeView,
   GoalRequest,
   GoalResult,
+  GoalProgress,
   RecommendationResult,
 } from "../../../contracts/backend";
 import { apiRequest, ApiFailure, endpoints, sameVersion } from "@/lib/api";
@@ -25,6 +26,8 @@ export function useEmployee(
   const [recLoading, setRecLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [asOfDate, setAsOfDate] = useState<string>();
+  const [completion, setCompletion] = useState<{ result: CompletionResult; previousProgress: GoalProgress | null }>();
   const generation = useRef(0);
   const profileAbort = useRef<AbortController | null>(null);
   const recAbort = useRef<AbortController | null>(null);
@@ -36,6 +39,7 @@ export function useEmployee(
     action: string;
     key: string;
     body: CompletionRequest;
+    previousProgress: GoalProgress | null;
   } | null>(null);
   const [pendingTarget, setPendingTarget] = useState<string | null>(null);
   const recommend = useCallback(
@@ -99,6 +103,7 @@ export function useEmployee(
       if (result.data.employee_id !== id)
         throw new Error("Сервер вернул другой профиль.");
       setProfile(result.data);
+      setAsOfDate(result.meta.as_of_date ?? undefined);
       void recommend(result.data);
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -128,6 +133,7 @@ export function useEmployee(
         action,
         key: crypto.randomUUID(),
         body: { expected_version: profile.version, simulation: true, target },
+        previousProgress: profile.progress ?? null,
       };
     const saved = receipt.current;
     lock.current = true;
@@ -156,8 +162,9 @@ export function useEmployee(
       setPendingTarget(null);
       onChanged?.();
       setNotice(
-        `${result.meta.replayed ? "Повторный запрос: сохранённый результат." : "Симуляция сохранена."} ${result.data.skill_changes.map((s) => `${s.skill_id}: ${s.before} → ${s.after}`).join("; ")}`,
+        result.meta.replayed ? "Сохранённый результат восстановлен. Навыки повторно не начислены." : "Выполнение отмечено. Посмотрите, как изменился ваш путь.",
       );
+      setCompletion({ result: result.data, previousProgress: saved.previousProgress });
       // Receipt may be older than current state: always GET current profile.
       await refresh();
     } catch (error) {
@@ -202,6 +209,7 @@ export function useEmployee(
       });
       if (!controller.signal.aborted) {
         setNotice("Цель сохранена.");
+        setCompletion(undefined);
         onChanged?.();
         await refresh();
       }
@@ -218,6 +226,7 @@ export function useEmployee(
   }
   return {
     profile,
+    asOfDate,
     recommendations,
     error,
     recError,
@@ -226,6 +235,14 @@ export function useEmployee(
     recLoading,
     busy,
     notice,
+    completion,
+    dismissCompletion: () => setCompletion(undefined),
+    acceptLearningCompletion: async (result: CompletionResult, previousProgress: GoalProgress | null) => {
+      setCompletion({ result, previousProgress });
+      setNotice("Демомодуль пройден. Результат сохранён, следующие шаги обновляются.");
+      onChanged?.();
+      await refresh();
+    },
     pendingTarget,
     refresh,
     complete,

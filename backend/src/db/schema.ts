@@ -32,3 +32,12 @@ export const actionReceipts = pgTable('action_receipts', {
 }, t => [primaryKey({ columns: [t.actorId, t.operation, t.idempotencyKey] })]);
 export const importBatches = pgTable('import_batches', { id: text('id').primaryKey(), actorId: text('actor_id').notNull().references(() => accounts.id), fingerprint: text('fingerprint').notNull(), result: jsonb('result').notNull(), recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow() });
 export const auditRecords = pgTable('audit_records', { id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(), actorId: text('actor_id').notNull().references(() => accounts.id), operation: text('operation').notNull(), targetEmployeeId: text('target_employee_id').references(() => employees.employeeId), details: jsonb('details').notNull(), recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow() });
+export const learningAttempts = pgTable('learning_attempts', {
+  id: text('id').primaryKey(), employeeId: text('employee_id').notNull().references(() => employees.employeeId), eventId: text('event_id').notNull().references(() => events.eventId),
+  moduleId: text('module_id').notNull(), moduleVersion: integer('module_version').notNull(), occurrenceKey: text('occurrence_key').notNull(),
+  target: jsonb('target').notNull(), courseSnapshot: jsonb('course_snapshot').notNull(), completedLessonIds: jsonb('completed_lesson_ids').$type<string[]>().notNull().default([]),
+  status: text('status').notNull().default('learning'), quizAttempts: integer('quiz_attempts').notNull().default(0), lastScore: integer('last_score'),
+  lastAnswers: jsonb('last_answers'), lastFeedback: jsonb('last_feedback').notNull().default([]), completionResult: jsonb('completion_result'), previousProgress: jsonb('previous_progress'),
+  createdBy: text('created_by').notNull().references(() => accounts.id), createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(), passedAt: timestamp('passed_at', { withTimezone: true }),
+}, t => [uniqueIndex('learning_occurrence_module_idx').on(t.employeeId, t.eventId, t.occurrenceKey, t.moduleId, t.moduleVersion), index('learning_attempts_employee_idx').on(t.employeeId, t.updatedAt)]);
