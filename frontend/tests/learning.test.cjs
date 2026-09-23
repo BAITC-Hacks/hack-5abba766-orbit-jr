@@ -194,3 +194,45 @@ test('refreshing a stale profile starts the module again when no attempt was cre
     assert.equal(state.loading, false);
   } finally { await close(root); }
 });
+
+test('a quiz passed after external completion is terminal without a new effect', async () => {
+  let submissions = 0;
+  const terminal = { ...quizResult(), attempt: progress({ status: 'passed', last_score: 100, quiz_attempts: 1 }), completion: null };
+  global.fetch = async (url) => {
+    if (url.endsWith('/quiz')) { submissions++; return reply(terminal); }
+    return initial(url);
+  };
+  const root = await mount();
+  try {
+    await act(async () => state.answer('question', 'b'));
+    await act(async () => state.submitQuiz());
+    assert.equal(state.attempt.status, 'passed');
+    assert.equal(state.result.completion, null);
+    assert.equal(state.pending, false);
+    await act(async () => state.submitQuiz());
+    assert.equal(submissions, 1);
+  } finally { await close(root); }
+});
+
+test('a resumed passed module explains the existing effect and returns without a fabricated completion', async () => {
+  const terminalState = { attempt: progress({ status: 'passed', last_score: 100, quiz_attempts: 1 }), module: course };
+  const { LearningPlayer } = load('src/components/quest/learning-player.tsx', {
+    '@/hooks/use-learning': { useLearning: () => terminalState },
+    './feedback': { Loading: () => null },
+  });
+  let closed = 0;
+  let completed = 0;
+  let root;
+  await act(async () => { root = create(React.createElement(LearningPlayer, {
+    employee: { employee_id: 'person', version }, moduleId: course.id, target, names: {},
+    event: { title: 'Authored event', duration_hours: 16 }, onError,
+    onClose: () => closed++, onCompleted: () => completed++,
+  })); });
+  try {
+    assert.match(root.root.findByProps({ role: 'status' }).children.join(''), /ранее учтён/);
+    assert.equal(root.root.findAllByProps({ className: 'learning-gains' }).length, 0);
+    await act(async () => root.root.findByProps({ className: 'primary' }).props.onClick());
+    assert.equal(closed, 1);
+    assert.equal(completed, 0);
+  } finally { await close(root); }
+});

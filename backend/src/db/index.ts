@@ -4,12 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { AppError } from '../errors';
 import type { DatasetSnapshot, DomainVersion } from '../types';
 import * as schema from './schema';
+import { databaseConnectionConfig } from './config';
 
 const databaseSchema = process.env.DATABASE_SCHEMA;
 if (databaseSchema && !/^[a-z][a-z0-9_]*$/.test(databaseSchema)) throw new Error('DATABASE_SCHEMA must be a lowercase SQL identifier');
 /** Constructing pools is lazy: build/import never opens a database connection. */
 const connectionOptions = {
-  connectionString: process.env.DATABASE_URL || 'postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest',
+  ...databaseConnectionConfig(),
   max: 10, connectionTimeoutMillis: 3000, idleTimeoutMillis: 30000,
   ...(databaseSchema ? { options: `-c search_path=${databaseSchema}` } : {}),
 };
@@ -24,10 +25,11 @@ export function closePools(): Promise<void> {
   return closing ??= Promise.all([pool.end(), recommendationLockPool.end()]).then(() => undefined);
 }
 export const db = drizzle(pool, { schema });
-export const SCHEMA_VERSION = '002_learning';
+export const SCHEMA_VERSION = '003_learning_external_completion';
 const MIGRATIONS = [
   { version: '001_initial', read: () => readFile(new URL('./migrations/001_initial.sql', import.meta.url), 'utf8') },
   { version: '002_learning', read: () => readFile(new URL('./migrations/002_learning.sql', import.meta.url), 'utf8') },
+  { version: '003_learning_external_completion', read: () => readFile(new URL('./migrations/003_learning_external_completion.sql', import.meta.url), 'utf8') },
 ] as const;
 
 export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>, options: { readOnly?: boolean; bootstrap?: boolean } = {}): Promise<T> {

@@ -20,9 +20,13 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://career_quest:${POSTGRES_PASSWORD:-career_quest_local}@db:5432/career_quest
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: career_quest
+      PGPASSWORD: ${POSTGRES_PASSWORD:-career_quest_local}
+      PGDATABASE: career_quest
       DATASET_DIR: /app/data/source
-      APP_ORIGIN: http://localhost:${APP_PORT:-3000}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${APP_PORT:-3000}}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}
       LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-8000}
