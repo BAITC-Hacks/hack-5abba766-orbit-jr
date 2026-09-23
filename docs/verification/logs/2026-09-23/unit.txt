@@ -1,0 +1,94 @@
+
+> test
+> npm run test -w backend && npm run test:client -w frontend
+
+
+> @career-quest/backend@1.0.0 test
+> vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.11 <repository>/backend
+
+
+ Test Files  20 passed (20)
+      Tests  431 passed (431)
+   Start at  16:30:10
+   Duration  19.70s (transform 5.66s, setup 0ms, import 25.75s, tests 27.73s, environment 2ms)
+
+
+> career-quest-ui@0.1.0 test:client
+> node --test tests/client.test.cjs tests/career-journey.test.cjs tests/learning.test.cjs tests/catalog-gaps.test.cjs
+
+✔ journey hides stale choices and names prerequisite activities in the current snapshot (19.3741ms)
+✔ skill focus prioritizes critical gaps and keeps non-target skills collapsed (5.5978ms)
+✔ recommendation explanation includes only cited facts and the supplied action (2.5756ms)
+✔ completion compares saved skill changes and coverage without inventing an earlier snapshot (28.3138ms)
+✔ an uncovered goal skill shows catalog action, critical count and an employee profile button (10.4846ms)
+✔ audience mismatch and level cap receive distinct explanations and actions (3.1215ms)
+✔ an empty diagnostic does not promise an executable route (0.7879ms)
+✔ a large catalog diagnostic keeps later needs available in a disclosure (2.5107ms)
+✔ the HR overview includes actionable catalog diagnostics and neutral goal attribution (5.8138ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ transport preserves structured 403, conflict details and request id (40.3847ms)
+✔ multipart leaves browser boundary intact and combines timeout with caller cancellation (2.1961ms)
+✔ malformed success is not turned into demo data (2.6763ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ profile renders while recommendations are pending; stale version is rejected (37.0208ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ completion retries use identical body/key and no optimistic skill update; receipt replay refetches current state (15.4799ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ late recommendations are discarded after completion and after switching profile (14.6689ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ double completion click sends one request; separate EV_036 sessions have distinct targets (8.4201ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import submits JSON+CSV with revision; atomic conflict is not reported as success (21.7788ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import preserves key and files after connection loss and reports server counts on replay (15.7395ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ employee session visiting HR never requests HR data (9.4715ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ 401 shows login without requesting profiles or recommendations (5.4728ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ connected profile displays missing goal and distinguishes AI, fallback and empty results (56.5846ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ 408 and 429 preserve completion receipts and replay the same key (15.0742ms)
+✔ login failure distinguishes invalid credentials from an expired session (1.6745ms)
+✔ null successful payload is rejected before components dereference it (0.5163ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ history status filtering keeps separate participations and their exact action targets (28.052ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ skill filter uses remaining server gaps, keeping above-target levels intact (9.9926ms)
+✔ scheduled activity with no date is never presented as self-paced (0.7051ms)
+✔ login failure keeps authentication message instead of claiming an expired session (1.0718ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import preview sends dry_run and never refreshes persisted data (8.4927ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a skill outside an active goal is not labeled as missing career goal (3.3767ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR sections preserve selected import files and keep panels separate (84.8188ms)
+✔ HR skill totals retain denominators and distinguish reached goals from missing goals (22.4994ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ resumes the attempt content version and only advances a lesson after the server confirms it (92.5934ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a failed quiz keeps skills unchanged and a later server-confirmed pass supplies the completion (11.4994ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an ambiguous quiz response retries the exact body and key and freezes answer changes (8.7482ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ quiz HTTP 408 keeps the original receipt until the outcome is known (5.6392ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ quiz HTTP 429 keeps the original receipt until the outcome is known (3.1626ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a definite version conflict keeps answers and requires refreshed state with a new submission key (5.1678ms)
+✔ refreshing a stale profile starts the module again when no attempt was created (4.601ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2703.7508

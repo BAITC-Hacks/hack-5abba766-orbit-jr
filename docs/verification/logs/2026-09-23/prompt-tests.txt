@@ -1,0 +1,13 @@
+
+> @career-quest/backend@1.0.0 test
+> vitest run --config vitest.config.ts tests/ai.test.ts tests/team-ai tests/domain-evaluation.test.ts
+
+
+ RUN  v4.1.11 <repository>/backend
+
+
+ Test Files  10 passed (10)
+      Tests  281 passed (281)
+   Start at  16:34:00
+   Duration  1.64s (transform 2.53s, setup 0ms, import 4.35s, tests 1.26s, environment 1ms)
+
