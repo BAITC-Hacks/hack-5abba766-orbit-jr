@@ -1,5 +1,16 @@
 "use client";
 import { useRef, useState } from "react";
+import {
+  ArrowUpRight,
+  Target,
+  Layers3,
+  BookOpen,
+  LayoutDashboard,
+  Activity,
+  LibraryBig,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 import type {
   CatalogView,
   CompletionRequest,
@@ -30,10 +41,12 @@ export function Employee({
   id,
   onError,
   onChanged,
+  viewer = "employee",
 }: {
   id: string;
   onError: (error: unknown) => void;
   onChanged?: () => void;
+  viewer?: "employee" | "hr";
 }) {
   const state = useEmployee(id, onError, onChanged);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
@@ -61,6 +74,14 @@ export function Employee({
   const learningModules = modules.data?.modules ?? [];
   const moduleFor = (eventId: string) => learningModules.find(module => module.event_id === eventId);
   const disabled = state.busy || !!state.pendingTarget;
+  const isHr = viewer === "hr";
+  function openGoal() {
+    const index = catalog.data?.role_profiles.findIndex(
+      (g) => g.role === p?.goal.target?.target_role && g.grade === p?.goal.target?.target_grade,
+    ) ?? -1;
+    setGoalIndex(index < 0 ? "" : String(index));
+    setGoalOpen(true);
+  }
   function openLearning(moduleId: string, eventId: string, target?: CompletionRequest["target"]) {
     const event = catalog.data?.events.find(item => item.event_id === eventId);
     if (!event || !p || disabled) return;
@@ -111,9 +132,10 @@ export function Employee({
       )}
       {p && (
         <>
-          <div className="page-top">
-            <div>
-              <span className="eyebrow">ВАША КАРЬЕРА. ВАШ МАРШРУТ.</span>
+          <div className="page-top employee-heading">
+            <div className="profile-identity">
+              <span className="profile-avatar" aria-hidden="true">{p.full_name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("")}</span>
+              <span className="eyebrow">{isHr ? "ПРОФИЛЬ СОТРУДНИКА · HR" : "МОЙ ПРОФИЛЬ"}</span>
               <h1>{p.full_name}</h1>
               <p>
                 {p.department} · {p.role} · {p.grade}
@@ -128,13 +150,27 @@ export function Employee({
               disabled={disabled}
               onClick={() => void state.refresh()}
             >
-              Обновить профиль
+              <RefreshCw size={16} aria-hidden="true" /> Обновить профиль
             </button>
           </div>
+          {isHr && (
+            <section className="hr-actions" aria-label="Действия HR">
+              <div>
+                <span className="eyebrow">ДЕЙСТВИЯ HR</span>
+                <h2>Развитие сотрудника</h2>
+                <p>Выберите цель для {p.full_name}, изучите обучение или оцените результат симуляции.</p>
+              </div>
+              <div className="hr-action-buttons">
+                <button className="primary" disabled={disabled || !catalog.data} onClick={openGoal}><Target size={17} aria-hidden="true" />{p.goal.target ? "Изменить цель" : "Назначить цель"}</button>
+                <button className="secondary" onClick={() => setTab("catalog")}><LibraryBig size={17} aria-hidden="true" />Подобрать обучение</button>
+                <button className="secondary" onClick={() => setTab("history")}><Activity size={17} aria-hidden="true" />История сотрудника</button>
+              </div>
+            </section>
+          )}
           <nav className="subnav" aria-label="Разделы профиля">
             {[
               ["overview", "Обзор"],
-              ["history", "Моя активность"],
+              ["history", isHr ? "Активность сотрудника" : "Моя активность"],
               ["catalog", "Каталог"],
               ["learning", "Учебная мастерская"],
             ].map(([key, label]) => (
@@ -144,78 +180,95 @@ export function Employee({
                 aria-current={tab === key ? "page" : undefined}
                 onClick={() => setTab(key)}
               >
+                {key === "overview" ? (
+                  <LayoutDashboard size={17} aria-hidden="true" />
+                ) : key === "history" ? (
+                  <Activity size={17} aria-hidden="true" />
+                ) : (
+                  <LibraryBig size={17} aria-hidden="true" />
+                )}
                 {label}
               </button>
             ))}
           </nav>
           {tab === "overview" && (
             <>
-              <section className="hero">
-                <div className="hero-copy">
-                  <span className="pill">{goalSources[p.goal.source]}</span>
-                  <h2>
-                    Следующая глава.
-                    <br />
-                    <span>
-                      {p.goal.target
-                        ? `${p.goal.target.target_grade} ${p.goal.target.target_role}`
-                        : "Выберите направление."}
-                    </span>
-                  </h2>
-                  <p>
-                    {p.goal.target
-                      ? "Ваши навыки и требования выбранной траектории."
-                      : "Определите профессию и грейд, к которым хотите двигаться."}
-                  </p>
+              <section className="goal-summary" aria-label="Карьерная цель">
+                <div className="goal-summary-copy">
+                  <span className="goal-label">Карьерная цель</span>
+                  <h2>{p.goal.target ? `${p.goal.target.target_grade} ${p.goal.target.target_role}` : "Выберите направление развития"}</h2>
+                  <p>{goalSources[p.goal.source]}{p.has_simulated_progress ? " · Включает симуляции" : ""}</p>
+                </div>
+                <div className="goal-summary-progress">
+                  <div><span>Соответствие навыков</span><strong>{p.progress ? `${Math.round(p.progress.coverage * 100)}%` : "—"}</strong></div>
+                  <progress max={100} value={p.progress ? Math.round(p.progress.coverage * 100) : 0} aria-label="Соответствие навыков цели" />
+                </div>
                   <button
-                    className="primary"
+                    className="secondary"
                     disabled={disabled || !catalog.data}
-                    onClick={() => {
-                      const index =
-                        catalog.data?.role_profiles.findIndex(
-                          (g) =>
-                            g.role === p.goal.target?.target_role &&
-                            g.grade === p.goal.target?.target_grade,
-                        ) ?? -1;
-                      setGoalIndex(index < 0 ? "" : String(index));
-                      setGoalOpen(true);
-                    }}
+                    onClick={openGoal}
                   >
-                    Выбрать цель
+                    {p.goal.target ? "Изменить цель" : "Выбрать цель"}
                   </button>
-                </div>
-                <div
-                  className="orbit-scene"
-                  aria-label="Соответствие навыков цели"
-                >
-                  <div className="orbital orbit-one" />
-                  <div className="orbital orbit-two" />
-                  <div className="planet-glow" />
-                  <div className="progress-orb">
-                    <span>СООТВЕТСТВИЕ ЦЕЛИ</span>
-                    <strong>
-                      {p.progress ? Math.round(p.progress.coverage * 100) : "—"}
-                      {p.progress && <small>%</small>}
-                    </strong>
-                    <p>навыков для выбранной цели</p>
+              </section>
+              <section
+                className="growth-dashboard"
+                aria-label="Развитие в цифрах"
+              >
+                <div className="growth-metric mint">
+                  <Layers3 size={23} aria-hidden="true" />
+                  <div>
+                    <strong>{p.skills.length}</strong>
+                    <span>навыков в профиле</span>
                   </div>
+                  <small>{isHr ? "Профессиональный капитал сотрудника" : "Ваш профессиональный капитал"}</small>
                 </div>
-                <div className="hero-foot">
-                  <span>
-                    {p.role} · {p.grade}
-                  </span>
-                  <span>
-                    {p.has_simulated_progress
-                      ? "С учётом демопрохождений"
-                      : "По оценке навыков и истории"}
-                  </span>
+                <div className="growth-metric gold">
+                  <Target size={23} aria-hidden="true" />
+                  <div>
+                    <strong>
+                      {p.goal.target
+                        ? p.skills.filter((s) => (s.gap ?? 0) > 0).length
+                        : "—"}
+                    </strong>
+                    <span>навыков для развития</span>
+                  </div>
+                  <small>
+                    {p.goal.target
+                      ? "Фокус на требованиях цели"
+                      : "Выберите цель, чтобы увидеть разрывы"}
+                  </small>
                 </div>
+                <button
+                  className="growth-metric lilac"
+                  onClick={() => setTab("history")}
+                >
+                  <BookOpen size={23} aria-hidden="true" />
+                  <div>
+                    <strong>
+                      {
+                        p.history.filter(
+                          (r) => r.effective_status === "in_progress",
+                        ).length
+                      }
+                    </strong>
+                    <span>активностей в процессе</span>
+                  </div>
+                  <small>
+                    Продолжить обучение{" "}
+                    <ArrowUpRight size={15} aria-hidden="true" />
+                  </small>
+                </button>
               </section>
               {state.completion && <CompletionResultPanel result={state.completion.result} previousProgress={state.completion.previousProgress} names={names} onClose={state.dismissCompletion} />}
               <CareerJourney employee={p} recommendations={state.recommendations} names={names} eventNames={eventNames} onSelect={chooseCard} />
-              <section>
+              <div className="employee-workspace">
+              <section className="recommendations-section">
                 <div className="section-heading">
-                  <h2>Ваш следующий шаг</h2>
+                  <div>
+                    <span className="eyebrow">{isHr ? "ПОДОБРАНО ДЛЯ СОТРУДНИКА" : "ПОДОБРАНО ДЛЯ ВАШЕГО РОСТА"}</span>
+                    <h2>Рекомендованное обучение</h2>
+                  </div>
                   <button
                     className="text-button"
                     disabled={disabled || state.recLoading}
@@ -240,6 +293,7 @@ export function Employee({
                 {state.recommendations && (
                   <>
                     <div className="insight">
+                      <Sparkles size={18} aria-hidden="true" />
                       <p>
                         {state.recommendations.mode === "ai"
                           ? "AI-подборка · проверенные сервером факты"
@@ -249,7 +303,7 @@ export function Employee({
                       </p>
                     </div>
                     <p className="fine-print">
-                      Карточки — альтернативы следующего шага. Ожидаемые
+                      Варианты следующего шага. Ожидаемые
                       приросты не складываются.
                     </p>
                     <div className="course-grid">
@@ -269,6 +323,7 @@ export function Employee({
                 )}
               </section>
               <Skills employee={p} names={names} />
+              </div>
             </>
           )}
           {tab === "history" && (
@@ -285,6 +340,19 @@ export function Employee({
           )}
           {tab === "catalog" && (
             <>
+              <div className="catalog-banner">
+                <div>
+                  <span className="eyebrow">БИБЛИОТЕКА ВОЗМОЖНОСТЕЙ</span>
+                  <h2>Каталог обучения</h2>
+                  <p>
+                    Курсы, практикумы и встречи.
+                  </p>
+                </div>
+                <div className="catalog-banner-icon" aria-hidden="true">
+                  <LibraryBig size={58} />
+                  <Sparkles size={22} />
+                </div>
+              </div>
               <div className="toolbar">
                 <label className="search">
                   Поиск
@@ -326,12 +394,13 @@ export function Employee({
                   )
                   .map((e) => (
                     <article className="course-card" key={e.event_id}>
+                      <span className="catalog-row-icon" aria-hidden="true"><BookOpen size={22} /></span>
                       <div className="course-body">
                         <span className="outline-tag">
                           {eventTypes[e.type]}
                         </span>
                         <h3>{e.title}</h3>
-                        <p>{e.description}</p>
+                        <details className="catalog-description"><summary>Описание программы</summary><p>{e.description}</p></details>
                         <p>
                           {formats[e.format]} · {e.duration_hours} ч.
                         </p>
@@ -393,6 +462,7 @@ export function Employee({
                 title={selected.title}
                 close={() => setSelected(undefined)}
               >
+                {isHr && <p className="modal-employee">Сотрудник: <strong>{p.full_name}</strong></p>}
                 <p>
                   {formats[selected.format]} · {selected.duration_hours} ч. ·{" "}
                   {activityDate(selected.format, selected.session_date)}
@@ -448,7 +518,8 @@ export function Employee({
               </Modal>
             )}
           {goalOpen && (
-            <Modal title="Ваше направление" close={() => setGoalOpen(false)}>
+            <Modal title={isHr ? "Карьерная цель сотрудника" : "Ваше направление"} close={() => setGoalOpen(false)}>
+              {isHr && <p className="modal-employee">Сотрудник: <strong>{p.full_name}</strong></p>}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

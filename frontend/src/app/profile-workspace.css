@@ -1,0 +1,67 @@
+/* Shared profile identity and HR workspace, using the active theme tokens. */
+html[data-theme] .profile-identity { position: relative; min-width: 0; padding-left: 84px; }
+html[data-theme] .profile-avatar {
+  position: absolute; left: 0; top: 2px; display: grid; place-items: center;
+  width: 64px; height: 64px; border-radius: 20px; font-size: 23px; font-weight: 700;
+  background: color-mix(in srgb, var(--blue) 12%, var(--surface)); color: var(--blue);
+  border: 1px solid color-mix(in srgb, var(--blue) 20%, var(--line));
+}
+html[data-theme] .profile-identity h1 { margin-top: 8px; overflow-wrap: anywhere; }
+html[data-theme] .profile-identity p { margin: 8px 0 0; line-height: 1.5; }
+html[data-theme] .hr-actions {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 20px; padding: 22px; margin: 10px 0 24px; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--blue) 25%, var(--line));
+  background: color-mix(in srgb, var(--blue) 5%, var(--surface));
+}
+.hr-actions h2 { margin: 6px 0; font-size: 18px; letter-spacing: -.3px; }
+.hr-actions p { margin: 0; color: var(--muted); max-width: 60ch; line-height: 1.6; }
+.hr-action-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.hr-action-buttons button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+html[data-theme] .modal-employee { padding: 12px 14px; border-radius: 10px; background: var(--surface-raised); color: var(--ink); overflow-wrap: anywhere; }
+html[data-theme] .employee-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+html[data-theme] .employee-card {
+  align-items: flex-start; gap: 14px; padding: 20px; margin: 0; min-width: 0;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--surface) !important;
+  text-align: left; transition: border-color .16s ease, box-shadow .16s ease;
+}
+html[data-theme] .employee-card:hover { border-color: var(--blue); box-shadow: 0 3px 16px color-mix(in srgb, var(--blue) 8%, transparent); }
+html[data-theme] .employee-avatar { flex: 0 0 44px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--surface-raised); color: var(--blue); font-size: 15px; }
+html[data-theme] .employee-card-body { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; gap: 6px; }
+html[data-theme] .employee-card-body strong { display: block; font-size: 16px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+html[data-theme] .employee-card-body > span, html[data-theme] .employee-card-body small { font-size: 12px; line-height: 1.5; }
+html[data-theme] .employee-card-body .employee-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--blue); font-size: 12px; }
+html[data-theme] .connected-main .employee-card-body .employee-link { color: var(--blue); }
+html[data-theme] .employee-card:nth-child(n) .employee-avatar { background: var(--surface-raised); color: var(--blue); }
+html[data-theme] .people-workspace { gap: 16px; }
+html[data-theme] .directory-filters { gap: 14px; align-items: end; padding: 18px 0; }
+html[data-theme] .directory-filters label { flex: 1 1 170px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--muted); }
+html[data-theme] .directory-filters label:first-child { flex-grow: 2; }
+html[data-theme] .directory-filters input, html[data-theme] .directory-filters select { width: 100%; min-height: 44px; }
+html[data-theme] .directory-count { margin: 4px 0 18px; color: var(--muted); font-size: 13px; }
+html[data-theme] .directory-count strong { color: var(--ink); }
+html[data-theme] .profile-context { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 20px 0 0; border: 0; }
+html[data-theme] .profile-context p { max-width: 520px; margin: 0; font-size: 12px; line-height: 1.6; }
+html[data-theme] .hr-profile > .subnav { position: static; width: fit-content; max-width: 100%; margin-bottom: 22px; }
+html[data-theme] :is(input, select, textarea) { min-height: 42px; }
+html[data-theme] button:disabled { cursor: not-allowed; opacity: .5; }
+html[data-theme] .secondary:hover:not(:disabled) { background: var(--surface-raised); border-color: var(--muted); }
+html[data-theme] .theme-control { gap: 4px; padding: 5px; }
+html[data-theme] .theme-control button { width: 44px; height: 40px; }
+html[data-theme] .theme-control button[aria-pressed="true"] { background: color-mix(in srgb, var(--blue) 15%, var(--surface)); color: var(--blue); }
+html[data-theme] .attention-row strong { white-space: normal; overflow-wrap: anywhere; }
+@media (min-width: 1500px) { html[data-theme] .employee-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1000px) { html[data-theme] .employee-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  html[data-theme] .employee-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme] .profile-identity { padding-left: 68px; }
+  html[data-theme] .profile-avatar { width: 52px; height: 52px; border-radius: 16px; font-size: 19px; }
+  html[data-theme] .profile-identity h1 { font-size: 24px; }
+  html[data-theme] .hr-actions { padding: 18px; gap: 16px; }
+  .hr-action-buttons { width: 100%; }
+  .hr-action-buttons button { flex: 1 1 180px; min-height: 44px; }
+  html[data-theme] .hr-profile > .subnav { display: flex; flex-wrap: wrap; width: 100%; }
+  html[data-theme] .hr-profile > .subnav button { flex: 1 1 auto; }
+  html[data-theme] .employee-card { padding: 16px; }
+  html[data-theme] .directory-pagination { flex-wrap: wrap; gap: 12px; }
+}

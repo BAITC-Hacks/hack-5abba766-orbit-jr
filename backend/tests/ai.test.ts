@@ -5,10 +5,10 @@ import { recommendations } from '../src/services/recommendations';
 import type { AiRankingInput, Candidate, DatasetSnapshot, EmployeeView, RecommendationFact } from '../src/types';
 
 const mocks = vi.hoisted(() => ({
-  readSnapshot: vi.fn(), readSnapshotWithClient: vi.fn(), getCandidates: vi.fn(),
+  readSnapshot: vi.fn(), readDomainVersionWithClient: vi.fn(), getCandidates: vi.fn(),
   connect: vi.fn(), query: vi.fn(), release: vi.fn(), fetch: vi.fn(), run: vi.fn(),
 }));
-vi.mock('../src/db', () => ({ recommendationLockPool: { connect: mocks.connect }, readSnapshotWithClient: mocks.readSnapshotWithClient }));
+vi.mock('../src/db', () => ({ recommendationLockPool: { connect: mocks.connect }, readDomainVersionWithClient: mocks.readDomainVersionWithClient }));
 vi.mock('../src/services/data', () => ({ readSnapshot: mocks.readSnapshot }));
 vi.mock('../src/domain', () => ({ getCandidates: mocks.getCandidates }));
 // Admission/cache behavior is covered separately; these tests isolate the DB protocol.
@@ -48,7 +48,7 @@ function choice(id = 'first', alternative?: string | null) {
     ...(alternative === undefined ? {} : { alternative_candidate_id: alternative }) };
 }
 
-const providerResponse = (output: unknown = { choices: [choice()] }) => new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(output) } }] }), { status: 200 });
+const providerResponse = (output: unknown = { choices: [choice()] }) => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }), { status: 200 });
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -61,7 +61,7 @@ beforeEach(() => {
   mocks.fetch.mockResolvedValue(providerResponse());
   const snapshot = { as_of_date: '2026-10-01', dataset_revision: 1, employee_revisions: { employee: 0 } } as unknown as DatasetSnapshot;
   mocks.readSnapshot.mockResolvedValue(snapshot);
-  mocks.readSnapshotWithClient.mockResolvedValue(snapshot);
+  mocks.readDomainVersionWithClient.mockResolvedValue(employee().version);
   mocks.getCandidates.mockReturnValue({ employee: employee(), candidates: input().candidates, emptyReason: null, signals: { similarFormatPenalty: new Map(input().candidates.map(c => [c.candidate_id, 0])), unlockedWeightedGain: new Map(input().candidates.map(c => [c.candidate_id, 0])), negativeOutcomes: new Map(input().candidates.map(c => [c.candidate_id, 0])) } });
   mocks.query.mockResolvedValue({ rows: [{ acquired: true }] });
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
@@ -107,6 +107,11 @@ describe('semantic ranking validation', () => {
 });
 
 describe('provider adapter without network calls', () => {
+  it('drops redundant provider comparisons while retaining the model order', async () => {
+    mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('second', 'first'), choice('first', 'fourth')] }));
+    await expect(rankCandidates(input())).resolves.toEqual({ choices: [choice('second'), choice('first', 'fourth')] });
+  });
+
   it('returns a validated provider ranking using only provided factual choices', async () => {
     await expect(rankCandidates(input())).resolves.toEqual({ choices: [choice()] });
     expect(mocks.fetch).toHaveBeenCalledOnce();
@@ -129,9 +134,9 @@ describe('provider adapter without network calls', () => {
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'provider_error' });
     mocks.fetch.mockResolvedValueOnce(providerResponse({ choices: [choice('invented')] }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
-    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: 'not json' } }] }), { status: 200 }));
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'not json' } }] }), { status: 200 }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
-    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { refusal: 'Refused', content: null } }] }), { status: 200 }));
+    mocks.fetch.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { refusal: 'Refused', content: null } }] }), { status: 200 }));
     await expect(rankCandidates(input())).rejects.toMatchObject({ reason: 'invalid_response' });
   });
 
@@ -218,12 +223,12 @@ describe('recommendation service modes and version boundaries', () => {
     await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
     expect(mocks.fetch).toHaveBeenCalledOnce();
 
-    mocks.readSnapshotWithClient.mockResolvedValue({ ...updatedSnapshot, employee_revisions: { employee: 2 } });
+    mocks.readDomainVersionWithClient.mockResolvedValue({ ...updatedVersion, employee_revision: 2 });
     await expect(recommendations('employee', { expected_version: updatedVersion })).rejects.toMatchObject({ code: 'STALE_RECOMMENDATION' });
     expect(mocks.fetch).toHaveBeenCalledTimes(2);
     expect(mocks.release).toHaveBeenCalledTimes(2);
     // A discarded stale result is not cached; recovery performs a new provider request.
-    mocks.readSnapshotWithClient.mockResolvedValue(updatedSnapshot);
+    mocks.readDomainVersionWithClient.mockResolvedValue(updatedVersion);
     await expect(recommendations('employee', { expected_version: updatedVersion })).resolves.toMatchObject({ mode: 'ai', version: updatedVersion });
     expect(mocks.fetch).toHaveBeenCalledTimes(3);
     expect(mocks.release).toHaveBeenCalledTimes(3);
@@ -268,10 +273,12 @@ describe('recommendation service modes and version boundaries', () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
-  it('rejects a changed version after provider completion instead of returning stale AI or fallback', async () => {
-    const changed = { dataset_revision: 1, employee_revisions: { employee: 1 } };
-    mocks.readSnapshot.mockResolvedValueOnce({ dataset_revision: 1, as_of_date: '2026-10-01', employee_revisions: { employee: 0 } }).mockResolvedValue(changed);
-    mocks.readSnapshotWithClient.mockResolvedValue(changed);
+  it.each([
+    { dataset_revision: 1, employee_revision: 1 },
+    { dataset_revision: 2, employee_revision: 0 },
+    { dataset_revision: 1, employee_revision: undefined },
+  ])('rejects a changed or removed version after provider completion: %j', async changed => {
+    mocks.readDomainVersionWithClient.mockResolvedValue(changed);
     await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({ code: 'STALE_RECOMMENDATION' });
     expect(mocks.release).toHaveBeenCalledOnce();
   });
@@ -305,7 +312,7 @@ describe('recommendation service modes and version boundaries', () => {
     expect(mocks.release).toHaveBeenCalledWith(undefined);
   });
 
-  it('holds no transaction during AI and reuses its existing connection for the final snapshot', async () => {
+  it('holds no transaction during AI and reuses its existing connection for the final atomic revision check', async () => {
     let resolveProvider!: (response: Response) => void;
     mocks.fetch.mockReturnValue(new Promise<Response>(resolve => { resolveProvider = resolve; }));
     const pending = recommendations('employee', { expected_version: version });
@@ -316,19 +323,18 @@ describe('recommendation service modes and version boundaries', () => {
     await expect(pending).resolves.toMatchObject({ mode: 'ai' });
     expect(mocks.readSnapshot).toHaveBeenCalledOnce();
     expect(mocks.connect).toHaveBeenCalledOnce();
-    expect(mocks.readSnapshotWithClient).toHaveBeenCalledWith({ query: mocks.query, release: mocks.release });
+    expect(mocks.readDomainVersionWithClient).toHaveBeenCalledWith({ query: mocks.query, release: mocks.release }, 'employee');
     expect(mocks.query.mock.calls.map(call => call[0])).toEqual([
       'SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired',
-      'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY', 'COMMIT',
       'SELECT pg_advisory_unlock(hashtextextended($1,0))',
     ]);
   });
 
-  it('rolls back a failed final snapshot and still releases its advisory lock', async () => {
+  it('releases its advisory lock when the final revision query fails', async () => {
     const failure = new Error('Synthetic snapshot read failed');
-    mocks.readSnapshotWithClient.mockRejectedValue(failure);
+    mocks.readDomainVersionWithClient.mockRejectedValue(failure);
     await expect(recommendations('employee', { expected_version: version })).rejects.toBe(failure);
-    expect(mocks.query.mock.calls.map(call => call[0])).toContain('ROLLBACK');
+    expect(mocks.query.mock.calls.map(call => call[0])).not.toContain('BEGIN');
     expect(mocks.query.mock.calls.at(-1)![0]).toBe('SELECT pg_advisory_unlock(hashtextextended($1,0))');
     expect(mocks.release).toHaveBeenCalledWith(undefined);
   });

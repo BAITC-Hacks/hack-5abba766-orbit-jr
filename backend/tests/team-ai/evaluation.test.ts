@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RecommendationResult } from '../../../contracts/backend'
+import type { RecommendationCard, RecommendationResult } from '../../../contracts/backend'
 import { evaluationCases, type EvaluationCase } from '../../evaluation/cases'
 import { acceptanceCases } from '../../evaluation/acceptance-cases'
 import { scoreEvaluation, summarizeEvaluations } from '../../evaluation/metrics'
@@ -126,6 +126,32 @@ describe('evaluation metrics', () => {
     result.version = { ...result.version, employee_revision: result.version.employee_revision + 1 }
     const score = scoreEvaluation(testCase, result)
     expect(score).toMatchObject({ validCitations: true, validSnapshotVersion: false, acceptedAi: false, aiExpectedChoicePass: null, aiBaselineAgreement: null })
+    expect(summarizeEvaluations([score])).toMatchObject({ invalidAiCases: 1, aiEndToEndPassRate: 0 })
+  })
+
+  it.each<[string, (card: RecommendationCard) => void]>([
+    ['rank', card => { card.rank = 3 }],
+    ['participation identity', card => { card.participation_id = 'invented/attempt' }],
+    ['skill effect', card => { card.expected_skill_changes[0]!.after = 5 }],
+    ['coverage', card => { card.goal_coverage_delta = 1 }],
+    ['rendered fact', card => { card.facts[0]!.text = 'Invented evidence' }],
+    ['rendered alternative', card => { card.alternative = { candidate_id: 'invented', event_id: 'invented', title: 'Invented', facts: [] } }],
+  ])('rejects a corrupted %s even with valid candidate and citation IDs', (_name, corrupt) => {
+    const result = structuredClone(aiResult(testCase, testCase.expectedTopCandidateIds[0]!))
+    corrupt(result.recommendations[0]!)
+    const score = scoreEvaluation(testCase, result)
+    expect(score).toMatchObject({ validCitations: true, validSnapshotVersion: true, validResultContract: false,
+      acceptedAi: false, aiExpectedChoicePass: null, aiBaselineAgreement: null })
+    expect(summarizeEvaluations([score])).toMatchObject({ invalidAiCases: 1, aiAcceptanceRate: 0, aiEndToEndPassRate: 0 })
+  })
+
+  it.each([
+    { fallback_reason: 'provider_error' },
+    { empty_reason: 'GOAL_REACHED' },
+  ])('rejects contradictory AI result metadata: %j', metadata => {
+    const result = { ...aiResult(testCase, testCase.expectedTopCandidateIds[0]!), ...metadata } as RecommendationResult
+    const score = scoreEvaluation(testCase, result)
+    expect(score).toMatchObject({ validCitations: true, validResultContract: false, acceptedAi: false })
     expect(summarizeEvaluations([score])).toMatchObject({ invalidAiCases: 1, aiEndToEndPassRate: 0 })
   })
 

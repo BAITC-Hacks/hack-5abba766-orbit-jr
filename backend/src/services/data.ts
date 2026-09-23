@@ -8,6 +8,11 @@ import { canonicalJson, sourceHash, validateRelations, employeeSchema, participa
 import type { DatasetSnapshot, SessionView, HealthView, GoalRequest, GoalResult, CompletionRequest, CompletionResult, ImportCommand, ImportResult, ImportIssue, EmployeeSource, ParticipationSource } from '../types';
 
 export async function readSnapshot(): Promise<DatasetSnapshot> { return withTransaction(readSnapshotWithClient, { readOnly: true }); }
+export async function readDatasetDate(): Promise<string> {
+  const { rows } = await pool.query('SELECT as_of_date FROM app_meta WHERE id=1 AND seed_complete=true');
+  if (!rows[0]) throw new AppError('NOT_READY', 'Датасет ещё не инициализирован', 503);
+  return rows[0].as_of_date;
+}
 export async function getHealth(): Promise<HealthView> {
   const base: HealthView = { status: 'not_ready', dataset_initialized: false, schema_version: null, ai_configured: isAiConfigured() };
   try {
@@ -153,11 +158,14 @@ export async function importData(actor: SessionView, command: ImportCommand, key
     const union = { ...snapshot, employees: [...snapshot.employees, ...newEmployees], history: [...snapshot.history, ...newHistory] };
     result.errors.push(...validateRelations(union, newEmployees, newHistory));
     const eventMap = new Map(snapshot.events.map(e => [e.event_id, e]));
+    const simulationIds = new Set(snapshot.completions.map(row => row.id));
     const completed = new Set<string>();
     const occurrence = (employee: string, eventId: string, date: string) => JSON.stringify([employee, eventId, eventMap.get(eventId)?.repeatable ? date : 'once']);
     for (const row of snapshot.history) if (row.status === 'completed' && !eventMap.get(row.event_id)?.mandatory) completed.add(occurrence(row.employee_id, row.event_id, row.date));
     for (const row of snapshot.completions) completed.add(occurrence(row.employee_id, row.event_id, row.session_date || 'once'));
     for (const row of newHistory) {
+      // Imported and simulated rows share participation IDs in employee history.
+      if (simulationIds.has(row.record_id)) issue('history', row.record_id, 'PARTICIPATION_ID_COLLISION', 'ID участия уже используется локальной симуляцией');
       const event = eventMap.get(row.event_id);
       if (row.status !== 'completed' || !event || event.mandatory) continue;
       const occurrenceKey = occurrence(row.employee_id, row.event_id, row.date);

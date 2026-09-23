@@ -1,0 +1,52 @@
+/* Data-led visuals for learning, participation and imports. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+html[data-theme] .activity-section .activity-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 20px 0; }
+html[data-theme] .activity-section .activity-stats > div { padding: 12px; border-bottom: 0; }
+html[data-theme] .visual-recommendation {
+  display: grid; grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 20px; padding: 18px 0; align-items: center;
+}
+.recommendation-art { position: relative; border-radius: 16px; overflow: hidden; }
+html[data-theme] .visual-recommendation .activity-art { display: grid !important; height: 120px; }
+.recommendation-rank { position: absolute; left: 9px; top: 7px; font-size: 11px; font-weight: 750; color: #193e36; }
+html[data-theme] .visual-recommendation .art-tile { width: 49px; height: 57px; border-radius: 12px; }
+html[data-theme] .visual-recommendation .art-halo { width: 80px; height: 80px; }
+html[data-theme] .visual-recommendation .learning-row-action { grid-column: 3; display: flex; align-items: center; gap: 6px; }
+.recommendation-impact { display: flex; flex-wrap: wrap; gap: 8px; margin: 5px 0; }
+.recommendation-impact > span { display: inline-flex; align-items: center; gap: 5px; border-radius: 7px; background: var(--surface-raised); padding: 5px 8px; color: var(--muted); font-size: 11px; }
+.recommendation-impact .impact-gain { color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, transparent); }
+.activity-distribution { display: flex; height: 9px; gap: 3px; overflow: hidden; border-radius: 8px; margin: -10px 0 25px; }
+.activity-distribution > span { flex-basis: 0; background: #89919f; }
+.activity-distribution .distribution-completed { background: #54b593; }
+.activity-distribution .distribution-in_progress { background: #709bea; }
+.activity-distribution .distribution-overdue { background: #d9985a; }
+.activity-distribution .distribution-dropped { background: #b096c8; }
+.activity-distribution .distribution-no_show { background: #c77f89; }
+.activity-filter-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.activity-filter-chips button { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--muted); font-size: 12px; }
+.activity-filter-chips button[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); background: color-mix(in srgb, var(--blue) 9%, var(--surface)); }
+.activity-filter-chips button span { font-size: 10px; font-variant-numeric: tabular-nums; opacity: .8; }
+html[data-theme] .activity-section .activity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+html[data-theme] .activity-section .activity-card { padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface) !important; display: flex; flex-direction: column; align-items: stretch; text-align: left; }
+html[data-theme] .activity-section .activity-card-top { display: flex; justify-content: space-between; margin-bottom: 16px; }
+html[data-theme] .activity-section .activity-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--surface-raised); color: var(--blue); }
+html[data-theme] .activity-section .activity-card h3 { margin-bottom: 12px; }
+html[data-theme] .activity-section .activity-card-footer { margin-top: auto; padding-top: 18px; }
+html[data-theme] .activity-section .activity-progress progress { max-width: none; width: 100%; height: 6px; }
+.import-steps { list-style: none; display: flex; padding: 0; margin: 24px 0; gap: 8px; }
+.import-steps li { display: flex; flex: 1; flex-direction: column; gap: 9px; padding: 14px; border-top: 3px solid var(--line); font-size: 12px; color: var(--muted); }
+.import-steps li.done, .import-steps li.current { border-color: var(--blue); color: var(--blue); }
+.import-file-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+html[data-theme] .import-file-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 22px; border: 1px dashed var(--line); border-radius: 16px; min-width: 0; background: var(--surface-raised); }
+.import-file-tile > svg { color: var(--blue); }
+.import-file-tile > span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.import-file-tile input { max-width: 100%; min-width: 0; font-size: 12px; }
+.import-format-help { margin: 16px 0; font-size: 12px; color: var(--muted); }
+.import-format-help summary { cursor: pointer; }
+@media (max-width: 760px) {
+  html[data-theme] .visual-recommendation { grid-template-columns: 80px minmax(0, 1fr); gap: 14px; }
+  html[data-theme] .visual-recommendation .activity-art { height: 100px; }
+  html[data-theme] .visual-recommendation .learning-row-action { grid-column: 2; grid-row: 2; justify-self: start; padding: 0; }
+  html[data-theme] .activity-section .activity-grid { grid-template-columns: 1fr; }
+  .import-file-grid { grid-template-columns: 1fr; }
+}

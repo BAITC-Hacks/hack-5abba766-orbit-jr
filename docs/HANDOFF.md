@@ -51,7 +51,7 @@
 
 ## Что делать дальше
 
-1. Backend уже строит snapshot и обе карты BaselineSignals, проверяет сессию,
+1. Backend уже строит snapshot и все три карты BaselineSignals, проверяет сессию,
    ограничивает параллельный подбор и повторно проверяет версию после ответа.
 2. При смене ключа, модели или prompt повторить живую проверку:
    `npm run smoke:ai`, затем `npm run eval:ai -- --live --suite=all --repeat=3`.

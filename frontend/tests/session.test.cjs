@@ -34,6 +34,7 @@ const feedback = {
 };
 const QuestApp = load("src/components/quest-app.tsx", {
   "@/lib/api": api,
+  "./quest/visuals": { Brand: () => null },
   "./quest/login": {
     Login: () => React.createElement("div", { "data-testid": "login" }),
   },
@@ -209,6 +210,7 @@ test("an unmounted login cannot publish a late account response", async (t) => {
   let signal;
   let loggedIn = 0;
   const { Login } = load("src/components/quest/login.tsx", {
+    "./visuals": { Brand: () => null },
     "@/lib/api": {
       endpoints: api.endpoints,
       apiRequest: async (_url, options) => {

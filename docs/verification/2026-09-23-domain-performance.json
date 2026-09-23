@@ -1,0 +1,56 @@
+{
+  "scope": "Same-process local before/after observations; not an SLA",
+  "baseline": "5543101",
+  "implementation": "87499cd",
+  "datasetPrivacy": "Only aggregate measurements and equality checks; source profiles excluded",
+  "cases": [
+    {
+      "name": "official",
+      "employees": 200,
+      "history": 2743,
+      "candidates": 474,
+      "beforeMs": {
+        "allRecommendations": 316,
+        "hr": 89
+      },
+      "afterMs": {
+        "allRecommendations": 101,
+        "hr": 33
+      },
+      "fullCandidateOutputsEqual": true,
+      "hrOutputsEqual": true
+    },
+    {
+      "name": "valid_synthetic_1000",
+      "employees": 1000,
+      "history": 50000,
+      "candidates": 19994,
+      "beforeMs": {
+        "allRecommendations": 55929,
+        "hr": 1121
+      },
+      "afterMs": {
+        "allRecommendations": 1637,
+        "hr": 69
+      },
+      "fullCandidateOutputsEqual": true,
+      "hrOutputsEqual": true
+    },
+    {
+      "name": "valid_synthetic_dense",
+      "employees": 1,
+      "history": 50000,
+      "candidates": 22,
+      "beforeMs": {
+        "allRecommendations": 25230,
+        "hr": 61644
+      },
+      "afterMs": {
+        "allRecommendations": 3175,
+        "hr": 121
+      },
+      "fullCandidateOutputsEqual": true,
+      "hrOutputsEqual": true
+    }
+  ]
+}

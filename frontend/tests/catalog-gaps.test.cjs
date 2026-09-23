@@ -11,7 +11,7 @@ function load(file, imports = {}) {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText;
   const loaded = { exports: {} };
-  new Function('require', 'module', 'exports', javascript)(id => imports[id] ?? require(id), loaded, loaded.exports);
+  new Function('require', 'module', 'exports', javascript)(id => imports[id] ?? (id.startsWith('@/') ? load(`src/${id.slice(2)}.ts`, imports) : id.startsWith('.') ? load(path.join(path.dirname(file), `${id}.tsx`), imports) : require(id)), loaded, loaded.exports);
   return loaded.exports;
 }
 const { CatalogGaps } = load('src/components/quest/catalog-gaps.tsx');

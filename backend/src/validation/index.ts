@@ -4,14 +4,27 @@ import { z } from 'zod';
 import { AppError } from '../errors';
 import type { DatasetSnapshot, EmployeeSource, ParticipationSource, ImportIssue } from '../types';
 
-export const idSchema = z.string().trim().min(1).max(200).refine(s => !['__proto__', 'prototype', 'constructor'].includes(s), 'Invalid identifier');
+// PostgreSQL text/JSONB cannot store NUL or unpaired UTF-16 surrogates.
+// Unicode mode preserves valid surrogate pairs, including emoji.
+export const storageTextSchema = z.string().refine(value => !/[\u0000\uD800-\uDFFF]/u.test(value), 'Text contains unsupported Unicode characters');
+export const idSchema = storageTextSchema.trim().min(1).max(200).refine(s => !['__proto__', 'prototype', 'constructor'].includes(s), 'Invalid identifier');
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, 'Invalid calendar date');
 export const gradeSchema = z.enum(['Junior', 'Middle', 'Senior', 'Lead']);
-const shortText = z.string().trim().min(1).max(500);
-const levels = z.record(idSchema, z.number().finite().min(0).max(5));
+const shortText = storageTextSchema.trim().min(1).max(500);
+const levels = z.preprocess((input, ctx) => {
+  if (input !== null && typeof input === 'object' && !Array.isArray(input)) {
+    const normalizedKeys = new Set<string>();
+    for (const key of Object.keys(input)) {
+      const normalized = key.trim();
+      if (normalizedKeys.has(normalized)) ctx.addIssue({ code: 'custom', path: [key], message: 'Duplicate skill identifier after normalization' });
+      normalizedKeys.add(normalized);
+    }
+  }
+  return input;
+}, z.record(idSchema, z.number().finite().min(0).max(5)));
 export const careerGoalSchema = z.object({ target_role: shortText, target_grade: gradeSchema }).strict();
 export const employeeSchema = z.object({
   employee_id: idSchema, full_name: shortText, department: shortText, role: shortText,
@@ -34,12 +47,12 @@ export const participationSchema = z.object({
 });
 const metaSchema = z.object({ dataset: shortText, version: shortText, as_of_date: dateSchema }).strict();
 export const employeeFileSchema = z.object({ meta: metaSchema, employees: z.array(employeeSchema).min(1).max(1000) }).strict();
-const skillSchema = z.object({ skill_id: idSchema, name: shortText, type: z.enum(['hard', 'soft']), category: shortText, description: z.string().max(10000) }).strict();
+const skillSchema = z.object({ skill_id: idSchema, name: shortText, type: z.enum(['hard', 'soft']), category: shortText, description: storageTextSchema.max(10000) }).strict();
 const roleSchema = z.object({ role: shortText, grade: gradeSchema, required_skills: levels, critical_skills: z.array(idSchema) }).strict();
 const scaleSchema = z.object({ '0': shortText, '1': shortText, '2': shortText, '3': shortText, '4': shortText, '5': shortText }).strict();
 export const skillsFileSchema = z.object({ meta: metaSchema, proficiency_scale: scaleSchema, skills: z.array(skillSchema).min(1), role_profiles: z.array(roleSchema).min(1) }).strict();
 const eventSchema = z.object({
-  event_id: idSchema, title: shortText, description: z.string().max(10000),
+  event_id: idSchema, title: shortText, description: storageTextSchema.max(10000),
   type: z.enum(['compliance', 'onboarding', 'course', 'workshop', 'mentoring', 'certification', 'meetup']),
   format: z.enum(['online', 'offline', 'self_paced']), duration_hours: z.number().finite().positive().max(10000),
   mandatory: z.boolean(), target_roles: z.array(shortText), target_grades: z.array(gradeSchema),
@@ -66,6 +79,8 @@ export function parseEmployeeFile(text: string, expectedAsOf: string): EmployeeS
 }
 const historyColumns = ['record_id', 'employee_id', 'event_id', 'date', 'due_date', 'status', 'completion_pct', 'score', 'feedback_rating', 'assigned_by'];
 export function parseHistoryCsv(text: string): ParticipationSource[] {
+  // The CSV parser encodes strings to UTF-8; reject malformed text before it can replace identifiers.
+  checked(storageTextSchema, text);
   let rows: Record<string, string>[];
   try {
     rows = parse(text, { bom: true, skip_empty_lines: true, trim: true, max_record_size: 100000,
@@ -102,7 +117,8 @@ export function validateRelations(snapshot: DatasetSnapshot, employees = snapsho
     if (e.career_goal && !roles.has(`${e.career_goal.target_role}\u0000${e.career_goal.target_grade}`)) add('employees', e.employee_id, 'career_goal', 'Неизвестная целевая роль и грейд');
     if (e.manager_id && (!people.has(e.manager_id) || e.manager_id === e.employee_id)) add('employees', e.employee_id, 'manager_id', 'Руководитель не найден или совпадает с сотрудником');
     for (const skill of Object.keys(e.skills)) if (!skills.has(skill)) add('employees', e.employee_id, `skills.${skill}`, 'Навык не найден');
-    if (e.hire_date > snapshot.as_of_date || e.last_review_date > snapshot.as_of_date) add('employees', e.employee_id, 'last_review_date', 'Дата не может быть позже даты среза');
+    if (e.hire_date > snapshot.as_of_date) add('employees', e.employee_id, 'hire_date', 'Дата не может быть позже даты среза');
+    if (e.last_review_date > snapshot.as_of_date) add('employees', e.employee_id, 'last_review_date', 'Дата не может быть позже даты среза');
   }
   for (const h of history) {
     if (!people.has(h.employee_id)) add('history', h.record_id, 'employee_id', 'Сотрудник не найден');

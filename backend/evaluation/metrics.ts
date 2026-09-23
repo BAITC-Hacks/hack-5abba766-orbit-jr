@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import type { RecommendationResult } from '../../contracts/backend'
 import { validateRanking } from '../src/ai/response-validator'
 import { rankBaseline } from '../src/domain/baseline'
@@ -18,6 +19,8 @@ export type EvaluationScore = {
   fallbackReason: RecommendationResult['fallback_reason']
   validCitations: boolean
   validSnapshotVersion: boolean
+  /** Ranking metadata and complete cards must match their server-grounded representation. */
+  validResultContract: boolean
   /** Null means the case does not specify decisive evidence. Applies to any mode. */
   requiredTopEvidencePass: boolean | null
   /** Null means the case specifies top-choice quality only. Applies to any mode. */
@@ -28,16 +31,25 @@ export type EvaluationScore = {
 export function scoreEvaluation(testCase: EvaluationCase, result: RecommendationResult): EvaluationScore {
   const topCandidateId = result.recommendations[0]?.candidate_id ?? null
   const baselineTopCandidateId = rankBaseline(testCase.input, testCase.signals)[0]?.candidate_id ?? null
-  const validCitations = validateRanking({
+  const validated = validateRanking({
     choices: result.recommendations.map((card) => ({
       candidate_id: card.candidate_id,
       reason_fact_ids: card.reason_fact_ids,
       alternative_candidate_id: card.alternative_candidate_id,
     })),
-  }, testCase.input).ok
+  }, testCase.input)
+  const validCitations = validated.ok
   const validSnapshotVersion = result.version.dataset_revision === testCase.input.version.dataset_revision &&
     result.version.employee_revision === testCase.input.version.employee_revision
-  const acceptedAi = result.mode === 'ai' && validCitations && validSnapshotVersion
+  // Revalidating only the model's IDs would silently discard corrupted ranks,
+  // effects, participation identities or rendered alternatives in the actual result.
+  const validResultContract = validated.ok && isDeepStrictEqual(result.recommendations, validated.cards) &&
+    result.empty_reason === null && (
+      (result.mode === 'ai' && result.fallback_reason === null) ||
+      (result.mode === 'rules_fallback' && ['missing_api_key', 'provider_timeout', 'provider_error', 'invalid_response']
+        .includes(result.fallback_reason))
+    )
+  const acceptedAi = result.mode === 'ai' && validCitations && validSnapshotVersion && validResultContract
 
   return {
     caseId: testCase.id,
@@ -52,6 +64,7 @@ export function scoreEvaluation(testCase: EvaluationCase, result: Recommendation
     fallbackReason: result.fallback_reason,
     validCitations,
     validSnapshotVersion,
+    validResultContract,
     requiredTopEvidencePass: testCase.requiredTopFactIds?.length
       ? testCase.requiredTopFactIds.every((id) => result.recommendations[0]?.reason_fact_ids.includes(id))
       : null,
@@ -80,7 +93,7 @@ export type EvaluationSummary = {
   aiEndToEndPassRate: number | null
   /** Only accepted AI cases with explicit decisive-evidence expectations. */
   aiDecisiveEvidencePassRate: number | null
-  /** Only accepted AI cases with an explicit complete-order expectation. */
+  /** Only accepted AI cases with an explicit order expectation, assessed over the returned prefix. */
   aiCandidateOrderPassRate: number | null
 }
 

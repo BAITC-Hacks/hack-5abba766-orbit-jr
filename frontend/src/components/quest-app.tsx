@@ -8,6 +8,7 @@ import { Navigation } from "./quest/navigation";
 import { Employee } from "./quest/employee";
 import { Hr } from "./quest/hr";
 import { Failure, Loading } from "./quest/feedback";
+import { Brand } from "./quest/visuals";
 export default function QuestApp({
   initialView = "overview",
 }: {
@@ -77,7 +78,7 @@ export default function QuestApp({
     return (
       <main className="login-page">
         <section className="panel">
-          <h1>Career Quest</h1>
+          <Brand />
           {error ? (
             <>
               <Failure error={error} retry={() => setAttempt((n) => n + 1)} />
@@ -156,6 +157,11 @@ export default function QuestApp({
             }
           />
         )}
+        <footer className="app-footer">
+          <Brand />
+          <span>Развитие сотрудников</span>
+          <span>Career Quest</span>
+        </footer>
       </main>
     </>
   );

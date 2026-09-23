@@ -117,6 +117,19 @@ export function validateRanking(raw: unknown, input: AiRankingInput): Validation
   return { ok: true, cards, output }
 }
 
+/** Drop only redundant optional comparisons before validating provider choices. */
+export function validateProviderRanking(raw: unknown, input: AiRankingInput): ValidationResult {
+  const parsed = AiRankingOutputSchema.safeParse(raw)
+  if (!parsed.success) return validateRanking(raw, input)
+  const chosen = new Set(parsed.data.choices.map((choice) => choice.candidate_id))
+  return validateRanking({ choices: parsed.data.choices.map((choice) => ({
+    ...choice,
+    // Preserve the model's ranking and evidence; never invent a replacement ID.
+    alternative_candidate_id: choice.alternative_candidate_id && chosen.has(choice.alternative_candidate_id)
+      ? null : choice.alternative_candidate_id,
+  })) }, input)
+}
+
 /** Build only from validated server IDs, including the deterministic ordered fallback. */
 export function cardsFromRanking(output: AiRankingOutput, candidates: Candidate[]): RecommendationCard[] {
   assertRecommendationEvidence(candidates)

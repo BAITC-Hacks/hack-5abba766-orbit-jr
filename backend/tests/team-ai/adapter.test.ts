@@ -6,7 +6,7 @@ import { getModel, getTimeoutMs, isAiConfigured, rankWithModel } from '../../src
 const fetchMock = vi.fn();
 const nativeFetch = globalThis.fetch;
 const snapshot = input([candidate({ candidate_id: 'C1' })]);
-const response = (content: string) => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+const response = (content: string) => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content } }] }), { status: 200 });
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   vi.stubEnv('LLM_API_KEY', 'synthetic-key');
@@ -144,10 +144,50 @@ describe('provider deadline and evidence regressions', () => {
   });
   it('bounds a stalled response body as well as initial response headers', async () => {
     vi.useFakeTimers(); vi.stubEnv('LLM_TIMEOUT_MS', '100');
-    fetchMock.mockResolvedValue({ ok: true, json: () => new Promise(() => {}) });
+    const cancel = vi.fn();
+    fetchMock.mockResolvedValue(new Response(new ReadableStream({ cancel })));
     const pending = rankWithModel(snapshot);
     await vi.advanceTimersByTimeAsync(100);
     expect(await pending).toMatchObject({ ok: false, reason: 'provider_timeout' });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+  it('rejects an oversized streaming body before the deadline and cancels its reader', async () => {
+    vi.useFakeTimers(); vi.stubEnv('LLM_TIMEOUT_MS', '100');
+    const cancel = vi.fn();
+    fetchMock.mockResolvedValue(new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(' '.repeat(65 * 1024)));
+      },
+      cancel,
+    })));
+    const pending = rankWithModel(snapshot);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await pending).toMatchObject({ ok: false, reason: 'invalid_response', ms: 0 });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('measures the body limit in UTF-8 bytes, including provider envelope metadata', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      choices: [{ finish_reason: 'stop', message: { content: '{}' } }],
+      padding: '€'.repeat(24 * 1024),
+    }));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+  });
+  it('decodes a multibyte character split between body chunks', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({
+      choices: [{ finish_reason: 'stop', message: { content: '{"label":"Я"}' } }],
+    }));
+    const split = bytes.indexOf(0xd0) + 1;
+    fetchMock.mockResolvedValue(new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes.slice(0, split));
+        controller.enqueue(bytes.slice(split));
+        controller.close();
+      },
+    })));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: true, output: { label: 'Я' } });
   });
   it('settles on caller cancellation and observes late provider rejection', async () => {
     vi.useFakeTimers();
@@ -176,7 +216,7 @@ describe('provider deadline and evidence regressions', () => {
     controller.abort();
     expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(false);
   });
-  it.each([{}, null, { choices: [{}] }, { choices: [{ message: { content: ' ' } }] }, { choices: [{ message: { content: {} } }] }])('rejects malformed provider envelope %#', async body => {
+  it.each([{}, null, { choices: [{}] }, { choices: [{ finish_reason: 'stop', message: { content: ' ' } }] }, { choices: [{ finish_reason: 'stop', message: { content: {} } }] }])('rejects malformed provider envelope %#', async body => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify(body)));
     expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
   });
@@ -184,8 +224,30 @@ describe('provider deadline and evidence regressions', () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ finish_reason, message: { content: '{"choices":[]}' } }] })));
     expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
   });
+  it.each([undefined, null, '', 0, false])('requires an explicit successful finish reason (%s)', async finish_reason => {
+    fetchMock.mockResolvedValue(Response.json({ choices: [{ finish_reason, message: { content: '{}' } }] }));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+  });
+  it.each([
+    { 0: { finish_reason: 'stop', message: { content: '{}' } } },
+    [
+      { finish_reason: 'stop', message: { content: '{}' } },
+      { finish_reason: 'stop', message: { content: '{}' } },
+    ],
+  ])('rejects a completion envelope that is not a single-choice array %#', async choices => {
+    fetchMock.mockResolvedValue(Response.json({ choices }));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+  });
+  it('rejects malformed UTF-8 instead of silently replacing identifier bytes', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({
+      choices: [{ finish_reason: 'stop', message: { content: '{"candidate_id":"C1"}' } }],
+    }));
+    bytes[bytes.indexOf('C'.charCodeAt(0))] = 0xff;
+    fetchMock.mockResolvedValue(new Response(bytes));
+    expect(await rankWithModel(snapshot)).toMatchObject({ ok: false, reason: 'invalid_response' });
+  });
   it('never exposes provider refusal text', async () => {
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { refusal: 'private refusal', content: '{}' } }] })));
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { refusal: 'private refusal', content: '{}' } }] })));
     const result = await rankWithModel(snapshot);
     expect(result).toMatchObject({ ok: false, reason: 'invalid_response' });
     expect(JSON.stringify(result)).not.toContain('private refusal');

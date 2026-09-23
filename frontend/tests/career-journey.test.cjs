@@ -14,7 +14,7 @@ function load(file) {
   } }).outputText;
   const module = { exports: {} };
   new Function("require", "module", "exports", js)(
-    (id) => id.startsWith("@/") ? load(`src/${id.slice(2)}.ts`) : require(id),
+    (id) => id.startsWith("@/") ? load(`src/${id.slice(2)}.ts`) : id.startsWith(".") ? load(path.join(path.dirname(file), `${id}.tsx`)) : require(id),
     module, module.exports,
   );
   return module.exports;
@@ -37,7 +37,7 @@ const employee = {
 };
 const names = { critical: "Critical skill", broad: "Broad skill", covered: "Covered skill", unrelated: "Unrelated skill" };
 const card = {
-  candidate_id: "step-a", event_id: "event-a", title: "Candidate A",
+  candidate_id: "step-a", event_id: "event-a", title: "Candidate A", rank: 1,
   event_type: "course", format: "self_paced", duration_hours: 2,
   relevance: "prerequisite", action: "start", session_date: null,
   unlocks_event_ids: ["advanced"], goal_coverage_delta: .1,

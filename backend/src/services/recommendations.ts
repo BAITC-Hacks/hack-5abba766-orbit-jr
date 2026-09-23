@@ -1,4 +1,4 @@
-import { recommendationLockPool, readSnapshotWithClient } from '../db';
+import { recommendationLockPool, readDomainVersionWithClient } from '../db';
 import { readSnapshot } from './data';
 import { getCandidates } from '../domain';
 import { AppError } from '../errors';
@@ -8,7 +8,7 @@ import { buildUserMessage, RANKING_JSON_SCHEMA, SYSTEM_PROMPT } from '../ai/prom
 import { recommendationWork } from './recommendation-work';
 import type { AiRankingInput, DomainVersion, RecommendationRequest, RecommendationResult } from '../types';
 
-const sameVersion = (a: DomainVersion, b: DomainVersion) => a.dataset_revision === b.dataset_revision && a.employee_revision === b.employee_revision;
+const sameVersion = (a: Partial<DomainVersion>, b: DomainVersion) => a.dataset_revision === b.dataset_revision && a.employee_revision === b.employee_revision;
 
 export async function recommendations(employeeId: string, request: RecommendationRequest, signal?: AbortSignal): Promise<RecommendationResult> {
   const snapshot = await readSnapshot();
@@ -38,18 +38,9 @@ async function rankSnapshot(employeeId: string, input: AiRankingInput,
     locked = Boolean(lock.rows[0]?.acquired);
     if (!locked) throw new AppError('RECOMMENDATION_IN_PROGRESS', 'Подбор для этого профиля уже выполняется.', 429);
     const result = await recommend(input, { signals, signal });
-    // The dedicated lock connection can also check the final snapshot without
-    // queuing for another connection while its advisory lock remains held.
-    let latest;
-    await connection.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    try {
-      latest = await readSnapshotWithClient(connection);
-      await connection.query('COMMIT');
-    } catch (error) {
-      await connection.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    }
-    const current = { dataset_revision: latest.dataset_revision, employee_revision: latest.employee_revisions[employeeId] };
+    // Reuse the lock connection for an atomic revision check. Loading every
+    // employee and history row again adds latency without strengthening freshness.
+    const current = await readDomainVersionWithClient(connection, employeeId);
     if (!sameVersion(current, input.version)) throw new AppError('STALE_RECOMMENDATION', 'Профиль изменился во время подбора. Обновите рекомендации.', 409, { current_version: current });
     return result;
   } finally {

@@ -114,6 +114,7 @@ describe('evaluation execution and exit status', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(report()).toMatchObject({
       run: 'baseline_only', model: null, repetitions: 2,
+      authoredCaseCount: 23, caseRunCount: 46,
       suitesIncluded: ['regression', 'challenge', 'acceptance', 'domain'],
       summary: { totalCases: 46, baselineExpectedChoicePassRate: 1, aiAcceptanceRate: null, aiEndToEndPassRate: null, aiCandidateOrderPassRate: null, fallbackRate: null },
     })
@@ -123,6 +124,7 @@ describe('evaluation execution and exit status', () => {
     expect(report().emptyChecks).toHaveLength(domainEmptyCases.length)
     expect(report().emptyChecks.every((check: { pass: boolean }) => check.pass)).toBe(true)
     expect(report().recommendationLatencyScope).toContain('excludes source validation, domain candidate generation, HTTP, database and browser latency')
+    expect(report().independenceScope).toContain('not independent expert holdout samples')
     expect(printed.join('\n')).not.toContain('synthetic-evaluation-key')
   })
 

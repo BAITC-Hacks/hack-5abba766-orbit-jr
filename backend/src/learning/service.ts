@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { readSnapshotWithClient, withTransaction } from '../db';
-import { AppError, invariant } from '../errors';
+import { invariant } from '../errors';
 import { assertCompletionAllowed, employeeView } from '../domain';
 import { audit, checkVersion, completeActivityInTransaction, ensureKey, lockDataset, receipt, saveReceipt, scope } from '../services/data';
 import { sourceHash, idSchema } from '../validation';
@@ -158,11 +158,21 @@ export async function submitQuiz(actor: SessionView, employeeId: string, attempt
     const grading = gradeQuiz(row.course_snapshot, request.answers);
     const previousProgress = employeeView(snapshot, employeeId).progress;
     let completion: CompletionResult | null = null;
+    let target = row.target;
     if (grading.passed) {
-      const applied = await completeActivityInTransaction(client, actor, employeeId, { expected_version: request.expected_version, simulation: true, target: row.target }, `learning:${attemptId}`);
+      // An import may create the canonical participation after these lessons began.
+      // Reconcile only this occurrence; the canonical writer still checks eligibility,
+      // existing completions and versions under the same metadata lock.
+      if (target.kind === 'new_participation') {
+        const event = snapshot.events.find(event => event.event_id === row.event_id)!;
+        const participation = snapshot.history.find(item => item.employee_id === employeeId && item.event_id === row.event_id
+          && item.status === 'in_progress' && (!event.repeatable || item.date === row.occurrence_key));
+        if (participation) target = { kind: 'existing_participation', participation_id: participation.record_id };
+      }
+      const applied = await completeActivityInTransaction(client, actor, employeeId, { expected_version: request.expected_version, simulation: true, target }, `learning:${attemptId}`);
       completion = applied.result;
     }
-    const { rows } = await client.query<AttemptRow>('UPDATE learning_attempts SET quiz_attempts=quiz_attempts+1,last_score=$2,last_answers=$3::jsonb,last_feedback=$4::jsonb,status=$5,completion_result=$6::jsonb,previous_progress=$7::jsonb,passed_at=CASE WHEN $8 THEN clock_timestamp() ELSE NULL END,updated_at=clock_timestamp() WHERE id=$1 RETURNING *', [attemptId, grading.score, JSON.stringify(request.answers), JSON.stringify(grading.feedback), grading.passed ? 'passed' : 'ready_for_quiz', completion ? JSON.stringify(completion) : null, previousProgress ? JSON.stringify(previousProgress) : null, grading.passed]);
+    const { rows } = await client.query<AttemptRow>('UPDATE learning_attempts SET quiz_attempts=quiz_attempts+1,last_score=$2,last_answers=$3::jsonb,last_feedback=$4::jsonb,status=$5,completion_result=$6::jsonb,previous_progress=$7::jsonb,passed_at=CASE WHEN $8 THEN clock_timestamp() ELSE NULL END,target=$9::jsonb,updated_at=clock_timestamp() WHERE id=$1 RETURNING *', [attemptId, grading.score, JSON.stringify(request.answers), JSON.stringify(grading.feedback), grading.passed ? 'passed' : 'ready_for_quiz', completion ? JSON.stringify(completion) : null, previousProgress ? JSON.stringify(previousProgress) : null, grading.passed, JSON.stringify(target)]);
     row = rows[0];
     if (completion) snapshot = await readSnapshotWithClient(client);
     const result: SubmitQuizResult = { attempt: attemptView(row, snapshot), feedback: grading.feedback, completion, previous_progress: previousProgress };

@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest';
 import pg from 'pg';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -49,6 +49,41 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
 
   const completion = (revision = 1): CompletionRequest => ({ expected_version: { dataset_revision: 1, employee_revision: revision }, simulation: true, target: { kind: 'existing_participation', participation_id: 'R_1' } });
 
+  async function durableCounts() {
+    const { rows } = await db.pool.query(`SELECT
+      (SELECT count(*)::int FROM action_receipts) AS receipts,
+      (SELECT count(*)::int FROM audit_records) AS audits,
+      (SELECT count(*)::int FROM import_batches) AS batches`);
+    return rows[0];
+  }
+
+  async function contend(writes: (() => Promise<unknown>)[]) {
+    const blocker = await db.pool.connect();
+    let settled: Promise<PromiseSettledResult<unknown>[]> | undefined;
+    let transactionOpen = false;
+    try {
+      await blocker.query('BEGIN');
+      transactionOpen = true;
+      await blocker.query('SELECT id FROM app_meta WHERE id=1 FOR UPDATE');
+      const { rows: [{ oid }] } = await blocker.query("SELECT 'app_meta'::regclass::oid AS oid");
+      settled = Promise.allSettled(writes.map(write => write()));
+      // Verify both writers are waiting on this schema's metadata lock before releasing it.
+      await vi.waitFor(async () => {
+        const { rows: [{ waiting }] } = await admin.query(`SELECT count(DISTINCT a.pid)::int AS waiting
+          FROM pg_stat_activity a JOIN pg_locks l ON l.pid=a.pid
+          WHERE l.relation=$1 AND a.wait_event_type='Lock' AND a.pid<>pg_backend_pid()`, [oid]);
+        expect(waiting).toBe(writes.length);
+      }, { timeout: 2000, interval: 10 });
+      await blocker.query('COMMIT');
+      transactionOpen = false;
+      return await settled;
+    } finally {
+      if (transactionOpen) await blocker.query('ROLLBACK');
+      blocker.release();
+      if (settled) await settled;
+    }
+  }
+
   it('initializes all data and preserves changes without source files on restart', async () => {
     expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '002_learning', dataset_initialized: true });
     const initial = await data.readSnapshot();
@@ -85,6 +120,53 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     expect(snapshot.global_revision).toBe(2);
   });
 
+  it('replays one concurrent completion receipt and keeps actors independent', async () => {
+    const same = await contend([
+      () => data.completeActivity(employee, 'E0001', completion(), 'same-receipt'),
+      () => data.completeActivity(employee, 'E0001', completion(), 'same-receipt'),
+    ]);
+    expect(same.every(result => result.status === 'fulfilled')).toBe(true);
+    const responses = same.map(result => (result as PromiseFulfilledResult<Awaited<ReturnType<typeof data.completeActivity>>>).value);
+    expect(responses.map(result => result.replayed).sort()).toEqual([false, true]);
+    expect(responses[0].result).toEqual(responses[1].result);
+    expect(await durableCounts()).toEqual({ receipts: 1, audits: 1, batches: 0 });
+    await expect(data.completeActivity(hr, 'E0001', completion(2), 'same-receipt')).rejects.toMatchObject({ code: 'ALREADY_COMPLETED' });
+    expect((await data.readSnapshot()).employee_revisions.E0001).toBe(2);
+  });
+
+  it('replays concurrent normalized imports without duplicate batches or revisions', async () => {
+    const incoming = { ...people[0], employee_id: 'NORMALIZED_IMPORT', full_name: 'Normalized name' };
+    const base = { expected_dataset_revision: 1, dry_run: false };
+    const results = await contend([
+      () => data.importData(hr, { ...base, employees: [{ ...incoming, full_name: '  Normalized name  ' }] }, 'same-import'),
+      () => data.importData(hr, { ...base, employees: [incoming] }, 'same-import'),
+    ]);
+    expect(results.every(result => result.status === 'fulfilled')).toBe(true);
+    const responses = results.map(result => (result as PromiseFulfilledResult<Awaited<ReturnType<typeof data.importData>>>).value);
+    expect(responses.map(result => result.replayed).sort()).toEqual([false, true]);
+    expect(responses[0].result).toEqual(responses[1].result);
+    expect(await durableCounts()).toEqual({ receipts: 1, audits: 1, batches: 1 });
+    const snapshot = await data.readSnapshot();
+    expect(snapshot).toMatchObject({ dataset_revision: 2, global_revision: 2 });
+    expect(snapshot.employees).toHaveLength(3);
+    await expect(data.importData(hr, { ...base, employees: [{ ...incoming, full_name: 'Different' }] }, 'same-import'))
+      .rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+  });
+
+  it('scopes receipt keys by actor and operation while binding completion targets', async () => {
+    const request = completion();
+    await data.completeActivity(employee, 'E0001', request, 'shared-key');
+    await data.importData(hr, { expected_dataset_revision: 1, dry_run: false,
+      history: [history({ status: 'declined', completion_pct: 0 })] }, 'shared-key');
+    const other = await data.completeActivity(hr, 'E0002', {
+      expected_version: { dataset_revision: 2, employee_revision: 2 }, simulation: true,
+      target: { kind: 'new_participation', event_id: 'EV_A', session_date: null },
+    }, 'shared-key');
+    expect(other.replayed).toBe(false);
+    await expect(data.completeActivity(hr, 'E0001', request, 'shared-key')).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    expect(await durableCounts()).toEqual({ receipts: 3, audits: 3, batches: 1 });
+  });
+
   it('rejects another employee and HR imports from employee account', async () => {
     await expect(data.updateGoal(employee, 'E0002', { expected_version: { dataset_revision: 1, employee_revision: 1 }, career_goal: null })).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(data.importData(employee, { expected_dataset_revision: 1, dry_run: true, employees: [people[0]] })).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -113,6 +195,91 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     await expect(data.importData(hr, { expected_dataset_revision: 2, dry_run: false, employees: [changed] }, 'conflict-import')).rejects.toMatchObject({ code: 'IMPORT_CONFLICT' });
   });
 
+  it('keeps selected goals and increments each affected existing employee only once', async () => {
+    await data.updateGoal(employee, 'E0001', { expected_version: { dataset_revision: 1, employee_revision: 1 },
+      career_goal: { target_role: 'Engineer', target_grade: 'Senior' } });
+    const added = { ...people[0], employee_id: 'NEW_WITH_HISTORY' };
+    const imported = await data.importData(hr, { expected_dataset_revision: 1, dry_run: false,
+      employees: [people[0], added], history: [
+        history({ record_id: 'OLD_FIRST', employee_id: 'E0001', status: 'declined', completion_pct: 0 }),
+        history({ record_id: 'OLD_SECOND', employee_id: 'E0001', status: 'in_progress', completion_pct: 40 }),
+        history({ record_id: 'NEW_FIRST', employee_id: added.employee_id }),
+      ] }, 'revision-import');
+    expect(imported.result).toMatchObject({ dataset_revision: 2, global_revision: 3, applied: true });
+    const snapshot = await data.readSnapshot();
+    expect(snapshot.employee_revisions).toEqual({ E0001: 3, E0002: 1, NEW_WITH_HISTORY: 1 });
+    expect(snapshot.goals.E0001).toEqual({ target_role: 'Engineer', target_grade: 'Senior' });
+    expect(snapshot.employees.find(row => row.employee_id === 'E0001')).toEqual(people[0]);
+    await expect(data.updateGoal(employee, 'E0001', { expected_version: { dataset_revision: 1, employee_revision: 2 }, career_goal: null }))
+      .rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+  });
+
+  it('leaves previews and repeated selected goals free of durable changes', async () => {
+    const first = await data.updateGoal(employee, 'E0001', { expected_version: { dataset_revision: 1, employee_revision: 1 }, career_goal: null });
+    const before = await data.readSnapshot();
+    const counts = await durableCounts();
+    expect((await data.updateGoal(employee, 'E0001', { expected_version: first.version, career_goal: null })).changed).toBe(false);
+    const preview = await data.importData(hr, { expected_dataset_revision: 1, dry_run: true, history: [history()] });
+    expect(preview.result).toMatchObject({ applied: false, errors: [], counts: { history: { new_rows: 1 } } });
+    expect(await data.readSnapshot()).toEqual(before);
+    expect(await durableCounts()).toEqual(counts);
+  });
+
+  it.each(['import', 'completion', 'goal'] as const)('rolls back %s data, revisions and receipts if the final audit write fails', async operation => {
+    const before = await data.readSnapshot();
+    const counts = await durableCounts();
+    await db.pool.query('ALTER TABLE audit_records ADD CONSTRAINT reject_audit CHECK (false)');
+    const act = () => operation === 'import'
+      ? data.importData(hr, { expected_dataset_revision: 1, dry_run: false,
+        employees: [{ ...people[0], employee_id: 'ROLLED_BACK' }], history: [history()] }, 'audit-failure')
+      : operation === 'completion'
+        ? data.completeActivity(employee, 'E0001', completion(), 'audit-failure')
+        : data.updateGoal(employee, 'E0001', { expected_version: { dataset_revision: 1, employee_revision: 1 }, career_goal: null });
+    await expect(act()).rejects.toMatchObject({ code: '23514' });
+    expect(await data.readSnapshot()).toEqual(before);
+    expect(await durableCounts()).toEqual(counts);
+    await db.pool.query('ALTER TABLE audit_records DROP CONSTRAINT reject_audit');
+    await expect(act()).resolves.toBeDefined();
+  });
+
+  it('serializes source imports against completions without duplicate credit', async () => {
+    const results = await contend([
+      () => data.importData(hr, { expected_dataset_revision: 1, dry_run: false,
+        history: [history({ employee_id: 'E0001' })] }, 'racing-import'),
+      () => data.completeActivity(employee, 'E0001', completion(), 'racing-completion'),
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find(result => result.status === 'rejected') as PromiseRejectedResult;
+    expect(['REVISION_CONFLICT', 'IMPORT_CONFLICT']).toContain(rejected.reason.code);
+    const snapshot = await data.readSnapshot();
+    expect(snapshot.global_revision).toBe(2);
+    expect(snapshot.employee_revisions.E0001).toBe(2);
+    expect(snapshot.completions.length + snapshot.history.filter(row => row.status === 'completed').length).toBe(1);
+    expect(await durableCounts()).toMatchObject({ receipts: 1, audits: 1 });
+  });
+
+  it('preserves a concurrent goal selection or rejects its stale version after an import', async () => {
+    const target = { target_role: 'Engineer', target_grade: 'Senior' as const };
+    const results = await contend([
+      () => data.updateGoal(employee, 'E0001', { expected_version: { dataset_revision: 1, employee_revision: 1 }, career_goal: target }),
+      () => data.importData(hr, { expected_dataset_revision: 1, dry_run: false,
+        employees: [people[0]], history: [history({ employee_id: 'E0001', status: 'declined', completion_pct: 0 })] }, 'goal-race'),
+    ]);
+    expect(results[1].status).toBe('fulfilled');
+    const snapshot = await data.readSnapshot();
+    expect(snapshot.dataset_revision).toBe(2);
+    if (results[0].status === 'fulfilled') {
+      expect(snapshot.goals.E0001).toEqual(target);
+      expect(snapshot.employee_revisions.E0001).toBe(3);
+      expect(snapshot.global_revision).toBe(3);
+    } else {
+      expect(results[0].reason).toMatchObject({ code: 'REVISION_CONFLICT' });
+      expect(Object.hasOwn(snapshot.goals, 'E0001')).toBe(false);
+      expect(snapshot.employee_revisions.E0001).toBe(2);
+      expect(snapshot.global_revision).toBe(2);
+    }
+  });
+
   it('prevents imported completed history from doubling a simulated skill gain', async () => {
     await data.completeActivity(employee, 'E0001', completion(), 'simulation');
     const command = { expected_dataset_revision: 1, dry_run: false, history: [history({ employee_id: 'E0001' })] };
@@ -120,6 +287,21 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     const unchanged = await data.importData(hr, { expected_dataset_revision: 1, dry_run: false, history: [{ ...history(), record_id: 'R_1', employee_id: 'E0001', date: '2026-09-15', status: 'in_progress', completion_pct: 50 }] }, 'reimport-original');
     expect(unchanged.result).toMatchObject({ applied: false, counts: { history: { identical_rows: 1 } } });
     expect((await data.readSnapshot()).completions).toHaveLength(1);
+  });
+
+  it('rejects source participation IDs already assigned to local simulations', async () => {
+    const simulated = await data.completeActivity(hr, 'E0002', {
+      expected_version: { dataset_revision: 1, employee_revision: 1 }, simulation: true,
+      target: { kind: 'new_participation', event_id: 'EV_A', session_date: null },
+    }, 'local-participation');
+    const row = history({ record_id: simulated.result.participation_id, status: 'in_progress', completion_pct: 50 });
+    const command = { expected_dataset_revision: 1, dry_run: true, history: [row] };
+    const preview = await data.importData(hr, command);
+    expect(preview.result.errors).toContainEqual(expect.objectContaining({
+      file: 'history', record_id: row.record_id, code: 'PARTICIPATION_ID_COLLISION',
+    }));
+    await expect(data.importData(hr, { ...command, dry_run: false }, 'colliding-participation')).rejects.toMatchObject({ code: 'IMPORT_CONFLICT' });
+    expect((await data.readSnapshot()).history).toHaveLength(1);
   });
 
   it('normalizes BOM/quoted CSV and rejects unknown columns and impossible dates', async () => {

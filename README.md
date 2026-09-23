@@ -41,7 +41,7 @@
 
 ## AI и объяснимость
 
-Используется серверный адаптер **OpenAI-совместимого Chat Completions API** со строгой JSON Schema. В [.env.example](.env.example) задана модель `gpt-6-sol`; для неё код устанавливает `reasoning_effort: low`. Можно указать другую модель и полный URL совместимого API, но её поддержку Structured Outputs и качество ответов нужно проверять отдельно.
+Используется серверный адаптер **OpenAI-совместимого Chat Completions API** со строгой JSON Schema. В [.env.example](.env.example) задана модель `gpt-6-luna`; для неё код устанавливает `reasoning_effort: low`. Можно указать другую модель и полный URL совместимого API, но её поддержку Structured Outputs и качество ответов нужно проверять отдельно.
 
 Разделение ответственности:
 
@@ -70,7 +70,7 @@
 | HTTP API | Next.js Route Handlers в Node.js runtime, серверный пакет `backend/` |
 | Хранилище | PostgreSQL 18; в Compose закреплён образ 18.6, схема Drizzle ORM, SQL и транзакции через `pg` |
 | Валидация | Zod, `csv-parse` для CSV |
-| AI | Нативный `fetch`, Chat Completions, Structured Outputs; конфигурация `gpt-6-sol` в примере окружения |
+| AI | Нативный `fetch`, Chat Completions, Structured Outputs; конфигурация `gpt-6-luna` в примере окружения |
 | Проверки | Vitest, Node.js test runner, React Test Renderer, интеграционные тесты PostgreSQL |
 | Поставка | Docker, Docker Compose, GitHub Actions |
 
@@ -171,10 +171,10 @@ docker compose logs app
 
 ### 4. При необходимости включить AI
 
-В корневом `.env` задайте `LLM_API_KEY` и доступную вашему аккаунту модель в `LLM_MODEL`. Для другого совместимого сервиса измените `LLM_API_URL`. После изменения конфигурации пересоздайте контейнер приложения:
+В корневом `.env` задайте `LLM_API_KEY` и `LLM_MODEL=gpt-6-luna`. Обновление `.env.example` не меняет уже существующий `.env`: замените старое значение модели вручную. Ключ хранится только в локальном `.env`, никогда в `.env.example` или Git. Для другого совместимого сервиса измените `LLM_API_URL`. После изменения конфигурации пересоздайте контейнер приложения:
 
 ```sh
-docker compose up -d --force-recreate app
+docker compose up -d --build --force-recreate app
 ```
 
 Без ключа приложение работает с явно обозначенным подбором по правилам. Поле `ai_configured` в `/api/health` означает наличие ключа и имени модели, **а не успешный запрос провайдеру**. Реальное подключение проверяется рекомендацией с режимом `ai` или командами живой проверки ниже.
@@ -189,7 +189,7 @@ docker compose up -d --force-recreate app
 | `APP_PORT` | Локальный порт приложения в Compose, по умолчанию `3000` |
 | `APP_ORIGIN` | Допустимый origin изменяющих запросов; Compose задаёт `http://localhost:${APP_PORT}` |
 | `LLM_API_KEY` | Ключ AI-провайдера; в примере пустой |
-| `LLM_MODEL` | Модель; в примере `gpt-6-sol` |
+| `LLM_MODEL` | Модель; в примере `gpt-6-luna` |
 | `LLM_API_URL` | Полный URL Chat Completions; по умолчанию `https://api.openai.com/v1/chat/completions` |
 | `LLM_TIMEOUT_MS` | Бюджет провайдера в миллисекундах, по умолчанию `8000`; код ограничивает его диапазоном 100–8000 |
 | `DEMO_EMPLOYEE_PASSWORD`, `DEMO_HR_PASSWORD` | Пароли демонстрационных аккаунтов при их создании |

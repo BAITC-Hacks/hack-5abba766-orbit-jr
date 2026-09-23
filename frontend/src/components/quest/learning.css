@@ -1,4 +1,4 @@
-.learning-shell { --learn-ink: #15243b; --learn-blue: #345fea; --learn-muted: #6b7382; color: var(--learn-ink); padding: 10px 0 56px; }
+.learning-shell { --learn-ink: var(--ink); --learn-blue: var(--blue); --learn-muted: var(--muted); color: var(--learn-ink); padding: 10px 0 56px; }
 .learning-topbar, .learning-meta, .learning-progress-head, .learning-lesson-actions { display: flex; align-items: center; gap: 16px; }
 .learning-topbar { justify-content: space-between; margin-bottom: 38px; }
 .learning-back { display: inline-flex; align-items: center; gap: 8px; }
@@ -76,5 +76,14 @@
 .learning-library-card h3 { font-size: 16px; line-height: 1.5; }
 .learning-library-card p { color: #718096; font-size: 12px; line-height: 1.7; }
 .learning-library-card button { margin-top: auto; }
+/* Keep the learning flow in the same light/dark workspace. */
+html[data-theme] :is(.learning-reader,.learning-sidebar,.learning-library,.learning-library-card) { background: var(--surface); border-color: var(--line); color: var(--ink); }
+html[data-theme] :is(.learning-paragraph,.learning-bullets,.learning-meta,.learning-library > p,.learning-library-card p,.learning-quiz > p,.learning-celebration > p,.learning-sources,.learning-navigation button,.learning-options label) { color: var(--muted); }
+html[data-theme] :is(.learning-callout,.learning-gains > div,.learning-options label.selected,.learning-navigation button.active) { background: var(--surface-raised); border-color: var(--blue); color: var(--ink); }
+html[data-theme] :is(.learning-options label,.learning-lesson-actions,.learning-sources,.learning-step-number) { border-color: var(--line); }
+html[data-theme] .learning-options label:hover { background: var(--surface-raised); border-color: var(--blue); }
+html[data-theme] :is(.learning-gains strong,.learning-sources a,.learning-library-card > span) { color: var(--blue); }
+html[data-theme="dark"] :is(.cq-other-skills summary,.cq-skills-covered) { color: var(--muted); }
+html[data-theme="dark"] :is(.cq-skill-group h3 span,.cq-other-skills summary > span) { color: var(--ink); background: var(--surface-raised); }
 @media (max-width: 900px) { .learning-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 18px; } .learning-reader { padding: 25px; } }
 @media (max-width: 700px) { .learning-heading-icon { display: none; } .learning-layout { grid-template-columns: 1fr; } .learning-sidebar { position: static; padding: 18px; } .learning-navigation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 13px 0 0; } .learning-navigation li { margin: 2px; } .learning-navigation button { height: 100%; font-size: 11px; } .learning-sidebar .learning-save-note { margin-top: 12px; } .learning-reader { padding: 22px 18px; } .learning-topbar { gap: 8px; margin-bottom: 26px; } .learning-demo-label { font-size: 9px; padding: 6px 9px; } .learning-library { padding: 19px; } .learning-library-grid { grid-template-columns: 1fr; } .learning-lesson-actions { justify-content: stretch; } .learning-lesson-actions button { flex: 1; } }

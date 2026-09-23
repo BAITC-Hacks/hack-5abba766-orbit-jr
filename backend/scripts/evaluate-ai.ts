@@ -99,6 +99,8 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
     suite,
     suitesIncluded: [...new Set(cases.map((item) => item.suite))],
     repetitions: repeat,
+    authoredCaseCount: cases.length,
+    caseRunCount: rows.length,
     smoke: options.smoke,
     timestamp,
     providerBudgetMs: getTimeoutMs(),
@@ -117,7 +119,8 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
       },
     })))).digest('hex'),
     dataset: 'authored synthetic cases; not official or hidden judge profiles',
-    qualityScope: 'top-ranked choice and decisive evidence; full returned order only where expectedCandidateOrder is authored, otherwise other cards are validated for identifiers and citations only',
+    independenceScope: 'paired counterfactuals, permutations and repeated runs are correlated checks, not independent expert holdout samples',
+    qualityScope: 'top-ranked choice and decisive evidence; returned-order prefixes only where expectedCandidateOrder is authored; every card is checked for contract, snapshot grounding and citations',
     comparisonScope: 'agreement with authored rules; baseline agreement does not establish an AI benefit',
     coverage: includesDomain
       ? 'includes validated source profiles and history through the actual domain candidate pipeline'
@@ -142,7 +145,7 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
       aiPass: row.aiExpectedChoicePass ?? 'not measured',
       decisiveEvidence: row.requiredTopEvidencePass ?? 'not required',
       candidateOrder: row.expectedCandidateOrderPass ?? 'not measured',
-      citations: row.validCitations, version: row.validSnapshotVersion,
+      citations: row.validCitations, version: row.validSnapshotVersion, contract: row.validResultContract,
       ms: Math.round(row.recommendationLatencyMs), bytes: row.payloadBytes,
       fallback: row.fallbackReason ?? '-',
     })))
@@ -154,7 +157,7 @@ export async function evaluateAi(args: readonly string[]): Promise<0 | 1> {
     console.log(`promptSha256=${report.promptSha256}; schemaSha256=${report.schemaSha256}; casesSha256=${report.casesSha256}`)
     console.log('This measures authored top-choice expectations and recommendation-call latency, not product impact, HTTP latency or judge performance. Agreement with the rules baseline does not establish an AI benefit.')
   }
-  if (rows.some((row) => !row.baselineExpectedChoicePass || !row.validCitations || !row.validSnapshotVersion
+  if (rows.some((row) => !row.baselineExpectedChoicePass || !row.validCitations || !row.validSnapshotVersion || !row.validResultContract
     || row.requiredTopEvidencePass === false || row.expectedCandidateOrderPass === false)) return 1
   if (emptyChecks.some(check => !check.pass)) return 1
   if (live && rows.some((row) => !row.acceptedAi || row.aiExpectedChoicePass !== true
