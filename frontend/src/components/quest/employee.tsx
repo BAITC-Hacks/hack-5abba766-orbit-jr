@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Target,
@@ -40,6 +40,7 @@ import { CareerJourney } from "./career-journey";
 import { CompletionResultPanel } from "./completion-result";
 import { LearningPlayer } from "./learning-player";
 import { EmployeeProfile } from "./employee-profile";
+import { SkillCourseDetails } from "./skill-course-details";
 
 export function Employee({
   id,
@@ -76,6 +77,8 @@ export function Employee({
   const searchInput = useRef<HTMLInputElement>(null);
   const skillsPanel = useRef<HTMLDivElement>(null);
   const [type, setType] = useState("all");
+  const [skillFilter, setSkillFilter] = useState("");
+  const catalogHeading = useRef<HTMLHeadingElement>(null);
   const p = state.profile;
   const names = Object.fromEntries(
     catalog.data?.skills.map((s) => [s.skill_id, s.name]) ?? [],
@@ -85,10 +88,22 @@ export function Employee({
   const goalGrades = catalog.data?.grades ?? [];
   const goalOptions = catalog.data?.role_profiles.map((profile, index) => ({ profile, index }))
     .sort((a, b) => a.profile.role.localeCompare(b.profile.role) || goalGrades.indexOf(a.profile.grade) - goalGrades.indexOf(b.profile.grade));
-  const filteredEvents = catalog.data?.events.filter(event =>
+  const selectedSkill = p?.skills.find(skill => skill.skill_id === skillFilter);
+  const skillEvents = catalog.data?.events.filter(event => !skillFilter ||
+    event.develops_skills.some(effect => effect.skill_id === skillFilter && effect.gain > 0)) ?? [];
+  const filteredEvents = skillEvents.filter(event =>
     (type === "all" || event.type === type) &&
     `${event.title} ${event.description}`.toLocaleLowerCase("ru-RU").includes(query.trim().toLocaleLowerCase("ru-RU")),
-  ) ?? [];
+  );
+  useEffect(() => {
+    if (tab === "catalog" && skillFilter) catalogHeading.current?.focus();
+  }, [tab, skillFilter]);
+  function browseSkill(skillId: string) {
+    setSkillFilter(skillId);
+    setQuery("");
+    setType("all");
+    setTab("catalog");
+  }
   const moduleFor = (eventId: string) => learningModules.find(module => module.event_id === eventId);
   const disabled = state.busy || !!state.pendingTarget;
   const isHr = viewer === "hr";
@@ -190,7 +205,7 @@ export function Employee({
               </button>
             ))}
           </nav>
-          {tab === "profile" && <EmployeeProfile employee={p} names={names} onGoal={openGoal} disabled={disabled || !catalog.data} readOnly={readOnly} />}
+          {tab === "profile" && <EmployeeProfile employee={p} names={names} onGoal={openGoal} disabled={disabled || !catalog.data} readOnly={readOnly} onBrowseSkill={browseSkill} />}
           {tab === "overview" && (
             <>
               <section className="goal-summary" aria-label="Карьерная цель">
@@ -339,7 +354,7 @@ export function Employee({
                   </>
                 )}
               </section>
-              <div ref={skillsPanel} tabIndex={-1} aria-label="Навыки к цели"><Skills employee={p} names={names} readOnly={readOnly} /></div>
+              <div ref={skillsPanel} tabIndex={-1} aria-label="Навыки к цели"><Skills employee={p} names={names} readOnly={readOnly} onBrowseSkill={browseSkill} /></div>
               </div>
             </>
           )}
@@ -361,7 +376,7 @@ export function Employee({
               <div className="catalog-banner">
                 <div>
                   <span className="eyebrow">БИБЛИОТЕКА ВОЗМОЖНОСТЕЙ</span>
-                  <h2>Каталог обучения</h2>
+                  <h2 ref={catalogHeading} tabIndex={-1}>Каталог обучения</h2>
                   <p>
                     Курсы, практикумы и встречи.
                   </p>
@@ -371,6 +386,15 @@ export function Employee({
                   <Sparkles size={22} />
                 </div>
               </div>
+              {skillFilter && <section className="catalog-skill-context" aria-label="Обучение по навыку">
+                <div><h3>{names[skillFilter] ?? skillFilter}</h3>
+                  {selectedSkill && <p>Текущий уровень: {selectedSkill.current_level}{selectedSkill.required_level !== null && ` · Цель: ${selectedSkill.required_level}`}</p>}
+                  <p>Программы, развивающие этот навык. Учитывайте условия участия и предел уровня каждой программы.</p>
+                </div>
+                <button type="button" className="secondary" onClick={() => setSkillFilter("")}>Все навыки</button>
+              </section>}
+              {catalog.loading && <Loading>Загрузка каталога…</Loading>}
+              <Failure error={catalog.error} retry={catalog.reload} />
               <div className="toolbar">
                 <label className="search">
                   Поиск
@@ -382,6 +406,11 @@ export function Employee({
                   />
                 </label>
                 <CatalogSelect value={type} onChange={setType} options={[["all", "Все типы"], ...Object.entries(eventTypes)]} />
+                <CatalogSelect label="Навык" value={skillFilter} onChange={setSkillFilter}
+                  options={[["", "Все навыки"], ...(catalog.data?.skills.map(skill => [skill.skill_id, skill.name] as [string, string]) ?? [])]} />
+                {(query || type !== "all" || skillFilter) && <button type="button" className="text-button" onClick={() => {
+                  setQuery(""); setType("all"); setSkillFilter(""); searchInput.current?.focus();
+                }}>Сбросить фильтры</button>}
               </div>
               <div className="course-grid catalog-grid">
                 {filteredEvents.map((e) => (
@@ -393,7 +422,7 @@ export function Employee({
                         </span>
                         <h3>{e.title}</h3>
                         <details className="catalog-description"><summary>Описание программы</summary><p>{e.description}</p></details>
-                        <details className="catalog-description">
+                        {!selectedSkill && <details className="catalog-description">
                           <summary>Условия участия</summary>
                           <p>Роли: {e.target_roles.join(", ") || "Не указаны"}.</p>
                           <p>Грейды: {e.target_grades.join(", ") || "Не указаны"}.</p>
@@ -403,8 +432,9 @@ export function Employee({
                             ))}</ul>
                           ) : <p>Предварительные навыки не требуются.</p>}
                           <p>Персональный допуск также учитывает историю участия и дату занятия.</p>
-                        </details>
+                        </details>}
                         <div className="compact-meta"><span>{formats[e.format]}</span><span>{e.duration_hours} ч.</span>{e.mandatory && <span className="required-tag">Обязательное</span>}</div>
+                        {selectedSkill && <SkillCourseDetails event={e} skill={selectedSkill} employee={p} names={names} asOfDate={state.asOfDate} />}
                         {e.upcoming_sessions.length > 0 ? <details className="catalog-dates">
                           <summary>{[...e.upcoming_sessions].sort()[0]}{e.upcoming_sessions.length > 1 && <span> +{e.upcoming_sessions.length - 1} даты</span>}</summary>
                           <div className="compact-meta">{[...e.upcoming_sessions].sort().map(date => <span key={date}>{date}</span>)}</div>
@@ -413,22 +443,18 @@ export function Employee({
                       {moduleFor(e.event_id) && <div className="catalog-card-footer">{readOnly
                         ? <span className="outline-tag">Есть демомодуль</span>
                         : <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>}</div>}
+                      {!readOnly && !moduleFor(e.event_id) && state.recommendations?.recommendations.some(card => card.event_id === e.event_id) && <div className="catalog-card-footer"><button
+                        type="button" className="text-button" disabled={disabled}
+                        onClick={() => chooseCard(state.recommendations!.recommendations.find(card => card.event_id === e.event_id)!)}
+                      >Подробнее о шаге <ArrowUpRight size={16} aria-hidden="true" /></button></div>}
                     </article>
                   ))}
               </div>
-              {catalog.data && !catalog.loading && filteredEvents.length === 0 && (
+              {catalog.data && !catalog.loading && !catalog.error && filteredEvents.length === 0 && (
                   <div className="empty">
-                    <p>{catalog.data.events.length === 0 ? "В каталоге пока нет программ обучения." : "Ничего не найдено. Попробуйте другой запрос или сбросьте фильтры."}</p>
-                    {catalog.data.events.length > 0 && <button
-                      className="secondary"
-                      onClick={() => {
-                        setQuery("");
-                        setType("all");
-                        searchInput.current?.focus();
-                      }}
-                    >
-                      Сбросить фильтры
-                    </button>}
+                    <p>{skillFilter && skillEvents.length === 0
+                      ? `В каталоге пока нет обучения для навыка «${names[skillFilter] ?? skillFilter}». Обсудите с HR, какое обучение можно добавить для его развития.`
+                      : catalog.data.events.length === 0 ? "В каталоге пока нет программ обучения." : "Ничего не найдено. Попробуйте другой запрос или сбросьте фильтры."}</p>
                   </div>
                 )}
             </>

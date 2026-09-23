@@ -1,7 +1,7 @@
 import type { HrOverview } from "../../../../contracts/backend";
 import { goalSources } from "@/lib/labels";
 
-const colors = ["#74c9a7", "#b6a0e9", "#e3bf77", "#859bb7"];
+const colors = ["#72aaff", "#b6a0e9", "#e3bf77", "#859bb7"];
 export function GoalDonut({ data }: { data: HrOverview }) {
   const entries = Object.entries(data.goals_by_source);
   const total = entries.reduce((sum, [, count]) => sum + count, 0);

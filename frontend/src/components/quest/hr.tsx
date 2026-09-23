@@ -8,6 +8,9 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type {
   CatalogView,
@@ -101,14 +104,14 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
   }
   return (
     <>
-      <div hidden={!!selected}>
+      <div hidden={!!selected} className="hr-workspace">
         <header className="page-top hr-heading">
-          <div>
+          <div className="hr-heading-copy">
             <span className="eyebrow">HALYK · PEOPLE & GROWTH</span>
             <h1 ref={heading} tabIndex={-1}>
               Развитие команды
             </h1>
-
+            <p>Видеть потенциал. Находить точки роста. Поддерживать команду.</p>
           </div>
           <span className="workspace-label">
             <Users size={16} aria-hidden="true" />
@@ -121,6 +124,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               key={id}
               className={section === id ? "active" : ""}
               aria-current={section === id ? "page" : undefined}
+              aria-controls={`hr-${id}`}
               onClick={() => setSection(id)}
             >
               <Icon size={22} aria-hidden="true" />
@@ -131,7 +135,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             </button>
           ))}
         </nav>
-        <div hidden={section !== "overview"} className="hr-view">
+        <div id="hr-overview" hidden={section !== "overview"} className="hr-view">
           {overview.loading && <Loading>Обновляем сводку команды…</Loading>}
           <Failure error={overview.error} retry={overview.reload} />
           {overview.data && (
@@ -147,33 +151,53 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
           )}
         </div>
         <section
+          id="hr-people"
           hidden={section !== "people"}
           className="hr-view people-workspace"
           aria-labelledby="directory-title"
           aria-busy={directory.loading || filtersPending}
         >
-          <div className="section-heading">
-            <div>
-              <h2 id="directory-title">Сотрудники</h2>
+          <div className="section-heading directory-heading">
+            <div className="directory-heading-copy">
+              <span className="eyebrow">ЛЮДИ И ПОТЕНЦИАЛ</span>
+              <h2 id="directory-title">
+                Ваша команда
+                {directory.data && !filtersPending && !directory.loading && (
+                  <span className="directory-total" aria-label="Найдено сотрудников">
+                    {directory.data.total}
+                  </span>
+                )}
+              </h2>
+              <p>Откройте профиль, чтобы изучить навыки, цель и историю обучения.</p>
             </div>
+            <button className="secondary" onClick={() => setSection("import")}>
+              <Upload size={16} aria-hidden="true" />
+              Добавить сотрудников
+            </button>
           </div>
           <div className="toolbar directory-filters">
-            <label>
-              Поиск по имени
+            <label className="directory-search-field">
+              Имя или ID сотрудника
+              <span className="directory-input-wrap">
+                <Search size={18} aria-hidden="true" />
               <input
                 type="search"
                 value={q}
-                placeholder="Например, Анна"
+                maxLength={200}
+                placeholder="Найти сотрудника…"
                 onChange={(e) => {
                   setQ(e.target.value);
                   setOffset(0);
                 }}
               />
+              </span>
             </label>
             <label>
               Отдел
               <input
                 value={department}
+                maxLength={200}
+                aria-describedby="directory-department-help"
                 placeholder="Полное название отдела"
                 onChange={(e) => {
                   setDepartment(e.target.value);
@@ -189,6 +213,29 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               </button>
             )}
           </div>
+          <small id="directory-department-help" className="directory-filter-help">
+            Отдел ищется по полному названию. Поиск по имени и ID — по части текста.
+          </small>
+          {hasFilters && (
+            <div className="directory-active-filters" aria-label="Активные фильтры">
+              <span>Фильтры:</span>
+              {[
+                { label: "Поиск", value: q.trim(), clear: () => setQ("") },
+                { label: "Отдел", value: department.trim(), clear: () => setDepartment("") },
+                { label: "Роль", value: role, clear: () => setRole("") },
+              ].filter((filter) => filter.value).map((filter) => (
+                <button
+                  key={filter.label}
+                  className="directory-filter-chip"
+                  aria-label={`Убрать фильтр ${filter.label}: ${filter.value}`}
+                  onClick={() => { filter.clear(); setOffset(0); }}
+                >
+                  {filter.label}: {filter.value}
+                  <X size={14} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
           <Failure error={catalog.error} retry={catalog.reload} />
           {(directory.loading || filtersPending) && (
             <Loading>Ищем сотрудников…</Loading>
@@ -225,7 +272,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                     <span className="employee-card-body">
                       <strong>{p.full_name}</strong>
                       <span>
-                        {p.role} · {p.grade}
+                        {p.role} <span className="employee-grade">{p.grade}</span>
                       </span>
                       <small>{p.department}</small>
                       <span className="employee-link">
@@ -263,6 +310,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                     disabled={!offset || directory.loading || filtersPending}
                     onClick={() => setOffset((n) => Math.max(0, n - 24))}
                   >
+                    <ChevronLeft size={16} aria-hidden="true" />
                     Назад
                   </button>
                   <span>
@@ -279,13 +327,21 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                     onClick={() => setOffset((n) => n + 24)}
                   >
                     Далее
+                    <ChevronRight size={16} aria-hidden="true" />
                   </button>
                 </nav>
               )}
             </>
           )}
         </section>
-        <div hidden={section !== "import"} className="hr-view">
+        <div id="hr-import" hidden={section !== "import"} className="hr-view">
+          <div className="section-heading directory-heading">
+            <div>
+              <span className="eyebrow">ДАННЫЕ КОМАНДЫ</span>
+              <h2>Актуальные профили — точные решения</h2>
+              <p>Загрузите сотрудников и историю обучения, чтобы обновить картину развития.</p>
+            </div>
+          </div>
           <details className="import-format-help">
             <summary>Как работает импорт</summary>
             <ol>

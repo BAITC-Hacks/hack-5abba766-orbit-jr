@@ -2,7 +2,7 @@
 import { CatalogSelect } from "./catalog-select";
 import { GoalDonut } from "./growth-insights";
 import { useState } from "react";
-import { ArrowUpRight, Target, Users, Sparkles } from "lucide-react";
+import { ArrowUpRight, ArrowRight, Target, Users, Sparkles, ListChecks, Upload, ChartNoAxesCombined } from "lucide-react";
 import type { HrOverview as Overview } from "../../../../contracts/backend";
 import { emptyReasons, goalSources, statuses } from "@/lib/labels";
 import { CatalogGaps } from "./catalog-gaps";
@@ -42,13 +42,34 @@ export function HrOverview({
       acc[g.skill_id] = item;
       return acc;
     }, {}),
-  ).sort((a, b) => b.people - a.people || b.points - a.points);
+  ).filter((gap) => gap.people > 0).sort((a, b) => b.people - a.people || b.points - a.points);
   const missing = data.goals_by_source.missing;
+  const withGoal = Math.max(0, data.employee_count - missing);
+  const goalCoverage = data.employee_count ? Math.round(withGoal / data.employee_count * 100) : null;
   const available = data.no_next_step.filter(
     (p) => reason === "all" || p.reason === reason,
   );
   return (
     <>
+      <section className="hr-command-hero" aria-labelledby="hr-command-title">
+        <div className="hr-command-copy">
+          <span className="eyebrow">ЛЮДИ. НАВЫКИ. РАЗВИТИЕ.</span>
+          <h2 id="hr-command-title">Помогайте команде<br />двигаться вперёд</h2>
+          <p>Карьерные цели, потребности в обучении и следующий шаг для каждого сотрудника — в одном рабочем пространстве.</p>
+          <div className="hr-command-actions">
+            {showPeople && <button className="primary" onClick={showPeople}>Открыть сотрудников <ArrowRight size={18} aria-hidden="true" /></button>}
+            <a className="secondary" href="#hr-attention-section">Разобрать рекомендации <ArrowUpRight size={17} aria-hidden="true" /></a>
+          </div>
+        </div>
+        <div className="hr-goal-coverage">
+          <Target size={24} aria-hidden="true" />
+          <span>Сотрудники с целью</span>
+          <strong>{goalCoverage === null ? "—" : `${goalCoverage}%`}</strong>
+          <progress max={data.employee_count || 1} value={withGoal} aria-label="Доля сотрудников с карьерной целью" />
+          <p>{data.employee_count ? `${withGoal} из ${data.employee_count} сотрудников` : "Данные появятся после импорта"}</p>
+          <small>Включая автоматически определённые цели</small>
+        </div>
+      </section>
       <section className="hr-summary-cards" aria-label="Показатели команды">
         <div>
           <span className="metric-icon">
@@ -57,7 +78,7 @@ export function HrOverview({
           <p>Сотрудники</p>
           <strong>{data.employee_count}</strong>
           {showPeople && <button className="text-button" onClick={showPeople}>
-            Перейти к команде <ArrowUpRight size={15} aria-hidden="true" />
+            Открыть список <ArrowUpRight size={15} aria-hidden="true" />
           </button>}
         </div>
         <div>
@@ -66,7 +87,13 @@ export function HrOverview({
           </span>
           <p>Без карьерной цели</p>
           <strong>{missing}</strong>
-
+          <span>Цель помогает подобрать обучение</span>
+        </div>
+        <div>
+          <span className="metric-icon"><ListChecks size={21} aria-hidden="true" /></span>
+          <p>Без рекомендации</p>
+          <strong>{data.no_next_step.length}</strong>
+          <span>В том числе с достигнутой целью</span>
         </div>
         <div>
           <span className="metric-icon">
@@ -77,8 +104,25 @@ export function HrOverview({
           <span>Без подтверждения посещения</span>
         </div>
       </section>
+      <nav className="hr-priority-strip" aria-label="Быстрые действия HR">
+        <a className="hr-priority-card" href="#hr-attention-section">
+          <span className="hr-priority-icon"><ListChecks size={20} aria-hidden="true" /></span>
+          <span className="hr-priority-copy"><strong>Разобрать причины</strong><small>Почему нет следующего шага</small></span>
+          <ArrowUpRight size={18} aria-hidden="true" />
+        </a>
+        <a className="hr-priority-card" href="#hr-skills-section">
+          <span className="hr-priority-icon"><ChartNoAxesCombined size={20} aria-hidden="true" /></span>
+          <span className="hr-priority-copy"><strong>Спланировать обучение</strong><small>Навыки с наибольшим спросом</small></span>
+          <ArrowUpRight size={18} aria-hidden="true" />
+        </a>
+        {showImport && <button className="hr-priority-card" onClick={showImport}>
+          <span className="hr-priority-icon"><Upload size={20} aria-hidden="true" /></span>
+          <span className="hr-priority-copy"><strong>Обновить данные</strong><small>Импорт команды и истории</small></span>
+          <ArrowUpRight size={18} aria-hidden="true" />
+        </button>}
+      </nav>
       <div className="hr-overview-grid">
-        <section className="hr-surface">
+        <section className="hr-surface" id="hr-skills-section" tabIndex={-1}>
           <span className="eyebrow">ПЛАНИРОВАНИЕ ОБУЧЕНИЯ</span>
           <h2>Какие навыки развивать</h2>
           <p className="section-description">
@@ -159,12 +203,12 @@ export function HrOverview({
         </section>
       </div>
       <CatalogGaps gaps={data.catalog_gaps} names={names} open={open} />
-      <section className="hr-surface">
+      <section className="hr-surface" id="hr-attention-section" tabIndex={-1}>
         <div className="section-heading">
           <div>
             <span className="eyebrow">РАБОТА С ТРАЕКТОРИЯМИ</span>
             <h2>Сотрудники без рекомендации</h2>
-
+            <p className="section-description">Откройте профиль, чтобы изучить цель и доступные варианты обучения.</p>
           </div>
           <span className="count-badge" role="status">{reason === "all" ? `${available.length} чел.` : `${available.length} из ${data.no_next_step.length} чел.`}</span>
         </div>

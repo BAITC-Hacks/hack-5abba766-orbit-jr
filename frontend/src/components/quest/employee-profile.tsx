@@ -6,12 +6,13 @@ import { Skills } from "./skills";
 const workFormats = { office: "В офисе", hybrid: "Гибридный", remote: "Удалённо" };
 const languages = { ru: "Русский", kk: "Қазақша", en: "English" };
 
-export function EmployeeProfile({ employee: p, names, onGoal, disabled, readOnly = false }: {
+export function EmployeeProfile({ employee: p, names, onGoal, disabled, readOnly = false, onBrowseSkill }: {
   employee: EmployeeView;
   names: Record<string, string>;
   onGoal: () => void;
   disabled: boolean;
   readOnly?: boolean;
+  onBrowseSkill?: (skillId: string) => void;
 }) {
   const completed = p.history.filter(row => row.effective_status === "completed").length;
   const active = p.history.filter(row => row.effective_status === "in_progress").length;
@@ -41,6 +42,6 @@ export function EmployeeProfile({ employee: p, names, onGoal, disabled, readOnly
       <div><dt>Завершено активностей</dt><dd>{completed}</dd></div>
       <div><dt>В процессе обучения</dt><dd>{active}</dd></div>
     </dl>
-    <Skills employee={p} names={names} readOnly={readOnly} />
+    <Skills employee={p} names={names} readOnly={readOnly} onBrowseSkill={onBrowseSkill} />
   </div>;
 }
