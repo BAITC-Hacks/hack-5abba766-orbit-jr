@@ -14,7 +14,7 @@ afterEach(() => vi.resetAllMocks())
 describe('recommendation boundary', () => {
   it('returns validated model choices with the exact snapshot version', async () => {
     rankWithModel.mockResolvedValue({ ok: true, ms: 20, output: { choices: [{
-      candidate_id: 'OTHER', reason_fact_ids: ['OTHER-gap', 'OTHER-req', 'OTHER-grade'],
+      candidate_id: 'OTHER', reason_fact_ids: ['OTHER-gap', 'OTHER-req', 'OTHER-grade', 'OTHER-effort'],
       alternative_candidate_id: 'NEW_JUDGE_ID',
     }] } })
     const state = snapshot()
@@ -37,7 +37,7 @@ describe('recommendation boundary', () => {
 
   it('keeps AI choices when only their optional comparisons point to selected cards', async () => {
     rankWithModel.mockResolvedValue({ ok: true, ms: 20, output: { choices: ['OTHER', 'NEW_JUDGE_ID'].map((id, index) => ({
-      candidate_id: id, reason_fact_ids: [`${id}-gap`, `${id}-req`, `${id}-grade`],
+      candidate_id: id, reason_fact_ids: [`${id}-gap`, `${id}-req`, `${id}-grade`, `${id}-effort`],
       alternative_candidate_id: ['NEW_JUDGE_ID', 'OTHER'][index],
     })) } })
     const result = await recommend(snapshot(), options)

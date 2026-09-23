@@ -22,7 +22,7 @@ afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
 function choice(candidate: Candidate) {
   return {
     candidate_id: candidate.candidate_id,
-    reason_fact_ids: candidate.facts.filter(fact => ['grade', 'skill_gap', 'history', 'target_requirement'].includes(fact.category)).map(fact => fact.fact_id),
+    reason_fact_ids: candidate.facts.filter(fact => ['grade', 'skill_gap', 'history', 'target_requirement', 'effort'].includes(fact.category)).map(fact => fact.fact_id),
     alternative_candidate_id: null,
   }
 }
@@ -124,8 +124,9 @@ describe('authored source → domain → actual recommendation adapter', () => {
     respond({ choices: [response] })
     const result = await recommend(testCase.input, { signals: testCase.signals })
     const score = scoreEvaluation(testCase, result)
-    expect(score).toMatchObject({ acceptedAi: true, aiExpectedChoicePass: true, requiredTopEvidencePass: false })
-    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: 0 })
+    expect(result).toMatchObject({ mode: 'rules_fallback', fallback_reason: 'invalid_response' })
+    expect(score).toMatchObject({ acceptedAi: false, aiExpectedChoicePass: null, requiredTopEvidencePass: true })
+    expect(summarizeEvaluations([score])).toMatchObject({ aiEndToEndPassRate: 0, aiDecisiveEvidencePassRate: null, invalidAiCases: 1 })
   })
 
   it('preserves candidate identity, gains and ranking when source catalog order changes', () => {

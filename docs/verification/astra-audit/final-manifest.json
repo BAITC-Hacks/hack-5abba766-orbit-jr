@@ -1,0 +1,43 @@
+{
+  "startedAt": "2026-09-23T12:21:09.340Z",
+  "baseCommit": "867f529bc9eb61135e5d35a3405717cf547369ec",
+  "model": "gpt-6-luna",
+  "reasoningEffort": "low",
+  "providerBudgetMs": 8000,
+  "sourceHashesAtStart": {
+    "backend/src/ai/adapter.ts": "6b999250e31e8f84cc2027affaf7831f9916430fafba3f76b70dd698dae2e7ac",
+    "backend/src/ai/prompt.ts": "b3c22e3549c1a1ce54b54d858283483a9f4c94aeb7f1bff7aa4770061714ba51",
+    "backend/src/ai/recommend.ts": "6144f656214cd4378421ab5e963a3bbcf478eddc575a705dac4a5fee362516cb",
+    "backend/src/ai/response-validator.ts": "ddd9cf09a60bff9cc40530d2479080be586d6bc96a0001c092d3f857f40323ca",
+    "backend/src/domain/baseline.ts": "59dcf51dc8b9c79f0e467bec28748c8640280b54eb8acc84142ec458d1fd3815"
+  },
+  "stages": [
+    {
+      "name": "stress-54",
+      "startedAt": "2026-09-23T12:21:09.342Z",
+      "completedAt": "2026-09-23T12:25:50.214Z",
+      "exitCode": 1
+    },
+    {
+      "name": "all-23",
+      "startedAt": "2026-09-23T12:25:50.216Z",
+      "completedAt": "2026-09-23T12:27:05.450Z",
+      "exitCode": 1
+    },
+    {
+      "name": "authenticated-live-flow",
+      "startedAt": "2026-09-23T12:27:05.452Z",
+      "completedAt": "2026-09-23T12:27:15.125Z",
+      "exitCode": 0
+    }
+  ],
+  "completedAt": "2026-09-23T12:27:15.126Z",
+  "sourceHashesAtEnd": {
+    "backend/src/ai/adapter.ts": "6b999250e31e8f84cc2027affaf7831f9916430fafba3f76b70dd698dae2e7ac",
+    "backend/src/ai/prompt.ts": "b3c22e3549c1a1ce54b54d858283483a9f4c94aeb7f1bff7aa4770061714ba51",
+    "backend/src/ai/recommend.ts": "6144f656214cd4378421ab5e963a3bbcf478eddc575a705dac4a5fee362516cb",
+    "backend/src/ai/response-validator.ts": "ddd9cf09a60bff9cc40530d2479080be586d6bc96a0001c092d3f857f40323ca",
+    "backend/src/domain/baseline.ts": "59dcf51dc8b9c79f0e467bec28748c8640280b54eb8acc84142ec458d1fd3815"
+  },
+  "sourceUnchanged": true
+}

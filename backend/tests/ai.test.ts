@@ -44,7 +44,7 @@ function input(): AiRankingInput {
 }
 
 function choice(id = 'first', alternative?: string | null) {
-  return { candidate_id: id, reason_fact_ids: [`${id}:grade`, `${id}:skill_gap`, `${id}:history`],
+  return { candidate_id: id, reason_fact_ids: [`${id}:grade`, `${id}:skill_gap`, `${id}:history`, `${id}:effort`],
     ...(alternative === undefined ? {} : { alternative_candidate_id: alternative }) };
 }
 

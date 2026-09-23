@@ -36,7 +36,7 @@ describe('configuration', () => {
 });
 
 describe('rankWithModel', () => {
-  it.each([['gpt-6-sol', 'low'], ['gpt-6-luna', 'xhigh']])('uses %s with %s reasoning without temperature', async (model, effort) => {
+  it.each([['gpt-6-sol', 'low'], ['gpt-6-luna', 'low']])('uses %s with %s reasoning without temperature', async (model, effort) => {
     vi.stubEnv('LLM_MODEL', model);
     fetchMock.mockResolvedValue(response('{}'));
     await rankWithModel(snapshot);

@@ -183,7 +183,7 @@ describe.skipIf(!databaseUrl)('AI flow: authored fixtures, real PostgreSQL and H
         calls++;
         if (calls === 1) { entered(); await blocked; }
         const candidate = input.candidates[0];
-        const output = { choices: [{ candidate_id: candidate.candidate_id, reason_fact_ids: candidate.facts.filter(fact => ['grade', 'skill_gap', 'history', 'target_requirement'].includes(fact.category)).map(fact => fact.fact_id), alternative_candidate_id: null }] };
+        const output = { choices: [{ candidate_id: candidate.candidate_id, reason_fact_ids: candidate.facts.map(fact => fact.fact_id), alternative_candidate_id: null }] };
         response.writeHead(200, { 'Content-Type': 'application/json' });
         response.end(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(output) } }] }));
       } catch { response.writeHead(500); response.end(); }

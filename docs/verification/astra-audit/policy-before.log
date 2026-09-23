@@ -1,0 +1,73 @@
+
+ RUN  v4.1.11 D:/Projects/baitc_hackathon/orbit-jr/backend
+
+ ❯ tests/team-ai/policy-priority.test.ts (11 tests | 7 failed) 27ms
+     × rejects an omitted better candidate on critical closures despite complete valid evidence 14ms
+     × rejects an omitted better candidate on total weighted target value despite complete valid evidence 2ms
+     × rejects an omitted better candidate on same-event outcomes despite complete valid evidence 1ms
+     × rejects an omitted better candidate on similar-format outcomes despite complete valid evidence 1ms
+     × rejects an omitted better candidate on duration despite complete valid evidence 1ms
+     × rejects an omitted better candidate on continuation despite complete valid evidence 1ms
+     × rejects the whole answer when a later card skips a better remaining candidate 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects an omitted better candidate on critical closures despite complete valid evidence
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects an omitted better candidate on total weighted target value despite complete valid evidence
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects an omitted better candidate on same-event outcomes despite complete valid evidence
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects an omitted better candidate on similar-format outcomes despite complete valid evidence
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects an omitted better candidate on duration despite complete valid evidence
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects an omitted better candidate on continuation despite complete valid evidence
+AssertionError: expected { version: { …(2) }, mode: 'ai', …(3) } to match object { mode: 'rules_fallback', …(1) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "fallback_reason": "invalid_response",
+-   "mode": "rules_fallback",
++   "fallback_reason": null,
++   "mode": "ai",
+  }
+
+ ❯ tests/team-ai/policy-priority.test.ts:66:22
+     64|       const untouched = structuredClone(raw)
+     65|       const result = await recommend(state, { signals })
+     66|       expect(result).toMatchObject({ mode: 'rules_fallback', fallback_…
+       |                      ^
+     67|       expect(result.recommendations[0].candidate_id).toBe('A')
+     68|       expect(raw).toEqual(untouched)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/team-ai/policy-priority.test.ts > hard recommendation policy priorities > rejects the whole answer when a later card skips a better remaining candidate
+AssertionError: expected { version: { …(2) }, mode: 'ai', …(3) } to match object { mode: 'rules_fallback', …(1) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "fallback_reason": "invalid_response",
+-   "mode": "rules_fallback",
++   "fallback_reason": null,
++   "mode": "ai",
+  }
+
+ ❯ tests/team-ai/policy-priority.test.ts:77:20
+     75|     const raw = respond(['A', 'C', 'B'])
+     76|     const result = await recommend(state, { signals })
+     77|     expect(result).toMatchObject({ mode: 'rules_fallback', fallback_re…
+       |                    ^
+     78|     expect(result.recommendations.map(c => c.candidate_id)).toEqual(['…
+     79|     expect(raw.choices.map(c => c.candidate_id)).toEqual(['A', 'C', 'B…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 4 passed (11)
+   Start at  17:19:48
+   Duration  584ms (transform 110ms, setup 0ms, import 250ms, tests 27ms, environment 0ms)
+

@@ -26,10 +26,19 @@ Rules:
   fact) count as ONE category, even though they have different fact_id values.
   For a prerequisite without useful direct skill-gap evidence, cite grade, history
   and target_requirement; the conditional-unlock fact is still required.
+- Every choice must also cite ALL of that candidate's available history and effort
+  facts, even when those factors did not decide its rank. If unlocks_event_ids is
+  nonempty, cite ALL of that candidate's target_requirement facts, including both
+  ordinary target requirements and conditional future benefit. Do not infer fact
+  meaning from its identifier. These citations are required evidence coverage;
+  they do not imply that every listed factor decided the ranking.
 - First prefer more fully closed critical gaps against the selected target.
-- Then compare useful target gain: count only the remaining gap actually closed,
-  with critical skills weighted 2 and other required skills weighted 1. Growth in
-  unrelated skills or above the required level adds no target benefit.
+- Then compare TOTAL useful target value, using ranking_factors.weighted_target_value
+  when supplied. This already includes useful direct gain PLUS discounted conditional
+  future gain. Do NOT sort by weighted_direct_gain as an earlier priority: a smaller
+  direct gain with greater total value outranks a larger direct gain with lower total.
+  Count only the remaining gap actually closed, with critical skills weighted 2 and
+  other required skills weighted 1. Unrelated or above-target growth adds no benefit.
 - Include documented one-step future benefit: useful direct target gain plus
   0.5 times the best single unlocked activity's weighted target gain. Use only
   supplied facts describing that unlocked activity; an unlock ID alone is not a
@@ -76,8 +85,8 @@ Rules:
   Copy identifiers exactly, including similar-looking Unicode characters.
 
 Before returning, check every choice: at least 3 distinct required categories;
-its own history fact whenever history or similar_format_penalty affected ranking;
-its conditional-unlock fact whenever future benefit affected ranking. Multiple
+all its available history and effort facts; all its target_requirement facts
+whenever unlocks_event_ids is nonempty. Multiple
 target_requirement facts never substitute for a missing third category.
 Return only the structured object. Do not write prose, levels or numbers.`
 

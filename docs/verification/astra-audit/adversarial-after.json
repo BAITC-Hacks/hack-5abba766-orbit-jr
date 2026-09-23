@@ -1,0 +1,147 @@
+{
+  "stage": "after-evidence-guard",
+  "providerCalls": 0,
+  "stubbedTransportCalls": 17,
+  "passedAssertions": true,
+  "observations": [
+    {
+      "id": "domain-prerequisite-benefit-missing-decisive-evidence",
+      "mode": "rules_fallback",
+      "acceptedAi": false,
+      "fallbackEvidencePass": true,
+      "reason": "invalid_response"
+    },
+    {
+      "id": "domain-prerequisite-benefit-complete-evidence",
+      "mode": "ai",
+      "preservedCandidate": true
+    },
+    {
+      "id": "domain-similar-format-history-missing-decisive-evidence",
+      "mode": "rules_fallback",
+      "acceptedAi": false,
+      "fallbackEvidencePass": true,
+      "reason": "invalid_response"
+    },
+    {
+      "id": "domain-similar-format-history-complete-evidence",
+      "mode": "ai",
+      "preservedCandidate": true
+    },
+    {
+      "id": "effort-decisive-omission",
+      "mode": "rules_fallback",
+      "fallbackEvidencePass": true,
+      "reason": "invalid_response"
+    },
+    {
+      "id": "injection-wrong-selection-reaches-cards",
+      "mode": "ai",
+      "expectedChoicePass": false,
+      "caveat": "Simulated provider compliance with injection, not evidence the live model obeys it."
+    },
+    {
+      "id": "foreign-candidate-fact",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "invented-fact",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "duplicate-fact",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "invented-candidate",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "model-numeric-claim",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "model-causality-prose",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "too-many-for-limit",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "no-choices",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "duplicate-choice",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "confusable-fact-id",
+      "mode": "rules_fallback",
+      "reason": "invalid_response",
+      "baselinePreserved": true
+    },
+    {
+      "id": "invalid-limit-boundaries",
+      "rejectedBeforeProvider": [
+        0,
+        4,
+        1.5,
+        "NaN"
+      ]
+    },
+    {
+      "id": "one-card-limit-three",
+      "returned": 1,
+      "limit": 3,
+      "orderPass": true,
+      "contract": "Allowed 1..limit; does not test complete top-3."
+    },
+    {
+      "id": "employee-isolation",
+      "candidatesAndSignalsUnchanged": true,
+      "nameAndEmployeeIdOmitted": true
+    },
+    {
+      "id": "untrusted-label-in-fact-text",
+      "includedInPayload": true,
+      "factCategories": [
+        "skill_gap",
+        "target_requirement"
+      ],
+      "caveat": "Input exposure confirmed, exploitation requires live provider; system says data is not instructions."
+    },
+    {
+      "id": "evaluation-scope",
+      "cases": 23,
+      "baselineTop1Pass": 23,
+      "decisiveEvidenceCases": 10,
+      "orderCases": 1
+    },
+    {
+      "id": "self-alternative-sanitized",
+      "accepted": true,
+      "alternative": null,
+      "rankingPreserved": true
+    }
+  ]
+}

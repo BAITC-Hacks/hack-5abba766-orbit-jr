@@ -44,7 +44,7 @@ describe.skipIf(!databaseUrl)('recommendation concurrency on isolated PostgreSQL
         request.signal?.removeEventListener('abort', abort);
         resolve(Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ choices: [{
           candidate_id: candidate.candidate_id,
-          reason_fact_ids: candidate.facts.filter(fact => ['grade', 'skill_gap', 'history'].includes(fact.category)).map(fact => fact.fact_id),
+          reason_fact_ids: candidate.facts.map(fact => fact.fact_id),
           alternative_candidate_id: null,
         }] }) } }] }));
       };
