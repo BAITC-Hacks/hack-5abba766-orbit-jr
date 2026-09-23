@@ -918,7 +918,7 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
 
 test("HR goal action names the employee and writes only to the selected profile", async () => {
   const previousDocument = global.document;
-  global.document = { activeElement: null, querySelector: () => null };
+  global.document = { activeElement: null, documentElement: { style: { overflow: "" } }, querySelector: () => null };
   const profile = {
     ...employee(1, "hr-selected"), full_name: "Анна Петровна Иванова",
     department: "Разработка", role: "Engineer", grade: "Junior",

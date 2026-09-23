@@ -56,6 +56,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
   const settledQ = useDebouncedValue(q);
   const settledDepartment = useDebouncedValue(department);
   const filtersPending = q !== settledQ || department !== settledDepartment;
+  const hasFilters = !!(q.trim() || department.trim() || role);
   const overview = useResource<Overview>(endpoints.hr, onError);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
   const directory = useResource<EmployeeDirectory>(
@@ -138,6 +139,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               data={overview.data}
               open={openProfile}
               showPeople={() => setSection("people")}
+              showImport={() => setSection("import")}
               names={Object.fromEntries(
                 catalog.data?.skills.map((s) => [s.skill_id, s.name]) ?? [],
               )}
@@ -148,6 +150,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
           hidden={section !== "people"}
           className="hr-view people-workspace"
           aria-labelledby="directory-title"
+          aria-busy={directory.loading || filtersPending}
         >
           <div className="section-heading">
             <div>
@@ -159,6 +162,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <label>
               Поиск по имени
               <input
+                type="search"
                 value={q}
                 placeholder="Например, Анна"
                 onChange={(e) => {
@@ -195,7 +199,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <>
               <p className="directory-count" role="status">
                 Найдено сотрудников: <strong>{directory.data.total}</strong>
-                {directory.data.total > 0 && (
+                {directory.data.items.length > 0 && (
                   <>
                     {" "}
                     · показаны {offset + 1}–
@@ -236,17 +240,25 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               {!directory.data.items.length && (
                 <div className="empty-state">
                   <Search size={32} aria-hidden="true" />
-                  <h3>Сотрудники не найдены</h3>
-                  <p>Измените имя, отдел или роль и попробуйте снова.</p>
-                  {(q || department || role) && (
+                  <h3>{directory.data.total > 0 ? "На этой странице нет сотрудников" : hasFilters ? "Сотрудники не найдены" : "В команде пока нет сотрудников"}</h3>
+                  <p>{directory.data.total > 0 ? "Список изменился. Вернитесь к первой странице." : hasFilters ? "Измените имя, отдел или роль и попробуйте снова." : "Добавьте профили через импорт, чтобы видеть команду и планировать обучение."}</p>
+                  {directory.data.total > 0 ? (
+                    <button className="secondary" onClick={() => setOffset(0)}>
+                      На первую страницу
+                    </button>
+                  ) : hasFilters ? (
                     <button className="secondary" onClick={clearFilters}>
                       Сбросить фильтры
+                    </button>
+                  ) : (
+                    <button className="secondary" onClick={() => setSection("import")}>
+                      Перейти к импорту
                     </button>
                   )}
                 </div>
               )}
               {directory.data.total > 24 && (
-                <div className="directory-pagination">
+                <nav className="directory-pagination" aria-label="Страницы сотрудников">
                   <button
                     className="secondary"
                     disabled={!offset || directory.loading || filtersPending}
@@ -269,7 +281,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                   >
                     Далее
                   </button>
-                </div>
+                </nav>
               )}
             </>
           )}

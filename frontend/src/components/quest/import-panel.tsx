@@ -42,6 +42,11 @@ export function ImportPanel({
         return;
       }
       const body = new FormData();
+      const emptyFile = [employees, history].find((file) => file?.size === 0);
+      if (emptyFile) {
+        setError(new Error(`Файл «${emptyFile.name}» пуст. Выберите файл с данными.`));
+        return;
+      }
       if (employees) body.append("employees", employees);
       if (history) body.append("history", history);
       body.append("expected_dataset_revision", String(revision));
@@ -138,7 +143,7 @@ export function ImportPanel({
         />
         Только проверить файлы, без сохранения
       </label>
-      <button className="primary" disabled={busy} onClick={() => void submit()}>
+      <button type="button" className="primary" disabled={busy} aria-busy={busy} onClick={() => void submit()}>
         {busy
           ? "Обработка…"
           : pending
@@ -155,7 +160,7 @@ export function ImportPanel({
         </p>
       )}
       {pending && !busy && (
-        <p>
+        <p role="status">
           Ответ не получен. Файлы и ключ сохранены для безопасной повторной
           попытки.
         </p>

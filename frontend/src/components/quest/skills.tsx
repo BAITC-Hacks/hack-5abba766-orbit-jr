@@ -29,7 +29,7 @@ export function Skills({
           </span>
           <b>{skill.current_level}<em> / {skill.required_level ?? "—"}</em></b>
         </div>
-        <div className="skill-segments" aria-label={`Уровень ${skill.current_level}, требование ${skill.required_level ?? "нет"}`}>
+        <div className="skill-segments" role="img" aria-label={`${names[skill.skill_id] ?? skill.skill_id}: уровень ${skill.current_level} из 5, требование ${skill.required_level ?? "нет"}`}>
           {Array.from({ length: 5 }, (_, i) => (
             <span key={i} className={i < skill.current_level ? "filled" : i < (skill.required_level ?? 0) ? "needed" : ""} />
           ))}

@@ -61,7 +61,7 @@ export function History({
         </div>
       </div>
       {!!rows.length && <div className="activity-distribution" role="img" aria-label={`Всего ${rows.length}: ${Object.entries(statuses).map(([key, label]) => `${label} ${rows.filter(row => row.effective_status === key).length}`).join(", ")}`}>
-        {Object.keys(statuses).map(key => <span key={key} className={`distribution-${key}`} style={{ flexGrow: rows.filter(row => row.effective_status === key).length }} />)}
+        {Object.keys(statuses).filter(key => rows.some(row => row.effective_status === key)).map(key => <span key={key} className={`distribution-${key}`} style={{ flexGrow: rows.filter(row => row.effective_status === key).length }} />)}
       </div>}
       {!!rows.length && (
         <div className="history-filter">
@@ -134,8 +134,10 @@ export function History({
             <div className="activity-card-footer">
               {row.actionable ? (
                 <button
+                  type="button"
                   className="primary"
                   disabled={busy}
+                  aria-label={`${learn && moduleEventIds.includes(row.event_id) ? "Продолжить уроки" : "Отметить выполненной"}: ${row.event_title}`}
                   onClick={() =>
                     learn && moduleEventIds.includes(row.event_id)
                       ? learn(row)
@@ -152,7 +154,7 @@ export function History({
                 </button>
               ) : null}
               <details className="activity-details">
-                <summary>Детали</summary>
+                <summary aria-label={`Детали: ${row.event_title}`}>Детали</summary>
                 {row.completion_origin === "simulation" && <p>Деморезультат не подтверждает посещение.</p>}
                 <p>Источник: {row.source_status ? "Загруженная история" : "Демонстрационный сценарий"}</p>
                 {row.source_status && <p>Исходный статус: {statuses[row.source_status]}</p>}
