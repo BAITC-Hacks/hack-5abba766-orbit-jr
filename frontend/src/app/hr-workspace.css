@@ -1,6 +1,36 @@
 /* HR owns its palette and surfaces; employee workspaces keep their own theme. */
-html[data-theme] .hr-workspace { --blue: #167455; --green: #167455; --comfort-accent: #167455; --hr-soft: #eaf5ee; --hr-accent: #167455; }
-html[data-theme="dark"] .hr-workspace { --blue: #8edcbb; --green: #8edcbb; --comfort-accent: #8edcbb; --hr-soft: #20392e; --hr-accent: #8edcbb; }
+html[data-theme] .hr-workspace { --blue: #1769d2; --green: #1769d2; --comfort-accent: #1769d2; --hr-soft: #edf3fb; --hr-accent: #1769d2; }
+html[data-theme="dark"] .hr-workspace { --blue: #72aaff; --green: #72aaff; --comfort-accent: #72aaff; --hr-soft: #202e44; --hr-accent: #72aaff; }
+/* Shared profile, import and status components also use the HR blue palette. */
+html[data-theme] .hr-profile { --hr-accent: #1769d2; --hr-soft: #edf3fb; }
+html[data-theme="dark"] .hr-profile { --hr-accent: #72aaff; --hr-soft: #202e44; }
+html[data-theme] :is(.hr-workspace, .hr-profile) :is(.text-button, .analytics-details > summary, .hr-tip, .hr-tip svg) { color: var(--hr-accent); }
+html[data-theme] .hr-workspace .hr-sections button.active { border-color: var(--hr-accent); }
+html[data-theme] :is(.hr-workspace, .hr-profile) :is(.status-badge.completed, .status-badge.in_progress, .feedback.success) { color: var(--hr-accent); background: var(--hr-soft); border-color: var(--hr-accent); }
+html[data-theme] .hr-profile .activity-distribution .distribution-completed { background: var(--hr-accent); }
+html[data-theme] .hr-profile .activity-art { --art-bg: var(--hr-soft); --art-main: #72aaff; --art-shadow: #3565a5; }
+html[data-theme] .hr-profile :is(.art-label, .art-arrow) { color: var(--ink); background: var(--surface); border-color: var(--line); }
+html[data-theme] .hr-profile .recommendation-rank { color: var(--ink); }
+html[data-theme] .hr-profile .verified-facts { color: var(--muted); }
+html[data-theme] .hr-profile .outline-tag { border-color: var(--line); }
+html[data-theme] .hr-profile .activity-card-top::before { border-color: var(--line); box-shadow: none; }
+html[data-theme] .hr-workspace button { box-shadow: none; }
+html[data-theme] .hr-workspace input[type="file"] { border-color: var(--line); }
+html[data-theme] :is(.hr-workspace, .hr-profile) .secondary,
+html[data-theme] body:has(.hr-workspace) .nav-logout { background: var(--surface-raised); border-color: var(--line); color: var(--ink); }
+html[data-theme] :is(.hr-workspace, .hr-profile) .muted { color: var(--muted); }
+html[data-theme] .hr-profile :is(.profile-context p, .skill-row small, .activity-date, .activity-details, .activity-details p, .activity-progress > span, .course-body p, .outline-tag, .section-description) { color: var(--muted); }
+html[data-theme] .hr-profile .activity-progress strong { color: var(--ink); }
+html[data-theme] .hr-profile progress { accent-color: var(--hr-accent); background: var(--surface-raised); }
+html[data-theme] .hr-profile progress::-webkit-progress-bar { background: var(--surface-raised); }
+html[data-theme] .hr-profile progress::-webkit-progress-value { background: var(--hr-accent); }
+html[data-theme] .hr-profile progress::-moz-progress-bar { background: var(--hr-accent); }
+html[data-theme] .hr-workspace :is(.gap-item strong, .attention-row strong) { color: var(--ink); }
+html[data-theme] .hr-workspace :is(.gap-item span, .count-badge) { color: var(--hr-accent); background: var(--hr-soft); }
+html[data-theme] .hr-workspace .gap-item progress,
+html[data-theme] .hr-workspace .gap-item progress::-webkit-progress-bar { background: var(--surface-raised); }
+html[data-theme] .hr-workspace .attention-row { border-color: var(--line); }
+html[data-theme] .hr-workspace :is(.attention-row small, .attention-row > span:nth-child(2)) { color: var(--muted); }
 html[data-theme] .hr-workspace [hidden] { display: none !important; }
 html[data-theme] .hr-workspace .hr-heading { padding: 8px 0 24px; margin: 0; align-items: center; min-height: 0; }
 html[data-theme] .hr-workspace .hr-heading h1 { font-size: clamp(25px, 3vw, 34px); letter-spacing: -1px; }
@@ -11,25 +41,25 @@ html[data-theme] .hr-workspace .hr-sections button { min-height: 44px; border-ra
 html[data-theme] .hr-workspace .hr-sections button.active { background: var(--hr-soft); color: var(--hr-accent); }
 html[data-theme] .hr-workspace .hr-sections button > svg { width: 18px; height: 18px; flex-shrink: 0; }
 html[data-theme] .hr-workspace .hr-view { display: grid; gap: 20px; }
-html[data-theme] .hr-workspace .hr-command-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .45fr); gap: 32px; align-items: center; padding: clamp(24px, 3vw, 38px); color: #f4fff8; border: 1px solid #396f55; border-radius: 22px; background: radial-gradient(ellipse at 100% 0, #3e7a5340, transparent 65%), #123d2e; }
-html[data-theme] .hr-workspace .hr-command-copy .eyebrow { display: block; color: #b8e4c8; font-size: 10px; letter-spacing: .15em; margin-bottom: 12px; }
-html[data-theme] .hr-workspace .hr-command-copy h2 { color: #f4fff8; font-size: clamp(23px, 2.8vw, 34px); line-height: 1.18; letter-spacing: -.8px; max-width: 630px; margin: 0 0 14px; }
-html[data-theme] .hr-workspace .hr-command-copy p { color: #c0d8c9; line-height: 1.7; font-size: 13px; max-width: 600px; margin: 0; }
+html[data-theme] .hr-workspace .hr-command-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .45fr); gap: 32px; align-items: center; padding: clamp(24px, 3vw, 38px); color: #f4f8ff; border: 1px solid #395f94; border-radius: 22px; background: radial-gradient(ellipse at 100% 0, #3e6cba40, transparent 65%), #142e53; }
+html[data-theme] .hr-workspace .hr-command-copy .eyebrow { display: block; color: #b8d3fa; font-size: 10px; letter-spacing: .15em; margin-bottom: 12px; }
+html[data-theme] .hr-workspace .hr-command-copy h2 { color: #f4f8ff; font-size: clamp(23px, 2.8vw, 34px); line-height: 1.18; letter-spacing: -.8px; max-width: 630px; margin: 0 0 14px; }
+html[data-theme] .hr-workspace .hr-command-copy p { color: #c0d1eb; line-height: 1.7; font-size: 13px; max-width: 600px; margin: 0; }
 html[data-theme] .hr-workspace .hr-command-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 html[data-theme] .hr-workspace .hr-command-actions > :is(a, button) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font-size: 12px; line-height: 1.5; }
-html[data-theme] .hr-workspace .hr-command-actions .primary { min-height: 42px; padding: 11px 17px; color: #173b2b; background: #d4edb3; border: 1px solid #d4edb3; border-radius: 9px; box-shadow: none; }
-html[data-theme] .hr-workspace .hr-command-actions .secondary { min-height: 42px; padding: 11px 17px; color: #f0fff4; background: #ffffff0a; border: 1px solid #a8d0b757; border-radius: 9px; }
+html[data-theme] .hr-workspace .hr-command-actions .primary { min-height: 42px; padding: 11px 17px; color: #132e52; background: #bed9ff; border: 1px solid #bed9ff; border-radius: 9px; box-shadow: none; }
+html[data-theme] .hr-workspace .hr-command-actions .secondary { min-height: 42px; padding: 11px 17px; color: #f0f6ff; background: #ffffff0a; border: 1px solid #a8c2eb57; border-radius: 9px; }
 html[data-theme] .hr-workspace .hr-command-actions button:hover { filter: brightness(1.09); }
-html[data-theme] .hr-workspace .hr-goal-coverage { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 24px; border: 1px solid #b5dfc42b; border-radius: 16px; background: #ffffff08; }
-html[data-theme] .hr-workspace .hr-goal-coverage > span { color: #d2e8d9; font-size: 12px; }
-html[data-theme] .hr-workspace .hr-goal-coverage strong { color: #d4edb3; font-size: clamp(42px, 5vw, 66px); line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
-html[data-theme] .hr-workspace .hr-goal-coverage small { color: #bad4c3; font-size: 11px; line-height: 1.6; }
-html[data-theme] .hr-workspace .hr-goal-coverage > p { margin: 0; color: #d2e8d9; font-size: 12px; line-height: 1.6; }
-html[data-theme] .hr-workspace .hr-goal-coverage > svg { color: #d4edb3; }
-html[data-theme] .hr-workspace .hr-goal-coverage progress { appearance: none; width: 100%; height: 6px; border: 0; border-radius: 10px; overflow: hidden; background: #ffffff20; accent-color: #d4edb3; }
+html[data-theme] .hr-workspace .hr-goal-coverage { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 24px; border: 1px solid #b5cfff2b; border-radius: 16px; background: #ffffff08; }
+html[data-theme] .hr-workspace .hr-goal-coverage > span { color: #d2e2fa; font-size: 12px; }
+html[data-theme] .hr-workspace .hr-goal-coverage strong { color: #bed9ff; font-size: clamp(42px, 5vw, 66px); line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+html[data-theme] .hr-workspace .hr-goal-coverage small { color: #bacde9; font-size: 11px; line-height: 1.6; }
+html[data-theme] .hr-workspace .hr-goal-coverage > p { margin: 0; color: #d2e2fa; font-size: 12px; line-height: 1.6; }
+html[data-theme] .hr-workspace .hr-goal-coverage > svg { color: #bed9ff; }
+html[data-theme] .hr-workspace .hr-goal-coverage progress { appearance: none; width: 100%; height: 6px; border: 0; border-radius: 10px; overflow: hidden; background: #ffffff20; accent-color: #bed9ff; }
 html[data-theme] .hr-workspace .hr-goal-coverage progress::-webkit-progress-bar { background: #ffffff20; }
-html[data-theme] .hr-workspace .hr-goal-coverage progress::-webkit-progress-value { background: #d4edb3; border-radius: 10px; }
-html[data-theme] .hr-workspace .hr-goal-coverage progress::-moz-progress-bar { background: #d4edb3; border-radius: 10px; }
+html[data-theme] .hr-workspace .hr-goal-coverage progress::-webkit-progress-value { background: #bed9ff; border-radius: 10px; }
+html[data-theme] .hr-workspace .hr-goal-coverage progress::-moz-progress-bar { background: #bed9ff; border-radius: 10px; }
 html[data-theme] .hr-workspace .hr-summary-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 0; }
 /* Explicitly supersede the legacy global transparent-surface reset. */
 html[data-theme] .hr-workspace .hr-summary-cards > div { position: relative; display: flex; flex-direction: column; align-items: flex-start; padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface) !important; }
@@ -89,7 +119,7 @@ html[data-theme] .hr-workspace .directory-count { margin: 0; font-size: 12px; co
 html[data-theme] .hr-workspace .employee-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 html[data-theme] .hr-workspace .employee-card { display: flex; align-items: flex-start; gap: 14px; min-width: 0; padding: 22px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface) !important; text-align: left; transition: border-color .15s ease, background .15s ease; }
 html[data-theme] .hr-workspace .employee-card:hover { border-color: var(--hr-accent); background: color-mix(in srgb, var(--hr-soft) 40%, var(--surface)) !important; transform: none; box-shadow: none; }
-html[data-theme] .hr-workspace .employee-card::after { display: none; }
+html[data-theme] .hr-workspace .employee-card::after { display: none; border-color: transparent; box-shadow: none; }
 html[data-theme] .hr-workspace .employee-avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; color: var(--hr-accent); background: var(--hr-soft); font-size: 13px; }
 html[data-theme] .hr-workspace .employee-card-body { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 html[data-theme] .hr-workspace .employee-card-body strong { color: var(--ink); font-size: 13px; line-height: 1.55; }
@@ -103,7 +133,7 @@ html[data-theme] .hr-workspace .import-format-help { border: 1px solid var(--lin
 html[data-theme] .hr-workspace .import-format-help summary { color: var(--ink); font-weight: 550; }
 html[data-theme] .hr-workspace .import-file-tile { padding: 24px; border: 1px dashed color-mix(in srgb, var(--hr-accent) 55%, var(--line)); border-radius: 14px; background: var(--hr-soft); }
 html[data-theme] .hr-workspace :is(button, a, input, summary, [tabindex]):focus-visible { outline: 3px solid var(--hr-accent); outline-offset: 4px; }
-html[data-theme] .hr-workspace .hr-command-hero :is(button, a):focus-visible { outline-color: #e6f4b9; }
+html[data-theme] .hr-workspace .hr-command-hero :is(button, a):focus-visible { outline-color: #deebff; }
 @media (max-width: 1150px) {
   html[data-theme] .hr-workspace .employee-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   html[data-theme] .hr-workspace .directory-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
