@@ -6,6 +6,7 @@ Hackathon team repository for orbit.jr
 Interactive Next.js / React / TypeScript UI prototype. Requires Node.js 22 LTS.
 
 ```bash
+cd frontend
 npm ci
 npm run dev
 ```
@@ -22,5 +23,9 @@ activity history, simulated completions, HR preview and local JSON preflight.
 Uses explicitly labeled demo fixtures; backend authentication, AI and real import
 are not connected yet. No API keys or original dataset are included.
 
-See [frontend integration notes](docs/FRONTEND.md) and
+Frontend source, dependencies and configuration are contained in `frontend/`.
+Run the commands above from that directory. The root `docs/` directory contains
+shared project documentation.
+
+See [frontend integration notes](frontend/README.md) and
 [project architecture](docs/ARCHITECTURE.md).
