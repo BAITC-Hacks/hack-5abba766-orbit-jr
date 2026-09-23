@@ -21,19 +21,21 @@ html[data-theme] .learning-layout > * { min-width: 0; }
 html[data-theme] .learning-demo-label { background: var(--surface-raised); color: var(--muted); border-color: var(--line); }
 html[data-theme] .activity-card-footer { flex-wrap: wrap; }
 html[data-theme] .catalog-grid .course-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
   max-height: var(--catalog-card-height, 320px);
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
-html[data-theme] .catalog-grid .course-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+html[data-theme] .catalog-grid .course-body:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
 html[data-theme] .catalog-grid .catalog-row-icon { display: none; }
-html[data-theme] .catalog-grid .course-body { padding: 0; }
+html[data-theme] .catalog-grid .course-body { padding: 0; flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+html[data-theme] .catalog-grid .course-body > * { flex-shrink: 0; }
+html[data-theme] .catalog-card-footer { flex: 0 0 auto; padding-top: 12px; }
+html[data-theme] .catalog-card-footer .text-button { margin: 0; padding: 4px 0; text-align: left; }
 html[data-theme] .catalog-grid .course-body > .outline-tag { align-self: flex-start; }
 html[data-theme] .profile-summary-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; }
 html[data-theme] :is(.profile-info-card, .profile-goal-card) { padding: 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }

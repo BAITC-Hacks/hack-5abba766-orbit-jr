@@ -359,9 +359,9 @@ export function Employee({
               </div>
               <div className="course-grid catalog-grid">
                 {filteredEvents.map((e) => (
-                    <article className="course-card" key={e.event_id} tabIndex={0} aria-label={e.title}>
+                    <article className="course-card" key={e.event_id} aria-label={e.title}>
                       <span className="catalog-row-icon" aria-hidden="true"><BookOpen size={22} /></span>
-                      <div className="course-body">
+                      <div className="course-body" tabIndex={0} role="region" aria-label={`О программе: ${e.title}`}>
                         <span className="outline-tag">
                           {eventTypes[e.type]}
                         </span>
@@ -372,10 +372,10 @@ export function Employee({
                           <summary>{[...e.upcoming_sessions].sort()[0]}{e.upcoming_sessions.length > 1 && <span> +{e.upcoming_sessions.length - 1} даты</span>}</summary>
                           <div className="compact-meta">{[...e.upcoming_sessions].sort().map(date => <span key={date}>{date}</span>)}</div>
                         </details> : e.format !== "self_paced" && <p>Даты уточняются</p>}
-                        {moduleFor(e.event_id) && (readOnly
-                          ? <span className="outline-tag">Есть демомодуль</span>
-                          : <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>)}
                       </div>
+                      {moduleFor(e.event_id) && <div className="catalog-card-footer">{readOnly
+                        ? <span className="outline-tag">Есть демомодуль</span>
+                        : <button className="text-button" disabled={disabled} onClick={() => openLearning(moduleFor(e.event_id)!.id, e.event_id)}>Открыть демомодуль →</button>}</div>}
                     </article>
                   ))}
               </div>
