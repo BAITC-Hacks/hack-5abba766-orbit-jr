@@ -45,11 +45,11 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
     {state.loading && <Loading>Открываем материал и сохранённый прогресс…</Loading>}
     {course && <>
       <header className="learning-heading">
-        <div><span className="eyebrow">НЕБОЛЬШАЯ ПРАКТИКА. ПОНЯТНЫЙ РЕЗУЛЬТАТ.</span><h1>{course.title}</h1><p>{course.summary}</p></div>
+        <div><h1>{course.title}</h1><details className="compact-details"><summary>О модуле</summary><p>{course.summary}</p></details></div>
         <div className="learning-heading-icon" aria-hidden="true"><GraduationCap size={44} /></div>
       </header>
       <div className="learning-meta"><span><Clock3 size={15} /> ≈ {course.estimated_minutes} минут</span><span><BookOpen size={15} /> {course.lesson_count} урока</span><span>{course.question_count} вопроса в конце</span></div>
-      <p className="learning-context">Короткий практический фрагмент «{event.title}». Полная активность в каталоге — {event.duration_hours} ч. Здесь вы проходите демомодуль и наблюдаете его расчётный эффект на карьерную цель.</p>
+      <div className="compact-meta learning-context"><span>Демофрагмент курса</span><span>Полный курс: {event.duration_hours} ч.</span><span>Расчётный результат</span></div>
     </>}
     {!!state.error && <div className="learning-error" role="alert">
       <strong>{state.needsRefresh ? "Профиль изменился во время обучения" : "Не удалось завершить действие"}</strong>
@@ -70,7 +70,7 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
           })}
           <li><button className={isQuiz && !passed ? "active" : passed ? "done" : ""} disabled={!attempt || completed !== course.lesson_count || state.busy || state.pending} onClick={() => move(course.lesson_count)}><span className="learning-step-number">{passed ? <Check size={16} /> : <GraduationCap size={16} />}</span><span>Проверка понимания</span></button></li>
         </ol>
-        <p className="learning-save-note">{attempt ? "Завершённые уроки сохраняются. Можно закрыть модуль и продолжить позже." : "Материал доступен для знакомства. Для учёта прогресса требуется доступ к активности."}</p>
+        <p className="learning-save-note">{attempt ? "Прогресс сохранён · продолжите позже." : "Режим ознакомления · без сохранения прогресса."}</p>
       </aside>
       <div className="learning-reader" id="learning-content">
         {passed ? <section className="learning-celebration" aria-live="polite">
@@ -91,7 +91,7 @@ export function LearningPlayer({ employee, moduleId, event, target, names, onClo
             }}>{state.busy ? "Сохраняем…" : index === course.lesson_count - 1 ? "Перейти к проверке" : "Изучено, следующий урок"}<ArrowRight size={16} /></button>
           </div>
         </article> : <section className="learning-quiz">
-          <span className="eyebrow">ПРИМЕНИТЬ, А НЕ ПРОСТО ПРОЧИТАТЬ</span><h2>Проверим понимание</h2><p>Ответьте на все вопросы. Для завершения нужны все верные ответы; после ошибки можно вернуться к материалу и попробовать снова.</p>
+          <h2>Проверим понимание</h2><div className="compact-meta"><span>Нужны все верные ответы</span><span>Можно повторить</span></div>
           {state.result && !state.result.completion && <div className="learning-score" role="status">Верно {state.result.feedback.filter(item => item.correct).length} из {course.question_count}. Разберите пояснения и попробуйте ещё раз. Навыки пока не изменились.</div>}
           <form onSubmit={e => { e.preventDefault(); void state.submitQuiz(); }}>
             {course.questions.map((question, q) => {

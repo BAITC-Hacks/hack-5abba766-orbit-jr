@@ -5,10 +5,12 @@ export function Navigation({
   session,
   logout,
   busy,
+  profileActive = false,
 }: {
   session: SessionView;
   logout: () => void;
   busy: boolean;
+  profileActive?: boolean;
 }) {
   const home = session.role === "hr" ? "/hr" : "/employee";
   return (
@@ -22,7 +24,7 @@ export function Navigation({
           <Brand />
         </a>
         <nav aria-label="Главная навигация">
-          <a href={home} aria-current="page">
+          <a href={home} aria-current={!profileActive ? "page" : undefined}>
             {session.role === "hr" ? (
               <LayoutDashboard size={17} />
             ) : (
@@ -32,9 +34,11 @@ export function Navigation({
           </a>
         </nav>
         <div className="account-menu">
-          <span className="account-avatar" aria-hidden="true">
+          {session.role === "employee" ? <a className="account-avatar" href="/employee/profile" aria-label="Мой профиль" aria-current={profileActive ? "page" : undefined}>
             {session.display_name.slice(0, 1)}
-          </span>
+          </a> : <span className="account-avatar" aria-hidden="true">
+            {session.display_name.slice(0, 1)}
+          </span>}
           <span className="account-name" title={session.display_name}>
             {session.display_name}
             <small>{session.role === "hr" ? "HR-партнёр" : "Сотрудник"}</small>

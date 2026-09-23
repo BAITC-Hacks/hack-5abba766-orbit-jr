@@ -125,6 +125,7 @@ test('HR opens the actual employee profile with read-only permissions', async ()
     assert.equal(employeeProps.id, profile.employee_id);
     assert.equal(employeeProps.viewer, 'hr');
     assert.equal(employeeProps.readOnly, true);
+    assert.equal(employeeProps.initialTab, 'profile');
   } finally {
     if (root) await close(root);
     if (previousDocument === undefined) delete global.document;
@@ -139,8 +140,6 @@ test('HR sees the goal and recommendation evidence, including module cards, with
     assert.match(text(root.toJSON()), /Middle Engineer/);
     assert.match(text(root.toJSON()), /Проверенное объяснение рекомендации/);
     assertNoMutatingActions(root);
-    await click(button(root, 'Обновить профиль'));
-    assert.deepEqual(scenario.calls, [['refresh']]);
     for (const title of events.map(event => event.title)) {
       // The career journey and the recommendation card both open inspectable details.
       await click(button(root, title));
@@ -156,7 +155,7 @@ test('HR sees the goal and recommendation evidence, including module cards, with
       assertNoMutatingActions(root);
       await click(button(root, 'Закрыть окно'));
     }
-    assert.deepEqual(scenario.calls, [['refresh']]);
+    assert.deepEqual(scenario.calls, []);
   } finally { await close(root); }
 });
 
@@ -218,7 +217,23 @@ for (const readOnly of [undefined, false]) test(`HR viewer cannot opt into emplo
     await click(button(root, 'Курс анализа'));
     assert.equal(root.root.findByProps({ role: 'dialog' }).props['aria-label'], 'Курс анализа');
     assertNoMutatingActions(root);
+    await click(button(root, 'Закрыть окно'));
+    await click(button(root, 'Профиль'));
+    assert.match(text(root.toJSON()), /Направление развития/);
+    assertNoMutatingActions(root);
     assert.deepEqual(scenario.calls, []);
+  } finally { await close(root); }
+});
+
+test('the new profile entry point lets an employee edit their own goal', async () => {
+  const scenario = fixture();
+  const root = await scenario.mount({ initialTab: 'profile' });
+  try {
+    assert.match(text(root.toJSON()), /Направление развития/);
+    await click(button(root, 'Изменить цель'));
+    await act(async () => root.root.findByProps({ label: 'Профессия и грейд' }).props.onChange('1'));
+    await act(async () => root.root.findByType('form').props.onSubmit({ preventDefault: noop }));
+    assert.deepEqual(scenario.calls, [['goal', { target_role: 'Engineer', target_grade: 'Senior' }]]);
   } finally { await close(root); }
 });
 
@@ -227,7 +242,7 @@ test('an employee can still choose and clear their own goal', async () => {
   const root = await scenario.mount();
   try {
     await click(button(root, 'Изменить цель'));
-    await act(async () => root.root.findByType('select').props.onChange({ target: { value: '1' } }));
+    await act(async () => root.root.findByProps({ label: 'Профессия и грейд' }).props.onChange('1'));
     await act(async () => root.root.findByType('form').props.onSubmit({ preventDefault: noop }));
     assert.deepEqual(scenario.calls, [['goal', { target_role: 'Engineer', target_grade: 'Senior' }]]);
     await click(button(root, 'Изменить цель'));

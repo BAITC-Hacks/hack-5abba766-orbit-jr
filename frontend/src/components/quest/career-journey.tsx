@@ -48,8 +48,7 @@ export function CareerJourney({
       <div className="cq-journey-heading">
         <div>
           <span className="cq-kicker"><Route size={14} aria-hidden="true" /> {readOnly ? "КАРЬЕРНЫЙ ПУТЬ СОТРУДНИКА" : "ВАШ КАРЬЕРНЫЙ ПУТЬ"}</span>
-          <h2>{readOnly ? "От текущих навыков — к цели сотрудника." : "От текущих навыков — к вашей цели."}</h2>
-          <p>{readOnly ? "Здесь можно изучить варианты следующего шага. Выбор и прохождение остаются за сотрудником." : "Выберите один следующий шаг. После завершения путь обновится."}</p>
+          <h2>Карьерный путь</h2>
         </div>
         <span className="cq-goal-source">{goalSources[employee.goal.source]}</span>
       </div>
@@ -62,7 +61,7 @@ export function CareerJourney({
           <p className="cq-stage-role">{employee.role}</p>
           <div className="cq-current-coverage">
             <strong>{coverage === null ? "—" : `${coverage}%`}</strong>
-            <span>{coverage === null ? readOnly ? "Цель для сравнения пока не выбрана" : "Выберите цель для сравнения" : "требований цели покрыто навыками"}</span>
+            <span>{coverage === null ? readOnly ? "Цель пока не выбрана" : "Выберите цель для сравнения" : "соответствие цели"}</span>
           </div>
           {employee.has_simulated_progress && <span className="cq-inline-note">С учётом демо-завершений</span>}
         </li>
@@ -97,7 +96,7 @@ export function CareerJourney({
           <h3>{readOnly ? "Варианты для сотрудника" : "Ваш выбор"}</h3>
           {currentRecommendations?.recommendations.length ? (
             <>
-              <p className="cq-choice-note">Один из вариантов, подходящих сейчас.</p>
+
               <ul className="cq-next-options">
                 {currentRecommendations.recommendations.map((card) => (
                   <li key={card.candidate_id}>
@@ -105,9 +104,9 @@ export function CareerJourney({
                       <span>{card.title}</span><ArrowUpRight size={15} aria-hidden="true" />
                     </button>
                     {card.relevance === "prerequisite" ? (
-                      <p>Подготовительный шаг{card.unlocks_event_ids.length ? ` к ${card.unlocks_event_ids.map((id) => eventNames[id] ?? id).join(", ")}` : ""}. Доступ зависит от условий участия после завершения.</p>
+                      <details className="compact-details"><summary>Подготовительный шаг</summary><p>{card.unlocks_event_ids.length ? `Откроет: ${card.unlocks_event_ids.map((id) => eventNames[id] ?? id).join(", ")}. ` : ""}Доступ зависит от условий участия.</p></details>
                     ) : card.goal_coverage_delta > 0 ? (
-                      <p>Ожидаемый прогресс: +{new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(card.goal_coverage_delta * 100)} п. п. к цели</p>
+                      <p>+{new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(card.goal_coverage_delta * 100)} п. п. к цели</p>
                     ) : null}
                   </li>
                 ))}
@@ -123,7 +122,7 @@ export function CareerJourney({
           <span className="cq-stage-label">ЦЕЛЬ</span>
           <h3>{target?.target_grade ?? (readOnly ? "Направление сотрудника" : "Ваше направление")}</h3>
           <p className="cq-stage-role">{target?.target_role ?? "Роль и грейд пока не выбраны"}</p>
-          {target && <p className="cq-target-note">Ориентир — соответствие требованиям роли. Решение о повышении принимается отдельно.</p>}
+          {target && <p className="cq-target-note">Соответствие роли ≠ повышение.</p>}
         </li>
       </ol>
 

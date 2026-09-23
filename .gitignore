@@ -9,3 +9,6 @@ data/source/*
 coverage/
 test-results/
 playwright-report/
+
+# Local project references and supplied datasets. Do not publish.
+/docs/

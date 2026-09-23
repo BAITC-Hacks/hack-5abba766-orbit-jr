@@ -117,7 +117,7 @@ docs/               описание устройства и сохранённ�
 compose.yaml        приложение и PostgreSQL
 ```
 
-Подробности: [архитектура](docs/ARCHITECTURE.md), [серверные правила и API](docs/BACKEND.md).
+Подробности: [серверные компоненты, правила и API](docs/BACKEND.md).
 
 ## Установка и запуск
 
@@ -342,7 +342,6 @@ npm run verify:ai-flow -- --live
 ## Документация
 
 - [Пользовательская механика и значение показателей](docs/PRODUCT_GUIDE.md)
-- [Архитектура](docs/ARCHITECTURE.md)
 - [Бэкенд: модули и разработка](backend/README.md)
 - [Доменные правила и API](docs/BACKEND.md)
 - [AI, конфигурация и evaluation](docs/AI.md)

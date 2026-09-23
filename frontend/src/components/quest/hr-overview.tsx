@@ -1,4 +1,5 @@
 "use client";
+import { CatalogSelect } from "./catalog-select";
 import { GoalDonut } from "./growth-insights";
 import { useState } from "react";
 import { ArrowUpRight, Target, Users, Sparkles } from "lucide-react";
@@ -63,7 +64,7 @@ export function HrOverview({
           </span>
           <p>Без карьерной цели</p>
           <strong>{missing}</strong>
-          <span>Помогите выбрать направление развития</span>
+
         </div>
         <div>
           <span className="metric-icon">
@@ -71,7 +72,7 @@ export function HrOverview({
           </span>
           <p>Смоделировано завершений</p>
           <strong>{data.participation.simulated_completions}</strong>
-          <span>Сценарии развития, без подтверждения посещения</span>
+          <span>Без подтверждения посещения</span>
         </div>
       </section>
       <div className="hr-overview-grid">
@@ -79,8 +80,7 @@ export function HrOverview({
           <span className="eyebrow">ПЛАНИРОВАНИЕ ОБУЧЕНИЯ</span>
           <h2>Какие навыки развивать</h2>
           <p className="section-description">
-            Навыки, которых не хватает до карьерных целей. Сначала — те, где
-            разрыв есть у большего числа людей.
+            По числу сотрудников с разрывом до цели.
           </p>
           <div className="gap-list">
             {gaps.slice(0, expanded ? undefined : 5).map((g) => (
@@ -96,7 +96,7 @@ export function HrOverview({
                   value={g.people}
                   aria-label={"Сотрудники с разрывом: " + (names[g.id] ?? g.id)}
                 />
-                <small>Из сотрудников, которым этот навык нужен для цели</small>
+
               </div>
             ))}
           </div>
@@ -144,15 +144,12 @@ export function HrOverview({
         <section className="hr-surface">
           <span className="eyebrow">НАПРАВЛЕНИЯ РОСТА</span>
           <h2>Карьерные цели</h2>
-          <p className="section-description">
-            Откуда взялась цель каждого сотрудника.
-          </p>
+
           <GoalDonut data={data} />
           <div className="hr-tip">
             <Target size={22} aria-hidden="true" />
             <p>
-              Откройте профиль сотрудника, чтобы уточнить цель и посмотреть
-              подходящие активности.
+Цель и обучение — в профиле сотрудника.
             </p>
           </div>
         </section>
@@ -163,31 +160,13 @@ export function HrOverview({
           <div>
             <span className="eyebrow">РАБОТА С ТРАЕКТОРИЯМИ</span>
             <h2>Сотрудники без рекомендации</h2>
-            <p className="section-description">
-              Причины разные: от отсутствия цели до её достижения. Откройте
-              профиль, чтобы разобраться.
-            </p>
+
           </div>
           <span className="count-badge">{data.no_next_step.length} чел.</span>
         </div>
         {!!data.no_next_step.length && (
-          <label className="field-label reason-filter">
-            Причина
-            <select
-              value={reason}
-              onChange={(e) => {
-                setReason(e.target.value);
-                setAllPeople(false);
-              }}
-            >
-              <option value="all">Все причины</option>
-              {Object.entries(hrEmptyReasons).map(([key, label]) => (
-                <option value={key} key={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <CatalogSelect label="Причина" value={reason} onChange={(value) => { setReason(value); setAllPeople(false); }}
+            options={[["all", "Все причины"], ...Object.entries(hrEmptyReasons)]} />
         )}
         <div className="attention-list">
           {available.slice(0, allPeople ? undefined : 8).map((p) => (
@@ -229,8 +208,7 @@ export function HrOverview({
         <span className="eyebrow">ИСТОРИЯ ОБУЧЕНИЯ</span>
         <h2>Участие в активностях</h2>
         <p className="section-description">
-          Исходная история показана отдельно от моделирования. Числа относятся к
-          участиям, а не к уникальным сотрудникам.
+Количество участий · исходная история.
         </p>
         <div className="participation-grid">
           {Object.entries(statuses).map(([key, label]) => (

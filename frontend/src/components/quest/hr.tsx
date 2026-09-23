@@ -1,4 +1,5 @@
 "use client";
+import { CatalogSelect } from "./catalog-select";
 import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
@@ -106,10 +107,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <h1 ref={heading} tabIndex={-1}>
               Развитие команды
             </h1>
-            <p>
-              Находите потребности в обучении и помогайте сотрудникам сделать
-              следующий шаг.
-            </p>
+
           </div>
           <span className="workspace-label">
             <Users size={16} aria-hidden="true" />
@@ -154,10 +152,6 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
           <div className="section-heading">
             <div>
               <h2 id="directory-title">Сотрудники</h2>
-              <p className="section-description">
-                Откройте профиль, чтобы посмотреть навыки, карьерную цель,
-                рекомендации и историю обучения.
-              </p>
             </div>
           </div>
           <div className="toolbar directory-filters">
@@ -183,25 +177,8 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                 }}
               />
             </label>
-            <label>
-              Роль
-              <select
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setOffset(0);
-                }}
-              >
-                <option value="">Все роли</option>
-                {Array.from(
-                  new Set(catalog.data?.role_profiles.map((p) => p.role)),
-                )
-                  .sort()
-                  .map((r) => (
-                    <option key={r}>{r}</option>
-                  ))}
-              </select>
-            </label>
+            <CatalogSelect label="Роль" value={role} onChange={(value) => { setRole(value); setOffset(0); }}
+              options={[["", "Все роли"], ...Array.from(new Set(catalog.data?.role_profiles.map((p) => p.role))).sort().map((r): [string, string] => [r, r])]} />
             {(q || department || role) && (
               <button className="secondary" onClick={clearFilters}>
                 Сбросить
@@ -347,13 +324,13 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               Вернуться {section === "people" ? "к сотрудникам" : "к обзору"}
             </button>
             <p>
-              Вы просматриваете профиль как HR. Цель выбирает и обучение
-              проходит сам сотрудник.
+              Просмотр HR. Цель и обучение выбирает сотрудник.
             </p>
           </div>
           <Employee
             viewer="hr"
             readOnly
+            initialTab="profile"
             key={selected + "-" + revision}
             id={selected}
             onError={onError}

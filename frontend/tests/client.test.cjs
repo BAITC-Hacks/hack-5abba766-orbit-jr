@@ -451,7 +451,7 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
   };
   for (const [mode, expected] of [
     ["ai", "AI-подборка"],
-    ["rules_fallback", "Резервная подборка по правилам"],
+    ["rules_fallback", "Подборка по правилам"],
     ["no_candidates", "Выберите направление развития"],
   ]) {
     let root;
@@ -734,7 +734,7 @@ test("a skill outside an active goal is not labeled as missing career goal", asy
   });
   try {
     const text = JSON.stringify(root.toJSON());
-    assert.match(text, /Не входит в требования выбранной цели/);
+    assert.match(text, /Вне цели/);
     assert.doesNotMatch(text, /[Цц]ель не выбрана/);
   } finally {
     await unmount(root);
@@ -903,8 +903,8 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
     assert.equal(bar.props.max, 5);
     await act(async () =>
       root.root
-        .findByType("select")
-        .props.onChange({ target: { value: "GOAL_REACHED" } }),
+        .findByProps({ label: "Причина" })
+        .props.onChange("GOAL_REACHED"),
     );
     assert.doesNotMatch(JSON.stringify(root.toJSON()), /No course/);
     await act(async () =>
@@ -936,7 +936,6 @@ test("HR read-only profile names the selected employee and only reads their data
   try {
     await act(async () => { root = create(React.createElement(Employee, { id: "hr-selected", viewer: "hr", readOnly: true, onError })); });
     assert.equal(root.root.findByType("h1").children.join(""), profile.full_name);
-    assert.match(JSON.stringify(root.toJSON()), /Карьерную цель и обучение сотрудник выбирает самостоятельно/);
     assert.equal(root.root.findAllByType("dialog").length, 0);
     const renderedButtons = root.root.findAllByType("button").map(node => node.children.filter(child => typeof child === "string").join(""));
     assert.equal(renderedButtons.some(label => /Выбрать цель|Назначить цель|Изменить цель|Убрать явную цель/.test(label)), false);

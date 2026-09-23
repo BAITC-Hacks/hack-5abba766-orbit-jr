@@ -1,5 +1,6 @@
 import type {
   EmptyReason,
+  FallbackReason,
   GoalSource,
   ParticipationStatus,
 } from "../../../contracts/backend";
@@ -24,6 +25,12 @@ export const emptyReasons: Record<EmptyReason, string> = {
     "Нет доступных активностей: условия участия не выполнены.",
   NO_BENEFICIAL_EVENTS: "Нет активностей с приростом навыков.",
   NO_GOAL_RELEVANT_EVENTS: "Нет подходящего шага для выбранной цели.",
+};
+export const fallbackReasons: Record<FallbackReason, string> = {
+  missing_api_key: "AI-подбор пока не настроен. Обучение подобрано по навыкам, цели и истории участия.",
+  provider_timeout: "AI не ответил вовремя. Обучение подобрано по правилам с учётом вашего профиля.",
+  provider_error: "AI временно недоступен. Обучение подобрано по правилам с учётом вашего профиля.",
+  invalid_response: "Ответ AI не прошёл проверку. Показана проверенная подборка по правилам.",
 };
 export const formats = {
   online: "Онлайн",
