@@ -12,12 +12,14 @@ export function CareerJourney({
   names,
   eventNames,
   onSelect,
+  readOnly = false,
 }: {
   employee: EmployeeView;
   recommendations?: RecommendationResult;
   names: Record<string, string>;
   eventNames: Record<string, string>;
   onSelect: (card: RecommendationCard) => void;
+  readOnly?: boolean;
 }) {
   const target = employee.goal.target;
   const gaps = employee.skills
@@ -45,9 +47,9 @@ export function CareerJourney({
     <section className="cq-journey" aria-label="Карьерный путь">
       <div className="cq-journey-heading">
         <div>
-          <span className="cq-kicker"><Route size={14} aria-hidden="true" /> ВАШ КАРЬЕРНЫЙ ПУТЬ</span>
-          <h2>От текущих навыков — к вашей цели.</h2>
-          <p>Выберите один следующий шаг. После завершения путь обновится.</p>
+          <span className="cq-kicker"><Route size={14} aria-hidden="true" /> {readOnly ? "КАРЬЕРНЫЙ ПУТЬ СОТРУДНИКА" : "ВАШ КАРЬЕРНЫЙ ПУТЬ"}</span>
+          <h2>{readOnly ? "От текущих навыков — к цели сотрудника." : "От текущих навыков — к вашей цели."}</h2>
+          <p>{readOnly ? "Здесь можно изучить варианты следующего шага. Выбор и прохождение остаются за сотрудником." : "Выберите один следующий шаг. После завершения путь обновится."}</p>
         </div>
         <span className="cq-goal-source">{goalSources[employee.goal.source]}</span>
       </div>
@@ -60,7 +62,7 @@ export function CareerJourney({
           <p className="cq-stage-role">{employee.role}</p>
           <div className="cq-current-coverage">
             <strong>{coverage === null ? "—" : `${coverage}%`}</strong>
-            <span>{coverage === null ? "Выберите цель для сравнения" : "требований цели покрыто навыками"}</span>
+            <span>{coverage === null ? readOnly ? "Цель для сравнения пока не выбрана" : "Выберите цель для сравнения" : "требований цели покрыто навыками"}</span>
           </div>
           {employee.has_simulated_progress && <span className="cq-inline-note">С учётом демо-завершений</span>}
         </li>
@@ -71,7 +73,7 @@ export function CareerJourney({
           <h3>{!target ? "Нужно направление" : gaps.length ? "Что подтянуть" : "Требования закрыты"}</h3>
           {criticalCount > 0 && <span className="cq-critical-count">Критических пробелов: {criticalCount}</span>}
           {!target ? (
-            <p>Выберите целевую роль и грейд в профиле.</p>
+            <p>{readOnly ? "Сотрудник выбирает целевую роль и грейд в своём профиле." : "Выберите целевую роль и грейд в профиле."}</p>
           ) : gaps.length ? (
             <>
               <ul className="cq-gap-list">
@@ -92,7 +94,7 @@ export function CareerJourney({
         <li className="cq-journey-stage cq-journey-next">
           <span className="cq-stage-marker" aria-hidden="true"><ArrowUpRight size={17} /></span>
           <span className="cq-stage-label">СЛЕДУЮЩИЙ ШАГ</span>
-          <h3>Ваш выбор</h3>
+          <h3>{readOnly ? "Варианты для сотрудника" : "Ваш выбор"}</h3>
           {currentRecommendations?.recommendations.length ? (
             <>
               <p className="cq-choice-note">Один из вариантов, подходящих сейчас.</p>
@@ -112,14 +114,14 @@ export function CareerJourney({
               </ul>
             </>
           ) : (
-            <p>{!target ? "Сначала выберите цель." : currentRecommendations?.mode === "no_candidates" ? emptyReasons[currentRecommendations.empty_reason] : "Подборка появится после обновления рекомендаций."}</p>
+            <p>{!target ? readOnly ? "Сотрудник пока не выбрал цель." : "Сначала выберите цель." : currentRecommendations?.mode === "no_candidates" ? emptyReasons[currentRecommendations.empty_reason] : "Подборка появится после обновления рекомендаций."}</p>
           )}
         </li>
 
         <li className="cq-journey-stage cq-journey-target">
           <span className="cq-stage-marker" aria-hidden="true"><Flag size={17} /></span>
           <span className="cq-stage-label">ЦЕЛЬ</span>
-          <h3>{target?.target_grade ?? "Ваше направление"}</h3>
+          <h3>{target?.target_grade ?? (readOnly ? "Направление сотрудника" : "Ваше направление")}</h3>
           <p className="cq-stage-role">{target?.target_role ?? "Роль и грейд пока не выбраны"}</p>
           {target && <p className="cq-target-note">Ориентир — соответствие требованиям роли. Решение о повышении принимается отдельно.</p>}
         </li>
@@ -128,7 +130,7 @@ export function CareerJourney({
       {employee.progress && (
         <details className="cq-progress-explanation">
           <summary>Как считается прогресс</summary>
-          <p>Складываем ваши уровни по навыкам цели, каждый — не выше требуемого, и делим на сумму требований. Приросты разных вариантов следующего шага не складываются: после выбора рекомендации пересчитываются.</p>
+          <p>Складываем {readOnly ? "уровни сотрудника" : "ваши уровни"} по навыкам цели, каждый — не выше требуемого, и делим на сумму требований. Приросты разных вариантов следующего шага не складываются: после выбора рекомендации пересчитываются.</p>
         </details>
       )}
     </section>

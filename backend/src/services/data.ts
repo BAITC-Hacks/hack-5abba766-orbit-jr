@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { pool, readSnapshotWithClient, withTransaction, SCHEMA_VERSION } from '../db';
 import { AppError } from '../errors';
+import { requireEmployeeWrite, requireHr } from '../auth';
 import { isAiConfigured } from '../ai/adapter';
 import { employeeView, assertCompletionAllowed, skillChanges } from '../domain';
 import { canonicalJson, sourceHash, validateRelations, employeeSchema, participationSchema, careerGoalSchema } from '../validation';
@@ -20,9 +21,6 @@ export async function getHealth(): Promise<HealthView> {
     const migrations = await pool.query('SELECT version FROM schema_migrations WHERE version=$1', [SCHEMA_VERSION]);
     return { ...base, status: rows[0]?.seed_complete && migrations.rowCount ? 'ok' : 'not_ready', dataset_initialized: Boolean(rows[0]?.seed_complete), schema_version: migrations.rows[0]?.version || null };
   } catch { return base; }
-}
-export function scope(actor: SessionView, id?: string): void {
-  if (actor.role !== 'hr' && (id === undefined || actor.employee_id !== id)) throw new AppError('FORBIDDEN', 'Доступ запрещён', 403);
 }
 export async function lockDataset(client: PoolClient): Promise<void> {
   const lock = await client.query('SELECT id FROM app_meta WHERE id=1 AND seed_complete=true FOR UPDATE');
@@ -49,7 +47,7 @@ export async function audit(client: PoolClient, actor: SessionView, operation: s
   await client.query('INSERT INTO audit_records(actor_id,operation,target_employee_id,details) VALUES($1,$2,$3,$4::jsonb)', [actor.account_id, operation, target, JSON.stringify(details)]);
 }
 export async function updateGoal(actor: SessionView, id: string, request: GoalRequest): Promise<GoalResult> {
-  scope(actor, id);
+  requireEmployeeWrite(actor, id);
   const goal = careerGoalSchema.nullable().safeParse(request.career_goal);
   if (!goal.success) throw new AppError('VALIDATION_ERROR', 'Некорректная карьерная цель');
   return withTransaction(async client => {
@@ -72,7 +70,7 @@ export async function updateGoal(actor: SessionView, id: string, request: GoalRe
   });
 }
 export async function completeActivity(actor: SessionView, id: string, request: CompletionRequest, key: string): Promise<{ result: CompletionResult; replayed: boolean }> {
-  scope(actor, id); ensureKey(key);
+  requireEmployeeWrite(actor, id); ensureKey(key);
   return withTransaction(async client => {
     await lockDataset(client);
     return completeActivityInTransaction(client, actor, id, request, key);
@@ -82,7 +80,7 @@ export async function completeActivity(actor: SessionView, id: string, request: 
 /** Caller must hold app_meta FOR UPDATE on this same transaction connection.
  * Learning uses this helper so quiz state, effects, receipts and audit commit together. */
 export async function completeActivityInTransaction(client: PoolClient, actor: SessionView, id: string, request: CompletionRequest, key: string): Promise<{ result: CompletionResult; replayed: boolean }> {
-  scope(actor, id); ensureKey(key);
+  requireEmployeeWrite(actor, id); ensureKey(key);
   if (request.simulation !== true) throw new AppError('INVALID_REQUEST', 'Поддерживается только явно указанная симуляция');
   const operation = 'completion';
   const hash = sourceHash({ operation, target_employee_id: id, body: request });
@@ -115,7 +113,7 @@ function validateImportRows(command: ImportCommand): { employees: EmployeeSource
   return { employees: employees.data, history: history.data };
 }
 export async function importData(actor: SessionView, command: ImportCommand, key?: string): Promise<{ result: ImportResult; replayed: boolean }> {
-  scope(actor);
+  requireHr(actor);
   if (!command.dry_run) ensureKey(key);
   const normalized = validateImportRows(command);
   const operation = 'import';

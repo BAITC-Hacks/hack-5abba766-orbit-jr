@@ -155,8 +155,8 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <div>
               <h2 id="directory-title">Сотрудники</h2>
               <p className="section-description">
-                Откройте профиль, чтобы посмотреть навыки, выбрать цель и план
-                развития.
+                Откройте профиль, чтобы посмотреть навыки, карьерную цель,
+                рекомендации и историю обучения.
               </p>
             </div>
           </div>
@@ -347,12 +347,13 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
               Вернуться {section === "people" ? "к сотрудникам" : "к обзору"}
             </button>
             <p>
-              Вы просматриваете профиль как HR. Изменение цели и симуляция
-              сохраняются для этого сотрудника.
+              Вы просматриваете профиль как HR. Цель выбирает и обучение
+              проходит сам сотрудник.
             </p>
           </div>
           <Employee
             viewer="hr"
+            readOnly
             key={selected + "-" + revision}
             id={selected}
             onError={onError}
