@@ -25,7 +25,7 @@ export function ImportPanel({
   const [result, setResult] = useState<ImportResult>();
   const [replayed, setReplayed] = useState(false);
   const [pending, setPending] = useState(false);
-  const [dryRun, setDryRun] = useState(false);
+  const [dryRun, setDryRun] = useState(true);
   const lock = useRef(false);
   const request = useRef<{ key: string; body: FormData } | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -92,6 +92,7 @@ export function ImportPanel({
     <section className="panel import-panel">
       <span className="eyebrow">ДАННЫЕ ДЛЯ РАЗВИТИЯ</span>
       <h2>Импорт профилей и истории</h2>
+      <p className="muted">Сначала проверьте файлы без изменения данных. После успешной проверки снимите флажок ниже и нажмите «Импортировать».</p>
       <ol className="import-steps" aria-label="Этапы импорта">
         <li className={employees || history ? "done" : "current"}><Upload size={20} /><span>Файлы</span></li>
         <li className={result?.dry_run && !result.errors.length ? "done" : ""}><CheckCircle2 size={20} /><span>Проверка</span></li>
@@ -147,7 +148,7 @@ export function ImportPanel({
         {busy
           ? "Обработка…"
           : pending
-            ? "Повторить тот же импорт"
+            ? dryRun ? "Повторить ту же проверку" : "Повторить тот же импорт"
             : dryRun
               ? "Проверить файлы"
               : "Импортировать"}
@@ -177,6 +178,9 @@ export function ImportPanel({
                   : "Новых записей нет"}
           </h3>
           {replayed && <p>Повторный запрос: показан сохранённый результат.</p>}
+          {result.dry_run && !result.errors.length && (
+            <p>Проверка завершена. Чтобы сохранить данные, снимите флажок «Только проверить файлы, без сохранения» и нажмите «Импортировать».</p>
+          )}
           {!result.errors.length && (
             <p>
               {result.dry_run ? "К добавлению" : "Добавлено"} профилей:{" "}

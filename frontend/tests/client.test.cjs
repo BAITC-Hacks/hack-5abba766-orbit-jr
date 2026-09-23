@@ -331,6 +331,7 @@ test("import submits JSON+CSV with revision; atomic conflict is not reported as 
       inputs[1].props.onChange({
         target: { files: [new File(["record_id\nR1"], "history.csv")] },
       });
+      inputs.find((input) => input.props.type === "checkbox").props.onChange({ target: { checked: false } });
     });
     await act(async () => root.root.findByType("button").props.onClick());
     const text = JSON.stringify(root.toJSON());
@@ -376,6 +377,7 @@ test("import preserves key and files after connection loss and reports server co
     );
   });
   try {
+    await act(async () => root.root.findAllByType("input").find((input) => input.props.type === "checkbox").props.onChange({ target: { checked: false } }));
     await act(async () =>
       root.root.findAllByType("input")[0].props.onChange({
         target: { files: [new File(["{}"], "employees.json")] },
@@ -699,10 +701,10 @@ test("import preview sends dry_run and never refreshes persisted data", async ()
       root.root.findAllByType("input")[0].props.onChange({
         target: { files: [new File(["{}"], "employees.json")] },
       });
-      root.root
+      assert.equal(root.root
         .findAllByType("input")
         .find((input) => input.props.type === "checkbox")
-        .props.onChange({ target: { checked: true } });
+        .props.checked, true);
     });
     await act(async () => root.root.findByType("button").props.onClick());
     assert.equal(changed, 0);
