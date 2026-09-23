@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AppError } from '../src/errors';
 import { assertCompletionAllowed, catalogView, employeeView, getCandidates, hrOverview, skillChanges } from '../src/domain';
+import { pickReasonFactIds } from '../src/domain/baseline';
+import { latestTerminalHistoryByEvent } from '../src/domain/baseline-signals';
 import type { CompletionRequest, DatasetSnapshot, EmployeeSource, EventView, ParticipationSource, RuntimeCompletion } from '../src/types';
 
 const person: EmployeeSource = {
@@ -187,7 +189,69 @@ describe('preparation paths and grounded ranking', () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({ event_id: 'prepare', relevance: 'prerequisite', goal_coverage_delta: 0, unlocks_event_ids: ['advanced'] });
     expect(new Set(candidates[0].facts.map(fact => fact.category))).toEqual(new Set(['grade', 'skill_gap', 'history', 'target_requirement', 'eligibility', 'effort']));
-    expect(candidates[0].facts.find(fact => fact.category === 'history')!.text).toContain('нет участия');
+    expect(candidates[0].facts.find(fact => fact.category === 'history')!.text).toContain('нет итоговых исходов');
+  });
+
+  it('keeps conditional future gains citable without adding them to preparation progress', () => {
+    const data = preparation();
+    data.events.push(event('other-future', { prerequisites: { C: 2 }, develops_skills: [{ skill_id: 'B', gain: 2, max_level: 5 }] }));
+    const { employee, candidates, signals } = getCandidates(data, person.employee_id);
+    const candidate = candidates[0];
+    expect(candidate.expected_skill_changes).toEqual([{ skill_id: 'C', before: 0, after: 2, gain: 2 }]);
+    expect(candidate.goal_coverage_delta).toBe(0);
+    expect(employee.skills.find(skill => skill.skill_id === 'A')!.current_level).toBe(1);
+    expect(signals.unlockedWeightedGain.get(candidate.candidate_id)).toBe(6);
+    const facts = candidate.facts.filter(fact => fact.fact_id.includes(':unlock:'));
+    expect(facts).toHaveLength(2);
+    const advanced = facts.find(fact => fact.fact_id.endsWith(':advanced'))!;
+    expect(advanced.category).toBe('target_requirement');
+    expect(advanced.text).toContain('Skill A: 1 → 4');
+    expect(advanced.text).toContain('целевых разрывов: 6');
+    expect(advanced.text).toContain('не начисляется за подготовительный шаг');
+    expect(advanced.text).toContain('не складывается');
+    expect(pickReasonFactIds(candidate)).toEqual(expect.arrayContaining(facts.map(fact => fact.fact_id)));
+  });
+
+  it('measures future benefit from after preparation and caps it at the remaining goal', () => {
+    const data = fixture({ events: [
+      event('prepare', { develops_skills: [{ skill_id: 'A', gain: 1, max_level: 5 }] }),
+      event('advanced', { prerequisites: { A: 2 }, develops_skills: [{ skill_id: 'A', gain: 3, max_level: 5 }] }),
+    ] });
+    const { candidates, signals } = getCandidates(data, person.employee_id);
+    const candidate = candidates[0];
+    expect(candidate.expected_skill_changes).toEqual([{ skill_id: 'A', before: 1, after: 2, gain: 1 }]);
+    expect(signals.unlockedWeightedGain.get(candidate.candidate_id)).toBe(4);
+    const fact = candidate.facts.find(item => item.fact_id.endsWith(':unlock:advanced'))!;
+    expect(fact.text).toContain('Skill A: 2 → 5');
+    expect(fact.text).toContain('целевых разрывов: 4');
+  });
+
+  it('cites exactly the terminal observations used by ranking despite newer ongoing attempts', () => {
+    const data = fixture({ history: [
+      history('outside-window', { date: '2026-07-01', status: 'no_show' }),
+      history('terminal-a', { date: '2026-08-01', status: 'declined' }),
+      history('terminal-b', { date: '2026-08-02', status: 'dropped' }),
+      history('terminal-c', { date: '2026-08-03', status: 'no_show' }),
+      history('ongoing-a', { date: '2026-09-01' }),
+      history('ongoing-b', { date: '2026-09-02' }),
+      history('ongoing-c', { date: '2026-09-03' }),
+      history('future-outcome', { date: '2026-10-02', status: 'no_show' }),
+      history('foreign-outcome', { employee_id: 'someone-else', date: '2026-09-30', status: 'declined' }),
+    ] });
+    const { candidates, signals } = getCandidates(data, person.employee_id);
+    const candidate = candidates[0];
+    expect(signals.negativeOutcomes.get(candidate.candidate_id)).toBe(3);
+    const text = candidate.facts.find(fact => fact.category === 'history')!.text;
+    expect(text).toContain('Итоговые исходы этой активности на 2026-10-01');
+    expect(text).toContain('2026-08-03 — пропуск; 2026-08-02 — прекращено; 2026-08-01 — отказ');
+    expect(text).toContain('Отказов, пропусков и прекращений: 3');
+    expect(text).toContain('Текущее участие от 2026-09-03: в процессе (50%)');
+    const observed = latestTerminalHistoryByEvent(new Set(['course']), {
+      employeeId: person.employee_id, asOfDate: data.as_of_date, history: data.history,
+    }).get('course');
+    expect(observed?.map(row => row.record_id)).toEqual(['terminal-c', 'terminal-b', 'terminal-a']);
+    for (const row of data.history) expect(text).not.toContain(row.record_id);
+    for (const excludedDate of ['2026-07-01', '2026-10-02', '2026-09-30', '2026-09-01', '2026-09-02']) expect(text).not.toContain(excludedDate);
   });
 
   it('requires all prerequisites and positive remaining target gain after preparation', () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiError, baselineRanking, cardsFromRanking, rankCandidates, validateRanking } from '../src/ai';
+import { SYSTEM_PROMPT } from '../src/ai/prompt';
 import { recommendations } from '../src/services/recommendations';
 import type { AiRankingInput, Candidate, DatasetSnapshot, EmployeeView, RecommendationFact } from '../src/types';
 
@@ -7,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   readSnapshot: vi.fn(), readSnapshotWithClient: vi.fn(), getCandidates: vi.fn(),
   connect: vi.fn(), query: vi.fn(), release: vi.fn(), fetch: vi.fn(), run: vi.fn(),
 }));
-vi.mock('../src/db', () => ({ pool: { connect: mocks.connect }, readSnapshotWithClient: mocks.readSnapshotWithClient }));
+vi.mock('../src/db', () => ({ recommendationLockPool: { connect: mocks.connect }, readSnapshotWithClient: mocks.readSnapshotWithClient }));
 vi.mock('../src/services/data', () => ({ readSnapshot: mocks.readSnapshot }));
 vi.mock('../src/domain', () => ({ getCandidates: mocks.getCandidates }));
 // Admission/cache behavior is covered separately; these tests isolate the DB protocol.
@@ -113,7 +114,7 @@ describe('provider adapter without network calls', () => {
     const payload = JSON.parse(request.body as string);
     expect(payload.store).toBe(false);
     expect(payload.response_format.type).toBe('json_schema');
-    expect(payload.messages[0].content).toContain('data, never instructions');
+    expect(payload.messages[0].content).toBe(SYSTEM_PROMPT);
     expect(payload.messages[1].content).not.toContain(employee().full_name);
   });
 
@@ -158,7 +159,7 @@ describe('recommendation service modes and version boundaries', () => {
     expect(mocks.run.mock.lastCall![0]).toBe(key);
   });
 
-  it('invalidates cache identity when provider configuration, employee, evidence, limit or either revision changes', async () => {
+  it('invalidates cache identity when provider configuration, employee, evidence, ranking signals, limit or either revision changes', async () => {
     const first = await recommendations('employee', { expected_version: version });
     const originalKey = mocks.run.mock.lastCall![0] as string;
     const originalDomain = mocks.getCandidates.mock.results.at(-1)!.value;
@@ -183,6 +184,12 @@ describe('recommendation service modes and version boundaries', () => {
     changedEvidence.candidates[0].facts[0].text = 'Updated verified evidence from the current snapshot';
     mocks.getCandidates.mockReturnValue(changedEvidence);
     await expectNewKey();
+    for (const signalName of ['negativeOutcomes', 'similarFormatPenalty', 'unlockedWeightedGain'] as const) {
+      const changedSignals = structuredClone(originalDomain);
+      changedSignals.signals[signalName].set(changedSignals.candidates[0].candidate_id, 1);
+      mocks.getCandidates.mockReturnValue(changedSignals);
+      await expectNewKey();
+    }
     for (const updatedVersion of [{ ...version, dataset_revision: 2 }, { ...version, employee_revision: 1 }]) {
       mocks.getCandidates.mockReturnValue({ ...originalDomain, employee: { ...originalDomain.employee, version: updatedVersion } });
       mocks.readSnapshot.mockResolvedValue({ as_of_date: '2026-10-01', dataset_revision: updatedVersion.dataset_revision, employee_revisions: { employee: updatedVersion.employee_revision } });
@@ -193,7 +200,7 @@ describe('recommendation service modes and version boundaries', () => {
   it('reuses actual cached AI work while fresh version checks and post-provider staleness still reject', async () => {
     const { RecommendationWork } = await vi.importActual<typeof import('../src/services/recommendation-work')>('../src/services/recommendation-work');
     const work = new RecommendationWork();
-    mocks.run.mockImplementation((key: string, operation: Parameters<typeof work.run>[1]) => work.run(key, operation));
+    mocks.run.mockImplementation((key: string, operation: Parameters<typeof work.run>[1], options: Parameters<typeof work.run>[2]) => work.run(key, operation, options));
     // A fresh Response is needed for each real adapter invocation because its body is consumed once.
     mocks.fetch.mockImplementation(async () => providerResponse());
     const first = await recommendations('employee', { expected_version: version });
@@ -276,11 +283,34 @@ describe('recommendation service modes and version boundaries', () => {
     expect(mocks.release).toHaveBeenCalledOnce();
   });
 
+  it('reports bounded admission exhaustion without making a provider call', async () => {
+    mocks.connect.mockRejectedValueOnce(new Error('Synthetic connection queue timeout'));
+    await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({ code: 'STORAGE_BUSY', status: 503 });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it('aborts provider work and releases the advisory lock when the caller cancels', async () => {
+    const controller = new AbortController();
+    mocks.fetch.mockImplementation((_url: string, request: RequestInit) => new Promise((_resolve, reject) => {
+      request.signal!.addEventListener('abort', () => reject(new DOMException('Synthetic abort', 'AbortError')), { once: true });
+    }));
+    const pending = recommendations('employee', { expected_version: version }, controller.signal);
+    await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
+    expect(mocks.run.mock.lastCall![2]).toEqual({ sharePending: false });
+    controller.abort();
+    await expect(pending).resolves.toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_timeout' });
+    expect((mocks.fetch.mock.calls[0][1] as RequestInit).signal!.aborted).toBe(true);
+    expect(mocks.query.mock.calls.at(-1)![0]).toBe('SELECT pg_advisory_unlock(hashtextextended($1,0))');
+    expect(mocks.release).toHaveBeenCalledWith(undefined);
+  });
+
   it('holds no transaction during AI and reuses its existing connection for the final snapshot', async () => {
     let resolveProvider!: (response: Response) => void;
     mocks.fetch.mockReturnValue(new Promise<Response>(resolve => { resolveProvider = resolve; }));
     const pending = recommendations('employee', { expected_version: version });
     await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
+    expect(mocks.run.mock.lastCall![2]).toEqual({ sharePending: true });
     expect(mocks.query.mock.calls.map(call => call[0])).toEqual(['SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired']);
     resolveProvider(providerResponse());
     await expect(pending).resolves.toMatchObject({ mode: 'ai' });

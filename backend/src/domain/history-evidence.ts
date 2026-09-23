@@ -122,12 +122,15 @@ function groupText(label: string, group: HistoryEvidenceGroup): string {
 }
 
 /** Concise card copy; record/event identifiers remain in the structured summary. */
-export function historyEvidenceText(summary: HistoryEvidenceSummary): string {
-  const insufficient = [summary.exact_event, summary.similar_same_format, summary.similar_other_format]
+export function historyEvidenceText(summary: HistoryEvidenceSummary, options: { includeExact?: boolean } = {}): string {
+  const includeExact = options.includeExact !== false;
+  const groups = includeExact ? [summary.exact_event, summary.similar_same_format, summary.similar_other_format]
+    : [summary.similar_same_format, summary.similar_other_format];
+  const insufficient = groups
     .some(group => group.confidence === 'unknown');
   return [
     `За ${summary.window_start}–${summary.as_of_date}, до ${summary.sample_limit} последних итоговых записей на группу.`,
-    groupText('Эта активность', summary.exact_event),
+    includeExact ? groupText('Эта активность', summary.exact_event) : '',
     'Похожие активности имеют общие развиваемые навыки.',
     groupText('Похожие, тот же формат', summary.similar_same_format),
     groupText('Похожие, другой формат', summary.similar_other_format),

@@ -53,7 +53,7 @@ describe.skipIf(!connectionString)('persistent learning and atomic grading', () 
     await bootstrap.bootstrapDatabase(directory);
   });
   afterAll(async () => {
-    if (db) await db.pool.end();
+    if (db) await db.closePools();
     if (admin) { await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); }
     if (directory) await rm(directory, { recursive: true, force: true });
   });

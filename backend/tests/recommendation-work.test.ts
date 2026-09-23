@@ -47,4 +47,32 @@ describe('bounded recommendation work', () => {
     await work.run('a', async () => { recovered = true; return ai(); });
     expect(recovered).toBe(true);
   });
+
+  it('isolates caller-cancelled work from shared waiters while retaining cache reuse and the global bound', async () => {
+    const work = new RecommendationWork({ concurrency: 2, entries: 2, ttlMs: 100 });
+    const controller = new AbortController();
+    let finishShared!: (value: RecommendationResult) => void;
+    let sharedCalls = 0;
+    const cancelled = work.run('same', () => new Promise<RecommendationResult>(resolve => {
+      controller.signal.addEventListener('abort', () => resolve({ ...ai(), mode: 'rules_fallback', fallback_reason: 'provider_timeout' }), { once: true });
+    }), { sharePending: false });
+    const sharedOperation = () => {
+      sharedCalls++;
+      return new Promise<RecommendationResult>(resolve => { finishShared = resolve; });
+    };
+    const survivor = work.run('same', sharedOperation);
+    const duplicate = work.run('same', sharedOperation);
+    await expect(work.run('same', async () => ai(), { sharePending: false }))
+      .rejects.toMatchObject({ code: 'RECOMMENDATION_BUSY' });
+    controller.abort();
+    await expect(cancelled).resolves.toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_timeout' });
+    finishShared(ai());
+    await expect(survivor).resolves.toMatchObject({ mode: 'ai' });
+    await expect(duplicate).resolves.toMatchObject({ mode: 'ai' });
+    expect(sharedCalls).toBe(1);
+    let calledAgain = false;
+    await expect(work.run('same', async () => { calledAgain = true; return ai(); }, { sharePending: false }))
+      .resolves.toMatchObject({ mode: 'ai' });
+    expect(calledAgain).toBe(false);
+  });
 });

@@ -7,13 +7,22 @@ import * as schema from './schema';
 
 const databaseSchema = process.env.DATABASE_SCHEMA;
 if (databaseSchema && !/^[a-z][a-z0-9_]*$/.test(databaseSchema)) throw new Error('DATABASE_SCHEMA must be a lowercase SQL identifier');
-/** Constructing the pool is lazy: build/import never opens a database connection. */
-export const pool = new pg.Pool({
+/** Constructing pools is lazy: build/import never opens a database connection. */
+const connectionOptions = {
   connectionString: process.env.DATABASE_URL || 'postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest',
   max: 10, connectionTimeoutMillis: 3000, idleTimeoutMillis: 30000,
   ...(databaseSchema ? { options: `-c search_path=${databaseSchema}` } : {}),
-});
+};
+export const pool = new pg.Pool(connectionOptions);
+// Session locks live through provider latency. Keep their bounded connections
+// separate so AI saturation cannot stop authentication, profiles or writes.
+export const recommendationLockPool = new pg.Pool({ ...connectionOptions, connectionTimeoutMillis: 1000 });
 pool.on('error', () => { console.error('PostgreSQL idle connection failed'); });
+recommendationLockPool.on('error', () => { console.error('PostgreSQL recommendation connection failed'); });
+let closing: Promise<void> | undefined;
+export function closePools(): Promise<void> {
+  return closing ??= Promise.all([pool.end(), recommendationLockPool.end()]).then(() => undefined);
+}
 export const db = drizzle(pool, { schema });
 export const SCHEMA_VERSION = '002_learning';
 const MIGRATIONS = [

@@ -3,25 +3,27 @@ import type { RecommendationResult } from '../types';
 
 /** Process-local admission and bounded memoization; PostgreSQL still guards across processes. */
 export class RecommendationWork {
-  private readonly pending = new Map<string, Promise<RecommendationResult>>();
+  private readonly pending = new Map<string | symbol, Promise<RecommendationResult>>();
   private readonly cache = new Map<string, { expires: number; result: RecommendationResult }>();
 
   constructor(private readonly options = { concurrency: 3, entries: 128, ttlMs: 60_000 },
     private readonly now: () => number = Date.now) {}
 
-  async run(key: string, operation: () => Promise<RecommendationResult>): Promise<RecommendationResult> {
+  async run(key: string, operation: () => Promise<RecommendationResult>, options: { sharePending?: boolean } = {}): Promise<RecommendationResult> {
     const cached = this.cache.get(key);
     if (cached && cached.expires > this.now()) return structuredClone(cached.result);
     if (cached) this.cache.delete(key);
-    const existing = this.pending.get(key);
+    // Caller-owned cancellation must never abort another request sharing its work.
+    // Such operations get independent admission; immutable cached results remain shared.
+    const pendingKey = options.sharePending === false ? Symbol(key) : key;
+    const existing = this.pending.get(pendingKey);
     if (existing) return structuredClone(await existing);
-    // Do not queue more requests holding scarce database connections. Three AI
-    // calls leave seven connections in the application's ten-connection pool.
+    // Bound provider work even though its advisory locks use a dedicated DB pool.
     if (this.pending.size >= this.options.concurrency) {
       throw new AppError('RECOMMENDATION_BUSY', 'Сейчас выполняется несколько подборов. Повторите запрос через несколько секунд.', 429);
     }
     const work = Promise.resolve().then(operation);
-    this.pending.set(key, work);
+    this.pending.set(pendingKey, work);
     try {
       const result = await work;
       // A temporary provider failure must not hide recovery behind a cached fallback.
@@ -32,7 +34,7 @@ export class RecommendationWork {
       }
       return structuredClone(result);
     } finally {
-      this.pending.delete(key);
+      this.pending.delete(pendingKey);
     }
   }
 }

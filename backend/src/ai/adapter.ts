@@ -1,5 +1,6 @@
 import { RANKING_JSON_SCHEMA, SYSTEM_PROMPT, buildUserMessage } from './prompt';
 import type { AiRankingInput, FallbackReason } from '../types';
+import type { BaselineSignals } from '../domain/baseline';
 
 /** One native provider transport; no hidden retries, cached key, or second AI engine. */
 export type AdapterResult =
@@ -14,7 +15,7 @@ export function getTimeoutMs(): number {
   return Number.isSafeInteger(value) && value > 0 ? Math.max(100, Math.min(8000, value)) : 8000;
 }
 
-export async function rankWithModel(input: AiRankingInput, externalSignal?: AbortSignal): Promise<AdapterResult> {
+export async function rankWithModel(input: AiRankingInput, externalSignal?: AbortSignal, signals?: BaselineSignals): Promise<AdapterResult> {
   const key = process.env.LLM_API_KEY?.trim();
   if (!key || !getModel()) return { ok: false, reason: 'missing_api_key', detail: 'LLM_API_KEY and LLM_MODEL are required', ms: null };
   if (!input.candidates.length) return { ok: false, reason: 'provider_error', detail: 'called with no candidates', ms: null };
@@ -36,15 +37,23 @@ export async function rankWithModel(input: AiRankingInput, externalSignal?: Abor
   const timer = setTimeout(() => stop('deadline'), timeoutMs);
   const failed = (reason: FallbackReason, detail: string): AdapterResult => ({ ok: false, reason, detail, ms: Date.now() - started });
   try {
+    const model = getModel();
     const request = (async (): Promise<AdapterResult> => {
       const response = await fetch(process.env.LLM_API_URL || 'https://api.openai.com/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ model: getModel(), store: false, max_completion_tokens: 1400,
-          messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(input) }],
+        body: JSON.stringify({ model, store: false, max_completion_tokens: 1400,
+          ...(['gpt-6-sol', 'gpt-6-luna'].includes(model) ? { reasoning_effort: 'low' } : {}),
+          ...(/^(gpt-4o|gpt-4\.1)(-|$)/.test(model) ? { temperature: 0 } : {}),
+          messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: buildUserMessage(input, signals) }],
           response_format: { type: 'json_schema', json_schema: RANKING_JSON_SCHEMA },
         }),
       });
-      if (!response.ok) return failed('provider_error', 'Provider returned an unsuccessful HTTP status');
+      if (!response.ok) {
+        // An error body may stream indefinitely. Release its transport before
+        // returning fallback and clearing the deadline, without consuming it.
+        controller.abort();
+        return failed('provider_error', 'Provider returned an unsuccessful HTTP status');
+      }
       let body: { choices?: { finish_reason?: string; message?: { content?: string; refusal?: string } }[] } | null;
       try { body = await response.json(); }
       catch { return failed('invalid_response', 'Provider response was not JSON'); }

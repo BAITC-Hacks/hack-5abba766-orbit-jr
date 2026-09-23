@@ -74,6 +74,6 @@ describe('recommendation boundary', () => {
     rankWithModel.mockResolvedValue({ ok: false, reason: 'provider_error', detail: 'cancelled', ms: 0 })
     const controller = new AbortController()
     await recommend(snapshot(), { ...options, signal: controller.signal })
-    expect(rankWithModel).toHaveBeenCalledWith(expect.any(Object), controller.signal)
+    expect(rankWithModel).toHaveBeenCalledWith(expect.any(Object), controller.signal, testSignals)
   })
 })

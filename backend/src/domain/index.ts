@@ -1,5 +1,5 @@
 import { rankBaseline, type BaselineSignals } from './baseline';
-import { buildBaselineSignals } from './baseline-signals';
+import { buildBaselineSignals, latestTerminalHistoryByEvent } from './baseline-signals';
 import { historyEvidenceText, summarizeHistoryEvidence } from './history-evidence';
 import { buildCatalogCoverageGaps } from './catalog-coverage';
 import { AppError, invariant } from '../errors';
@@ -193,7 +193,9 @@ function weightedGain(before: SkillLevels, after: SkillLevels, profile: RoleProf
   }, 0);
 }
 
-function findUnlocked(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, before: SkillLevels, after: SkillLevels, profile: RoleProfile): { event: EventView; weighted_gain: number }[] {
+type UnlockedActivity = { event: EventView; weighted_gain: number; expected_skill_changes: SkillChange[] };
+
+function findUnlocked(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, before: SkillLevels, after: SkillLevels, profile: RoleProfile): UnlockedActivity[] {
   const history = snapshot.history.filter(row => row.employee_id === employee.employee_id);
   const completions = snapshot.completions.filter(row => row.employee_id === employee.employee_id);
   return snapshot.events.flatMap(event => {
@@ -209,8 +211,9 @@ function findUnlocked(snapshot: DatasetSnapshot, employee: EmployeeView, action:
         && !completedOccurrence(event, date, history, completions));
       if (!hasLaterSession) return [];
     }
-    const gain = weightedGain(after, applyEvent(after, event), profile);
-    return gain > 0 ? [{ event, weighted_gain: gain }] : [];
+    const future = applyEvent(after, event);
+    const gain = weightedGain(after, future, profile);
+    return gain > 0 ? [{ event, weighted_gain: gain, expected_skill_changes: levelChanges(after, future) }] : [];
   }).sort((a, b) => compareText(a.event.event_id, b.event.event_id));
 }
 
@@ -220,17 +223,19 @@ function candidateId(action: AvailableAction): string {
 
 const numberText = (value: number) => String(Math.round(value * 100) / 100);
 
-function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, candidate: Omit<Candidate, 'facts'>, unlocked: { event: EventView }[]): Candidate['facts'] {
+function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, action: AvailableAction, candidate: Omit<Candidate, 'facts'>, unlocked: UnlockedActivity[], recentOutcomes: readonly ParticipationSource[]): Candidate['facts'] {
   const names = new Map(snapshot.skills.map(skill => [skill.skill_id, skill.name]));
   const label = (id: string) => names.get(id) ?? id;
   const changes = candidate.expected_skill_changes.map(change => `${label(change.skill_id)}: ${numberText(change.before)} → ${numberText(change.after)}`).join('; ');
   const gapChanges = candidate.expected_skill_changes.filter(change => (employee.skills.find(skill => skill.skill_id === change.skill_id)?.gap ?? 0) > 0);
-  const related = snapshot.history.filter(row => row.employee_id === employee.employee_id && row.event_id === action.event.event_id && row.date <= snapshot.as_of_date).sort(byDateAndId);
-  const last = related.slice(-3);
   const statusLabels: Record<ParticipationStatus, string> = { completed: 'завершено', in_progress: 'в процессе', dropped: 'прекращено', no_show: 'пропуск', declined: 'отказ', overdue: 'просрочено' };
-  const historyText = related.length ? `История этой активности: ${related.length} участий; последние ${last.length}: ${last.map(row => `${row.date} — ${statusLabels[row.status]} (${row.completion_pct}%)`).join('; ')}.` : 'В исходной истории сотрудника нет участия в этой активности.';
+  const negatives = recentOutcomes.filter(row => row.status !== 'completed').length;
+  const historyText = (recentOutcomes.length
+    ? `Итоговые исходы этой активности на ${snapshot.as_of_date} (последние ${recentOutcomes.length}, от новых к старым): ${recentOutcomes.map(row => `${row.date} — ${statusLabels[row.status]}`).join('; ')}. Отказов, пропусков и прекращений: ${negatives}.`
+    : `В исходной истории нет итоговых исходов этой активности на ${snapshot.as_of_date}; отказов, пропусков и прекращений: 0. Отсутствие истории не говорит о мотивации.`)
+    + (action.participation ? ` Текущее участие от ${action.participation.date}: в процессе (${numberText(action.participation.completion_pct)}%); оно не входит в счётчик итоговых исходов.` : '');
   const similarHistory = historyEvidenceText(summarizeHistoryEvidence({ employeeId: employee.employee_id,
-    asOfDate: snapshot.as_of_date, event: action.event, events: snapshot.events, history: snapshot.history }));
+    asOfDate: snapshot.as_of_date, event: action.event, events: snapshot.events, history: snapshot.history }), { includeExact: false });
   const requirements = gapChanges.map(change => {
     const skill = employee.skills.find(item => item.skill_id === change.skill_id)!;
     return `${label(change.skill_id)}: требуется ${numberText(skill.required_level!)}, сейчас ${numberText(skill.current_level)}${skill.critical ? ', критический навык' : ''}`;
@@ -247,17 +252,16 @@ function candidateFacts(snapshot: DatasetSnapshot, employee: EmployeeView, actio
     { fact_id: `${candidate.candidate_id}:skill_gap`, category: 'skill_gap', text: `Расчётный эффект: ${changes}. ${unlocked.length ? `После завершения возможно открытие: ${unlocked.map(item => item.event.title).join('; ')}; расписание следующих шагов нужно проверить заново.` : ''}`.trim() },
     { fact_id: `${candidate.candidate_id}:history`, category: 'history', text: `${historyText} ${similarHistory}` },
     { fact_id: `${candidate.candidate_id}:target_requirement`, category: 'target_requirement', text: targetText },
+    ...unlocked.map(item => ({
+      fact_id: `${candidate.candidate_id}:unlock:${encodeURIComponent(item.event.event_id)}`,
+      category: 'target_requirement' as const,
+      text: `После завершения подготовки возможно отдельное прохождение «${item.event.title}». `
+        + `Его расчётный эффект от состояния после подготовки: ${item.expected_skill_changes.map(change => `${label(change.skill_id)}: ${numberText(change.before)} → ${numberText(change.after)}`).join('; ')}. `
+        + `Взвешенное сокращение оставшихся целевых разрывов: ${numberText(item.weighted_gain)} (вес критического навыка 2, остальных 1; рост выше требования и вне цели не учитывается). `
+        + 'Будущая польза условна и не начисляется за подготовительный шаг; расписание и допуск нужно проверить заново. Польза альтернативных следующих активностей не складывается.',
+    })),
     { fact_id: `${candidate.candidate_id}:eligibility`, category: 'eligibility', text: eligibilityText },
     { fact_id: `${candidate.candidate_id}:effort`, category: 'effort', text: `Полная длительность: ${numberText(action.event.duration_hours)} ч.; формат ${{ online: 'онлайн', offline: 'очно', self_paced: 'в своём темпе' }[action.event.format]}. Это трудозатраты, а не календарный срок.` },
-    ...unlocked.map(({ event }): Candidate['facts'][number] => {
-      const afterStep = applyEvent(levelsFrom(employee), action.event);
-      const afterFuture = applyEvent(afterStep, event);
-      const profile = targetProfile(snapshot, employee.goal)!;
-      const futureChanges = levelChanges(afterStep, afterFuture).map(change => `${label(change.skill_id)}: ${numberText(change.before)} → ${numberText(change.after)}`).join('; ');
-      const delta = (progressFor(afterFuture, profile)!.coverage - progressFor(afterStep, profile)!.coverage) * 100;
-      return { fact_id: `${candidate.candidate_id}:unlock:${encodeURIComponent(event.event_id)}`, category: 'target_requirement',
-        text: `После этого шага открываются предварительные требования для «${event.title}» (${event.event_id}). Только после отдельного завершения следующей активности: ${futureChanges}; ещё ${numberText(delta)} п.п. покрытия цели. Этот будущий эффект пока не начислен; расписание и допуск нужно проверить заново.` };
-    }),
   ];
 }
 
@@ -271,6 +275,9 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
   const levels = levelsFrom(employee);
   const actions = availableActions(snapshot, employee, levels);
   if (!actions.length) return empty('NO_ELIGIBLE_EVENTS');
+  const recentOutcomes = latestTerminalHistoryByEvent(new Set(actions.map(action => action.event.event_id)), {
+    employeeId, asOfDate: snapshot.as_of_date, history: snapshot.history,
+  });
   let hasBenefit = false;
   const candidates: Candidate[] = [];
   const unlockedWeightedGain = new Map<string, number>();
@@ -290,7 +297,7 @@ export function getCandidates(snapshot: DatasetSnapshot, employeeId: string): { 
       goal_coverage_delta: progressFor(after, profile)!.coverage - employee.progress.coverage,
       unlocks_event_ids: unlocked.map(item => item.event.event_id),
     };
-    candidates.push({ ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked) });
+    candidates.push({ ...base, facts: candidateFacts(snapshot, employee, action, base, unlocked, recentOutcomes.get(action.event.event_id) ?? []) });
     unlockedWeightedGain.set(base.candidate_id, Math.max(0, ...unlocked.map(item => item.weighted_gain)));
   }
   if (!candidates.length) return empty(hasBenefit ? 'NO_GOAL_RELEVANT_EVENTS' : 'NO_BENEFICIAL_EVENTS');

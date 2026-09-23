@@ -132,6 +132,20 @@ describe('source history evidence for similar activities', () => {
     }
   });
 
+  it('can omit exact-event copy when a caller supplies its own terminal-outcome scope', () => {
+    const summary = summarize([online, selfPaced].flatMap(activity =>
+      Array.from({ length: 3 }, (_, index) => row(`${activity.event_id}-${index}`, activity.event_id, 'completed'))));
+    expect(historyEvidenceText(summary)).toContain('Эта активность: нет итоговых записей');
+    expect(historyEvidenceText(summary)).toContain('данных недостаточно');
+    const text = historyEvidenceText(summary, { includeExact: false });
+    expect(text).not.toContain('Эта активность');
+    expect(text).not.toContain('данных недостаточно');
+    expect(text).toContain('Похожие, тот же формат: завершено 3/3');
+    expect(text).toContain('Похожие, другой формат: завершено 3/3');
+    expect(summary.exact_event.sample_size).toBe(0);
+    expect(summary.similar_same_format.evidence_ids).toHaveLength(3);
+  });
+
   it('clamps a leap-day window to February end in the preceding year', () => {
     const summary = summarize([
       row('included', online.event_id, 'completed', '2023-02-28'),
