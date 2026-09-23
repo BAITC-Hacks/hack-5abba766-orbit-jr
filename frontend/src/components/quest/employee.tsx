@@ -411,7 +411,7 @@ export function Employee({
                         </span>
                         <h3>{e.title}</h3>
                         <details className="catalog-description"><summary>Описание программы</summary><p>{e.description}</p></details>
-                        <details className="catalog-description">
+                        {!selectedSkill && <details className="catalog-description">
                           <summary>Условия участия</summary>
                           <p>Роли: {e.target_roles.join(", ") || "Не указаны"}.</p>
                           <p>Грейды: {e.target_grades.join(", ") || "Не указаны"}.</p>
@@ -421,7 +421,7 @@ export function Employee({
                             ))}</ul>
                           ) : <p>Предварительные навыки не требуются.</p>}
                           <p>Персональный допуск также учитывает историю участия и дату занятия.</p>
-                        </details>
+                        </details>}
                         <div className="compact-meta"><span>{formats[e.format]}</span><span>{e.duration_hours} ч.</span>{e.mandatory && <span className="required-tag">Обязательное</span>}</div>
                         {selectedSkill && <SkillCourseDetails event={e} skill={selectedSkill} employee={p} names={names} asOfDate={state.asOfDate} />}
                         {e.upcoming_sessions.length > 0 ? <details className="catalog-dates">
