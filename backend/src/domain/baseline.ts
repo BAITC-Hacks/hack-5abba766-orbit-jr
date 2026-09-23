@@ -14,8 +14,8 @@ import type {
  *   1. more fully closed critical gaps
  *   2. higher weighted_direct_gain + 0.5 * weighted_unlocked_gain (critical weight 2)
  *   3. fewer negative outcomes across the last three participations of the same event
- *   4. lower effort
- *   5. continue an equivalent existing attempt, then stable event and candidate IDs
+ *   4. fewer negative observations in a sufficiently observed similar format
+ *   5. lower effort, then continue an equivalent attempt and stable IDs
  *
  * This is a product heuristic for comparison, not a trained metric and not a
  * claimed probability of success. It is also what mode=rules_fallback returns,
@@ -34,6 +34,8 @@ export type BaselineSignals = {
   unlockedWeightedGain: ReadonlyMap<Id, number>
   /** Negative outcomes among the last three participations of the same event. */
   negativeOutcomes: ReadonlyMap<Id, number>
+  /** Observed negative share for other same-skill, same-format activities; zero when sample < 3. Not a success probability. */
+  similarFormatPenalty: ReadonlyMap<Id, number>
 }
 
 type BaselineInput = Pick<AiRankingInput, 'candidates'> & { profile: Pick<AiRankingInput['profile'], 'skills'> }
@@ -84,6 +86,8 @@ export function rankBaseline(
   for (const candidate of input.candidates) {
     signalValue(signals.unlockedWeightedGain, candidate.candidate_id)
     signalValue(signals.negativeOutcomes, candidate.candidate_id)
+    const formatPenalty = signalValue(signals.similarFormatPenalty, candidate.candidate_id)
+    if (formatPenalty > 1) throw new Error('Missing or invalid baseline signal')
   }
 
   return [...input.candidates].sort((a, b) => {
@@ -101,6 +105,10 @@ export function rankBaseline(
     const negA = signalValue(signals.negativeOutcomes, a.candidate_id)
     const negB = signalValue(signals.negativeOutcomes, b.candidate_id)
     if (negA !== negB) return negA - negB
+
+    const formatA = signalValue(signals.similarFormatPenalty, a.candidate_id)
+    const formatB = signalValue(signals.similarFormatPenalty, b.candidate_id)
+    if (formatA !== formatB) return formatA - formatB
 
     if (a.duration_hours !== b.duration_hours) return a.duration_hours - b.duration_hours
 

@@ -759,6 +759,7 @@ test("HR sections preserve selected import files and keep panels separate", asyn
         employee_count: 1,
         goals_by_source: { selected: 1, imported: 0, suggested: 0, missing: 0 },
         skill_gaps: [],
+        catalog_gaps: [],
         no_next_step: [],
         participation: {
           actual_by_status: counts,
@@ -846,6 +847,7 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
         names: { s: "Архитектура" },
         data: {
           employee_count: 5,
+          catalog_gaps: [],
           goals_by_source: {
             selected: 2,
             imported: 3,

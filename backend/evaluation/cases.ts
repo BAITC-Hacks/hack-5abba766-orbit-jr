@@ -164,7 +164,7 @@ function scenario(
       },
       candidates,
     },
-    signals: { unlockedWeightedGain, negativeOutcomes },
+    signals: { unlockedWeightedGain, negativeOutcomes, similarFormatPenalty: new Map(candidates.map(candidate => [candidate.candidate_id, 0])) },
     expectedTopCandidateIds,
   }
 }

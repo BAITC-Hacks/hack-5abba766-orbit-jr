@@ -26,8 +26,15 @@ Rules:
 - Use the supplied participation history when comparing relevant alternatives;
   repeated missed or declined activities can make another useful format preferable.
   Missing history is unknown, not a failure or a judgment about motivation.
+- History distinguishes this exact activity from other activities that develop the
+  same skills, grouped by the same or another format. Respect the observation window,
+  sample sizes and uncertainty. Do not generalize a sparse sample into a preference
+  or treat an observed negative share as a predicted probability of completion.
 - When history changes your choice, cite that candidate's history fact as one of
   the reasons. Three true but irrelevant facts are not an adequate explanation.
+- For a prerequisite, cite its conditional unlock fact when explaining future value.
+  When selecting alternatives, compare actual target benefit, observed history and
+  effort; cite the concrete distinguishing evidence instead of generic profile facts.
 - A candidate with action "continue" is already in progress; prefer finishing it over
   starting an equivalent activity.
 - A candidate with relevance "prerequisite" is only worth choosing when it unlocks

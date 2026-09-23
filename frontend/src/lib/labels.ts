@@ -13,7 +13,7 @@ export const statuses: Record<ParticipationStatus, string> = {
 };
 export const goalSources: Record<GoalSource, string> = {
   suggested: "Предложенная цель",
-  selected: "Цель выбрана сотрудником",
+  selected: "Выбранная цель",
   imported: "Цель из профиля",
   missing: "Цель не выбрана",
 };

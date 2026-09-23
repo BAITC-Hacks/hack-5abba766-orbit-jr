@@ -1,5 +1,6 @@
-import type { Candidate, DateOnly, Id, ParticipationSource } from '../types'
+import type { Candidate, DateOnly, EventView, Id, ParticipationSource } from '../types'
 import type { BaselineSignals } from './baseline'
+import { summarizeHistoryEvidence } from './history-evidence'
 
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 const TERMINAL_STATUSES = new Set(['completed', 'declined', 'dropped', 'no_show'])
@@ -15,6 +16,7 @@ export function buildBaselineSignals(
     employeeId: Id
     asOfDate: DateOnly
     history: readonly ParticipationSource[]
+    events: readonly EventView[]
     unlockedWeightedGain: ReadonlyMap<Id, number>
   },
 ): BaselineSignals {
@@ -31,7 +33,18 @@ export function buildBaselineSignals(
     if (row.status !== 'completed') count.negative += 1
     perEvent.set(row.event_id, count)
   }
+  const events = new Map(context.events.map(event => [event.event_id, event]))
+  const similarFormatPenalty = new Map<Id, number>()
+  for (const candidate of candidates) {
+    const event = events.get(candidate.event_id)
+    if (!event) throw new Error('Candidate event missing from history context')
+    const sample = summarizeHistoryEvidence({ employeeId: context.employeeId, asOfDate: context.asOfDate,
+      event, events: context.events, history: context.history }).similar_same_format
+    similarFormatPenalty.set(candidate.candidate_id, sample.confidence === 'observed'
+      ? (sample.counts.declined + sample.counts.no_show + sample.counts.dropped) / sample.sample_size : 0)
+  }
   return {
+    similarFormatPenalty,
     unlockedWeightedGain: context.unlockedWeightedGain,
     negativeOutcomes: new Map(candidates.map((candidate) => [
       candidate.candidate_id, perEvent.get(candidate.event_id)?.negative ?? 0,

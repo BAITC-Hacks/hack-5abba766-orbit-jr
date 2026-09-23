@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import type { RecommendationResult } from '../../contracts/backend'
 import { evaluationCases } from '../evaluation/cases'
+import { domainEvaluationCases, domainEmptyCases } from '../evaluation/domain-cases'
 import { scoreEvaluation, summarizeEvaluations } from '../evaluation/metrics'
 import { getModel, getTimeoutMs, isAiConfigured } from '../src/ai/adapter'
 import { buildUserMessage } from '../src/ai/prompt'
@@ -20,7 +21,7 @@ async function main(): Promise<void> {
     throw new Error('Live evaluation requires both LLM_API_KEY and LLM_MODEL in the repository .env or process environment')
   }
 
-  const cases = args.has('--smoke') ? evaluationCases.slice(0, 1) : evaluationCases
+  const cases = args.has('--smoke') ? domainEvaluationCases.slice(0, 1) : [...evaluationCases, ...domainEvaluationCases]
   const rows = []
   for (const testCase of cases) {
     const started = performance.now()
@@ -40,6 +41,13 @@ async function main(): Promise<void> {
     })
   }
   const scored = summarizeEvaluations(rows)
+  const emptyChecks = []
+  for (const testCase of domainEmptyCases) {
+    const result = await recommend(testCase.input, { signals: testCase.signals, emptyReason: testCase.expectedEmptyReason })
+    emptyChecks.push({ caseId: testCase.id, pass: result.mode === 'no_candidates' && result.empty_reason === testCase.expectedEmptyReason })
+  }
+  const latencies = rows.map(row => row.elapsedMs).sort((a, b) => a - b)
+  const percentile = (p: number) => latencies.length ? latencies[Math.ceil(latencies.length * p) - 1] : null
   const summary = live ? scored : {
     totalCases: scored.totalCases,
     baselineExpectedChoicePassRate: scored.baselineExpectedChoicePassRate,
@@ -54,6 +62,10 @@ async function main(): Promise<void> {
     model: live ? getModel() : null,
     providerBudgetMs: getTimeoutMs(),
     dataset: 'authored synthetic regression cases; not official or hidden judge profiles',
+    coverage: 'hand-authored ranking snapshots and validated source profiles/history through the actual domain pipeline',
+    latency: { p50Ms: percentile(0.5), p95Ms: percentile(0.95), maxMs: latencies.at(-1) ?? null,
+      scope: 'ranking call only; excludes HTTP, database and browser latency' },
+    emptyChecks,
     summary,
     cases: rows.map((row) => ({
       ...row, mode: live ? row.mode : 'baseline_only', fallback: live ? row.fallback : null,
@@ -72,9 +84,11 @@ async function main(): Promise<void> {
       fallback: row.fallbackReason ?? '-',
     })))
     console.log(JSON.stringify(summary, null, 2))
+    console.log(JSON.stringify({ latency: report.latency, emptyChecks }, null, 2))
     console.log('This measures authored regression expectations, not product impact or judge performance.')
   }
   if (rows.some((row) => !row.baselineExpectedChoicePass || !row.validCitations || !row.validSnapshotVersion)) process.exitCode = 1
+  if (emptyChecks.some(check => !check.pass)) process.exitCode = 1
   if (live && rows.some((row) => !row.acceptedAi || row.aiExpectedChoicePass !== true || row.elapsedMs > 10_000)) {
     process.exitCode = 1
   }
