@@ -155,16 +155,80 @@ describe.skipIf(!databaseUrl)('recommendation concurrency on isolated PostgreSQL
         new Promise<null>(resolve => { deadline = setTimeout(() => resolve(null), 1200); }),
       ]);
       expect(response, 'Cancelled HTTP work should release before the eight-second provider deadline').not.toBeNull();
-      expect(response!.status).toBe(200);
-      expect((await response!.json()).data).toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_timeout' });
+      expect(response!.status).toBe(503);
+      expect((await response!.json()).error).toMatchObject({ code: 'STORAGE_BUSY' });
       expect((fetch.mock.calls[0][1] as RequestInit).signal!.aborted).toBe(true);
-      acquired = Boolean((await observer.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', [lockName])).rows[0].acquired);
-      expect(acquired, 'Another connection must be able to acquire the same lock after cancellation').toBe(true);
+      await vi.waitFor(async () => {
+        acquired = Boolean((await observer.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', [lockName])).rows[0].acquired);
+        expect(acquired, 'Another connection must be able to acquire the same lock after cancellation').toBe(true);
+      }, { timeout: 1000, interval: 10 });
       console.info(JSON.stringify({ cancelledRequestReleaseMs: Math.round(performance.now() - started) }));
     } finally {
       if (deadline) clearTimeout(deadline);
       providerResponses.splice(0).forEach(complete => complete());
       await pending;
+      if (acquired) await observer.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [lockName]);
+      observer.release();
+    }
+  }, 15000);
+
+  it.each(['caller cancellation', 'database deadline'] as const)('ends real PostgreSQL work blocked after AI on %s', async interruption => {
+    const fetch = delayedProvider();
+    const employeeId = interruption === 'caller cancellation' ? 'PERSON_6' : 'PERSON_5';
+    const lockName = `recommend:${employeeId}:1:1`;
+    const controller = new AbortController();
+    const blocker = await db.pool.connect();
+    const observer = await admin.connect();
+    let acquired = false;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const pending = recommend(employeeId, { expected_version: version }, controller.signal);
+    // Observe the rejection immediately while the test arranges the database lock.
+    const observed = Promise.allSettled([pending]);
+    let recovery: Promise<RecommendationResult> | undefined;
+    try {
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce(), { timeout: 3000 });
+      await blocker.query('BEGIN');
+      await blocker.query('LOCK TABLE employees IN ACCESS EXCLUSIVE MODE');
+      const { rows: [{ oid }] } = await blocker.query("SELECT 'employees'::regclass::oid AS oid");
+      providerResponses.shift()!();
+      let backendPid: number | undefined;
+      await vi.waitFor(async () => {
+        const waiting = await observer.query(`SELECT a.pid FROM pg_stat_activity a JOIN pg_locks l ON l.pid=a.pid
+          WHERE l.relation=$1 AND a.wait_event_type='Lock' AND a.query LIKE '%LEFT JOIN employees e%'`, [oid]);
+        expect(waiting.rows).toHaveLength(1);
+        backendPid = waiting.rows[0]?.pid;
+      }, { timeout: 800, interval: 10 });
+      expect((await observer.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', [lockName])).rows[0].acquired).toBe(false);
+      const started = performance.now();
+      if (interruption === 'caller cancellation') controller.abort();
+      const outcome = await Promise.race([
+        observed,
+        new Promise<null>(resolve => { deadline = setTimeout(() => resolve(null), 2000); }),
+      ]);
+      expect(outcome, 'The final version check must not retain admission indefinitely').not.toBeNull();
+      expect(outcome![0]).toMatchObject({ status: 'rejected', reason: { code: 'STORAGE_BUSY', status: 503 } });
+      // Prove the backend query and session lock ended, not merely its JS promise.
+      await vi.waitFor(async () => {
+        expect((await observer.query('SELECT pid FROM pg_stat_activity WHERE pid=$1', [backendPid])).rows).toHaveLength(0);
+      }, { timeout: 1500, interval: 10 });
+      acquired = Boolean((await observer.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', [lockName])).rows[0].acquired);
+      expect(acquired).toBe(true);
+      console.info(JSON.stringify({ interruption, freshnessQueryReleaseMs: Math.round(performance.now() - started), backendEnded: true }));
+      await observer.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [lockName]);
+      acquired = false;
+      await blocker.query('ROLLBACK');
+      // The failed result was not cached and its slot is immediately reusable.
+      recovery = recommend(employeeId, { expected_version: version });
+      void recovery.catch(() => undefined);
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2), { timeout: 3000 });
+      providerResponses.shift()!();
+      await expect(recovery).resolves.toMatchObject({ mode: 'ai', version });
+    } finally {
+      if (deadline) clearTimeout(deadline);
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      providerResponses.splice(0).forEach(complete => complete());
+      await Promise.allSettled([pending, ...(recovery ? [recovery] : [])]);
       if (acquired) await observer.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [lockName]);
       observer.release();
     }

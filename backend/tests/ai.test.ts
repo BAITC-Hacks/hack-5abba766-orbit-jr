@@ -306,10 +306,36 @@ describe('recommendation service modes and version boundaries', () => {
     await vi.waitFor(() => expect(mocks.fetch).toHaveBeenCalledOnce());
     expect(mocks.run.mock.lastCall![2]).toEqual({ sharePending: false });
     controller.abort();
-    await expect(pending).resolves.toMatchObject({ mode: 'rules_fallback', fallback_reason: 'provider_timeout' });
+    await expect(pending).rejects.toMatchObject({ code: 'STORAGE_BUSY', message: 'Запрос подбора отменён.' });
     expect((mocks.fetch.mock.calls[0][1] as RequestInit).signal!.aborted).toBe(true);
-    expect(mocks.query.mock.calls.at(-1)![0]).toBe('SELECT pg_advisory_unlock(hashtextextended($1,0))');
-    expect(mocks.release).toHaveBeenCalledWith(undefined);
+    expect(mocks.readDomainVersionWithClient).not.toHaveBeenCalled();
+    expect(mocks.release).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ code: 'STORAGE_BUSY' }));
+  });
+
+  it.each(['acquire', 'version', 'unlock'] as const)('destroys a stalled connection during %s and observes late failures', async phase => {
+    let rejectLate!: (error: Error) => void;
+    const stalled = new Promise<never>((_resolve, reject) => { rejectLate = reject; });
+    if (phase === 'version') mocks.readDomainVersionWithClient.mockReturnValue(stalled);
+    else mocks.query.mockImplementation((sql: string) => {
+      const target = phase === 'acquire' ? 'pg_try_advisory_lock' : 'pg_advisory_unlock';
+      return sql.includes(target) ? stalled : Promise.resolve({ rows: [{ acquired: true }] });
+    });
+    const pending = recommendations('employee', { expected_version: version });
+    if (phase === 'unlock') await expect(pending).resolves.toMatchObject({ mode: 'ai' });
+    else await expect(pending).rejects.toMatchObject({ code: 'STORAGE_BUSY', message: 'База не ответила вовремя. Повторите подбор.' });
+    expect(mocks.release).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ code: 'STORAGE_BUSY' }));
+    if (phase === 'acquire') expect(mocks.fetch).not.toHaveBeenCalled();
+    rejectLate(new Error('Late transport rejection after connection destruction'));
+    await Promise.resolve();
+    expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it('maps a PostgreSQL statement deadline to a retryable storage error', async () => {
+    mocks.readDomainVersionWithClient.mockRejectedValue(Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' }));
+    await expect(recommendations('employee', { expected_version: version })).rejects.toMatchObject({
+      code: 'STORAGE_BUSY', status: 503, message: 'База не ответила вовремя. Повторите подбор.',
+    });
+    expect(mocks.release).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ code: 'STORAGE_BUSY' }));
   });
 
   it('holds no transaction during AI and reuses its existing connection for the final atomic revision check', async () => {

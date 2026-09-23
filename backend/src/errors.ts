@@ -5,3 +5,6 @@ export class AppError extends Error {
 export function invariant(condition: unknown, code: ErrorCode, message: string, status = 400): asserts condition {
   if (!condition) throw new AppError(code, message, status);
 }
+export function isStorageBusyError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && ['55P03', '57014', '40001', '40P01'].includes(String(error.code)));
+}

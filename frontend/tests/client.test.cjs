@@ -481,9 +481,50 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
       assert.match(text, new RegExp(expected));
       assert.match(text, /Цель не выбрана/);
       assert.doesNotMatch(text, /Senior/);
+      assert.doesNotMatch(text, /Ожидаемые.*приросты не складываются/);
     } finally {
       await unmount(root);
     }
+  }
+});
+
+test("exhausted recommendations explain the catalogue limit and focus the remaining skills", async () => {
+  const profile = {
+    ...employee(),
+    department: "Test", role: "Engineer", grade: "Junior", tenure_months: 12,
+    last_review_date: "2026-09-01", has_simulated_progress: false,
+    goal: { source: "selected", target: { target_role: "Engineer", target_grade: "Middle" } },
+    progress: { coverage: 0.25, critical_coverage: 0.25, remaining_gap: 3 },
+    skills: [
+      { skill_id: "S1", current_level: 1, required_level: 2, gap: 1, critical: true },
+      { skill_id: "S2", current_level: 0, required_level: 2, gap: 2, critical: false },
+    ],
+  };
+  global.fetch = async (url) => reply(
+    url === api.endpoints.learningModules ? { modules: [] } :
+    url === api.endpoints.catalog ? { skills: [], role_profiles: [], events: [] } :
+    url.endsWith("/recommendations") ? { ...rec(), empty_reason: "NO_GOAL_RELEVANT_EVENTS" } : profile,
+  );
+  const calls = [];
+  let root;
+  await act(async () => {
+    root = create(React.createElement(Employee, { id: "test-employee", onError }), {
+      createNodeMock: (element) => element.props["aria-label"] === "Навыки к цели" ? {
+        focus: () => calls.push("focus"), scrollIntoView: () => calls.push("scroll"),
+      } : null,
+    });
+  });
+  try {
+    const text = JSON.stringify(root.toJSON());
+    assert.match(text, /Разрывы с целью ещё есть/);
+    assert.doesNotMatch(text, /Варианты следующего шага/);
+    const metric = root.root.findAllByProps({ className: "growth-metric mint" })[0];
+    assert.equal(metric.findByType("strong").children.join(""), "1");
+    await act(async () => root.root.findAllByType("button")
+      .find((button) => button.children.includes("Посмотреть навыки к цели")).props.onClick());
+    assert.deepEqual(calls, ["focus", "scroll"]);
+  } finally {
+    await unmount(root);
   }
 });
 
@@ -916,7 +957,7 @@ test("HR skill totals retain denominators and distinguish reached goals from mis
   }
 });
 
-test("HR goal action names the employee and writes only to the selected profile", async () => {
+test("HR goal action follows grade order and writes the selected goal to the named employee", async () => {
   const previousDocument = global.document;
   global.document = { activeElement: null, querySelector: () => null };
   const profile = {
@@ -933,7 +974,8 @@ test("HR goal action names the employee and writes only to the selected profile"
       return reply({ employee: profile, changed: true, version: profile.version });
     }
     return reply(url === "/api/catalog"
-      ? { skills: [], events: [], role_profiles: [{ role: "Engineer", grade: "Senior" }] }
+      ? { skills: [], events: [], grades: ["Junior", "Middle", "Senior", "Lead"],
+          role_profiles: ["Senior", "Junior", "Lead", "Middle"].map(grade => ({ role: "Engineer", grade })) }
       : url.endsWith("/recommendations") ? rec() : profile);
   };
   try {
@@ -942,10 +984,11 @@ test("HR goal action names the employee and writes only to the selected profile"
     const actions = root.root.findByProps({ "aria-label": "Действия HR" });
     await act(async () => actions.findAllByType("button")[0].props.onClick());
     assert.equal(root.root.findByType("dialog").findByType("strong").children.join(""), profile.full_name);
-    await act(async () => root.root.findByType("select").props.onChange({ target: { value: "0" } }));
+    assert.deepEqual(root.root.findByType("select").findAllByType("option").map(option => option.props.value), ["", 1, 3, 0, 2]);
+    await act(async () => root.root.findByType("select").props.onChange({ target: { value: "3" } }));
     await act(async () => root.root.findByType("form").props.onSubmit({ preventDefault() {} }));
     assert.deepEqual(writes, [{ url: "/api/employees/hr-selected/goal", body: {
-      expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Senior" },
+      expected_version: profile.version, career_goal: { target_role: "Engineer", target_grade: "Middle" },
     } }]);
   } finally {
     if (root) await unmount(root);

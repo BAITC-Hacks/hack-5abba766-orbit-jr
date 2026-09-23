@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { z, ZodError } from 'zod';
-import { AppError, invariant } from '../errors';
+import { AppError, invariant, isStorageBusyError } from '../errors';
 import { login, logout, session, sessionCookie, requireEmployee, requireHr } from '../auth';
 import { readSnapshot, readDatasetDate, getHealth, updateGoal, completeActivity, importData } from '../services/data';
 import { recommendations } from '../services/recommendations';
@@ -174,7 +174,8 @@ export async function handleRequest(request: Request): Promise<Response> {
     }
     throw new AppError('NOT_FOUND', 'Маршрут не найден.', 404);
   } catch (error) {
-    const appError = error instanceof AppError ? error : error instanceof ZodError
+    const appError = error instanceof AppError ? error : isStorageBusyError(error)
+      ? new AppError('STORAGE_BUSY', 'База занята, повторите запрос', 503) : error instanceof ZodError
       ? new AppError('VALIDATION_ERROR', 'Проверьте данные запроса.', 400, { issues: error.issues.map(i => ({ path: i.path.join('.'), message: i.message })) })
       : new AppError('INTERNAL_ERROR', 'Не удалось выполнить операцию. Повторите позже.', 500);
     if (appError.status >= 500) console.error(JSON.stringify({ request_id: requestId, code: appError.code, error_type: error instanceof Error ? error.name : 'unknown' }));

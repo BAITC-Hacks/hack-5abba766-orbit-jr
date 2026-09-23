@@ -33,22 +33,66 @@ async function rankSnapshot(employeeId: string, input: AiRankingInput,
   });
   const lockName = `recommend:${employeeId}:${input.version.dataset_revision}:${input.version.employee_revision}`;
   let locked = false;
+  let released = false;
+  const release = (error?: Error) => {
+    if (released) return;
+    released = true;
+    connection.release(error);
+  };
+  // Provider deadlines do not cover PostgreSQL. A DDL lock or stalled socket can
+  // otherwise retain the admission slot and session lock after the caller leaves.
+  // Destroy the connection on interruption; the pool's server statement timeout
+  // also ends queries waiting inside PostgreSQL. A Promise-only race cannot do so.
+  const storage = async <T>(operation: () => Promise<T>, callerSignal?: AbortSignal): Promise<T> => {
+    const interrupted = (reason: 'cancelled' | 'deadline') => new AppError('STORAGE_BUSY',
+      reason === 'cancelled' ? 'Запрос подбора отменён.' : 'База не ответила вовремя. Повторите подбор.', 503);
+    if (callerSignal?.aborted) {
+      const error = interrupted('cancelled');
+      release(error);
+      throw error;
+    }
+    let stop!: (reason: 'cancelled' | 'deadline') => void;
+    const boundary = new Promise<never>((_resolve, reject) => {
+      stop = reason => {
+        const error = interrupted(reason);
+        reject(error);
+        release(error);
+      };
+    });
+    const onAbort = () => stop('cancelled');
+    callerSignal?.addEventListener('abort', onAbort, { once: true });
+    // Match the lock pool's connection budget for these three small SQL calls.
+    const timer = setTimeout(() => stop('deadline'), 1000);
+    try { return await Promise.race([operation(), boundary]); }
+    catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === '57014') {
+        const timeout = interrupted('deadline');
+        release(timeout);
+        throw timeout;
+      }
+      throw error;
+    }
+    finally {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener('abort', onAbort);
+    }
+  };
   try {
-    const lock = await connection.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', [lockName]);
+    const lock = await storage(() => connection.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS acquired', [lockName]), signal);
     locked = Boolean(lock.rows[0]?.acquired);
     if (!locked) throw new AppError('RECOMMENDATION_IN_PROGRESS', 'Подбор для этого профиля уже выполняется.', 429);
     const result = await recommend(input, { signals, signal });
     // Reuse the lock connection for an atomic revision check. Loading every
     // employee and history row again adds latency without strengthening freshness.
-    const current = await readDomainVersionWithClient(connection, employeeId);
+    const current = await storage(() => readDomainVersionWithClient(connection, employeeId), signal);
     if (!sameVersion(current, input.version)) throw new AppError('STALE_RECOMMENDATION', 'Профиль изменился во время подбора. Обновите рекомендации.', 409, { current_version: current });
     return result;
   } finally {
     let unlockError: Error | undefined;
-    if (locked) {
-      try { await connection.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [lockName]); }
+    if (locked && !released) {
+      try { await storage(() => connection.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [lockName])); }
       catch (error) { unlockError = error instanceof Error ? error : new Error('Advisory unlock failed'); }
     }
-    connection.release(unlockError);
+    release(unlockError);
   }
 }

@@ -1,7 +1,7 @@
 import pg, { type PoolClient } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { readFile } from 'node:fs/promises';
-import { AppError } from '../errors';
+import { AppError, isStorageBusyError } from '../errors';
 import type { DatasetSnapshot, DomainVersion } from '../types';
 import * as schema from './schema';
 
@@ -11,12 +11,18 @@ if (databaseSchema && !/^[a-z][a-z0-9_]*$/.test(databaseSchema)) throw new Error
 const connectionOptions = {
   connectionString: process.env.DATABASE_URL || 'postgresql://career_quest:career_quest_local@127.0.0.1:54329/career_quest',
   max: 10, connectionTimeoutMillis: 3000, idleTimeoutMillis: 30000,
+  // Auth and metadata also issue standalone statements outside withTransaction.
+  // Bound those waits on the server; SET LOCAL still overrides bootstrap budgets.
+  lock_timeout: 3000, statement_timeout: 15000,
   ...(databaseSchema ? { options: `-c search_path=${databaseSchema}` } : {}),
 };
 export const pool = new pg.Pool(connectionOptions);
 // Session locks live through provider latency. Keep their bounded connections
 // separate so AI saturation cannot stop authentication, profiles or writes.
-export const recommendationLockPool = new pg.Pool({ ...connectionOptions, connectionTimeoutMillis: 1000 });
+// Server-side cancellation is essential: PostgreSQL may not observe a client
+// disconnect while waiting for a table lock. This also bounds work after the
+// service watchdog destroys the socket. Provider waits run no SQL statement.
+export const recommendationLockPool = new pg.Pool({ ...connectionOptions, connectionTimeoutMillis: 1000, statement_timeout: 1000 });
 pool.on('error', () => { console.error('PostgreSQL idle connection failed'); });
 recommendationLockPool.on('error', () => { console.error('PostgreSQL recommendation connection failed'); });
 let closing: Promise<void> | undefined;
@@ -41,7 +47,7 @@ export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>,
     return result;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
-    if (error && typeof error === 'object' && 'code' in error && ['55P03', '57014', '40001', '40P01'].includes(String(error.code))) throw new AppError('STORAGE_BUSY', 'База занята, повторите запрос', 503);
+    if (isStorageBusyError(error)) throw new AppError('STORAGE_BUSY', 'База занята, повторите запрос', 503);
     throw error;
   } finally { client.release(); }
 }

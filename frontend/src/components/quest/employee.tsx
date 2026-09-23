@@ -23,6 +23,7 @@ import {
   formats,
   eventTypes,
   emptyReasons,
+  emptyReasonGuidance,
   goalSources,
   activityDate,
 } from "@/lib/labels";
@@ -65,6 +66,7 @@ export function Employee({
   const [goalIndex, setGoalIndex] = useState("");
   const [query, setQuery] = useState("");
   const searchInput = useRef<HTMLInputElement>(null);
+  const skillsPanel = useRef<HTMLDivElement>(null);
   const [type, setType] = useState("all");
   const p = state.profile;
   const names = Object.fromEntries(
@@ -72,6 +74,9 @@ export function Employee({
   );
   const eventNames = Object.fromEntries(catalog.data?.events.map(event => [event.event_id, event.title]) ?? []);
   const learningModules = modules.data?.modules ?? [];
+  const goalGrades = catalog.data?.grades ?? [];
+  const goalOptions = catalog.data?.role_profiles.map((profile, index) => ({ profile, index }))
+    .sort((a, b) => a.profile.role.localeCompare(b.profile.role) || goalGrades.indexOf(a.profile.grade) - goalGrades.indexOf(b.profile.grade));
   const moduleFor = (eventId: string) => learningModules.find(module => module.event_id === eventId);
   const disabled = state.busy || !!state.pendingTarget;
   const isHr = viewer === "hr";
@@ -218,10 +223,10 @@ export function Employee({
                 <div className="growth-metric mint">
                   <Layers3 size={23} aria-hidden="true" />
                   <div>
-                    <strong>{p.skills.length}</strong>
-                    <span>навыков в профиле</span>
+                    <strong>{p.skills.filter((skill) => skill.current_level > 0).length}</strong>
+                    <span>навыков с оценкой выше 0</span>
                   </div>
-                  <small>{isHr ? "Профессиональный капитал сотрудника" : "Ваш профессиональный капитал"}</small>
+                  <small>Из {p.skills.length} навыков каталога</small>
                 </div>
                 <div className="growth-metric gold">
                   <Target size={23} aria-hidden="true" />
@@ -302,6 +307,18 @@ export function Employee({
                             : emptyReasons[state.recommendations.empty_reason]}
                       </p>
                     </div>
+                    {state.recommendations.mode === "no_candidates" && <div className="empty">
+                      <p>{emptyReasonGuidance[state.recommendations.empty_reason]}</p>
+                      {state.recommendations.empty_reason === "GOAL_REQUIRED" || state.recommendations.empty_reason === "GOAL_REACHED" ? (
+                        <button className="secondary" disabled={disabled || !catalog.data} onClick={openGoal}>Выбрать направление развития</button>
+                      ) : (
+                        <button className="secondary" onClick={() => {
+                          skillsPanel.current?.focus({ preventScroll: true });
+                          skillsPanel.current?.scrollIntoView({ block: "start" });
+                        }}>Посмотреть навыки к цели</button>
+                      )}
+                    </div>}
+                    {state.recommendations.recommendations.length > 0 && <>
                     <p className="fine-print">
                       Варианты следующего шага. Ожидаемые
                       приросты не складываются.
@@ -319,10 +336,11 @@ export function Employee({
                         />
                       ))}
                     </div>
+                    </>}
                   </>
                 )}
               </section>
-              <Skills employee={p} names={names} />
+              <div ref={skillsPanel} tabIndex={-1} aria-label="Навыки к цели"><Skills employee={p} names={names} /></div>
               </div>
             </>
           )}
@@ -541,9 +559,9 @@ export function Employee({
                     onChange={(e) => setGoalIndex(e.target.value)}
                   >
                     <option value="">Выберите цель</option>
-                    {catalog.data?.role_profiles.map((g, i) => (
-                      <option key={`${g.role}-${g.grade}`} value={i}>
-                        {g.role} · {g.grade}
+                    {goalOptions?.map(({ profile, index }) => (
+                      <option key={`${profile.role}-${profile.grade}`} value={index}>
+                        {profile.role} · {profile.grade}
                       </option>
                     ))}
                   </select>

@@ -283,4 +283,72 @@ describe.skipIf(!databaseUrl)('HTTP: isolated PostgreSQL end-to-end', () => {
     expect(responses.filter(response => response.status === 429)).toHaveLength(2);
     expect(responses.every(response => !response.headers.has('set-cookie'))).toBe(true);
   });
+
+  it.each(['sessions', 'app_meta'] as const)('bounds standalone auth SQL blocked by maintenance on %s', async table => {
+    const cookie = await signIn();
+    const logoutCookie = await signIn();
+    const before = (await pool.query('SELECT count(*)::int AS count FROM sessions')).rows[0].count;
+    const blocker = await pool.connect();
+    let pending: Promise<Response[]> | undefined;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query(`LOCK TABLE ${table} IN ACCESS EXCLUSIVE MODE`);
+      const started = performance.now();
+      const requests = [
+        call('/api/auth/session', { cookie }),
+        call('/api/auth/logout', { method: 'POST', cookie: logoutCookie }),
+        call('/api/auth/login', { method: 'POST', body: { username: 'employee', password: 'employee-demo-2026' } }),
+        ...(table === 'app_meta' ? [call('/api/health')] : []),
+      ];
+      pending = Promise.all(requests);
+      let waitingPids: number[] = [];
+      await expect.poll(async () => {
+        const waiting = await admin.query(`SELECT DISTINCT pid FROM pg_locks
+          WHERE relation=$1::regclass AND NOT granted`, [`${schema}.${table}`]);
+        waitingPids = waiting.rows.map(row => row.pid);
+        return waitingPids.length;
+      }, { timeout: 2000 }).toBe(requests.length);
+      const responses = await Promise.race([
+        pending,
+        new Promise<undefined>(resolve => { deadline = setTimeout(() => resolve(undefined), 4500); }),
+      ]);
+      expect(responses, 'Blocked SQL must finish before maintenance releases its lock').toBeDefined();
+      for (const [index, response] of responses!.entries()) {
+        expect(response.status).toBe(503);
+        const body = await response.json();
+        if (index === 3) expect(body.data.status).toBe('not_ready');
+        else expect(body.error).toEqual({ code: 'STORAGE_BUSY', message: 'База занята, повторите запрос' });
+        // Clear the cookie only when server revocation has actually succeeded.
+        if (table === 'app_meta' && index === 1) expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
+        else expect(response.headers.has('set-cookie')).toBe(false);
+      }
+      const remaining = await admin.query(`SELECT count(*)::int AS count FROM pg_locks
+        WHERE relation=$1::regclass AND pid=ANY($2::int[])`, [`${schema}.${table}`, waitingPids]);
+      expect(remaining.rows[0].count, 'Timed-out server statements must no longer hold or wait for table locks').toBe(0);
+      const after = (await blocker.query('SELECT count(*)::int AS count FROM sessions')).rows[0].count;
+      expect(after).toBe(before - (table === 'app_meta' ? 1 : 0));
+      console.info(JSON.stringify({ phase: 'bounded-auth-maintenance', table, elapsed_ms: Math.round(performance.now() - started), remaining_locks: remaining.rows[0].count }));
+    } finally {
+      if (deadline) clearTimeout(deadline);
+      await blocker.query('ROLLBACK'); blocker.release();
+      if (pending) await pending;
+    }
+    expect((await call('/api/auth/session', { cookie })).status).toBe(200);
+    expect((await call('/api/auth/session', { cookie: logoutCookie })).status).toBe(table === 'app_meta' ? 401 : 200);
+    expect((await call('/api/auth/logout', { method: 'POST', cookie: logoutCookie })).status).toBe(200);
+    expect((await call('/api/auth/session', { cookie: logoutCookie })).status).toBe(401);
+    expect((await call('/api/health')).status).toBe(200);
+    expect((await call('/api/auth/session', { cookie: await signIn() })).status).toBe(200);
+  }, 15000);
+
+  it('keeps transaction and bootstrap SQL budgets local to their transaction', async () => {
+    const { withTransaction, recommendationLockPool } = await import('../src/db');
+    const query = "SELECT current_setting('lock_timeout') AS lock, current_setting('statement_timeout') AS statement";
+    expect((await pool.query(query)).rows[0]).toEqual({ lock: '3s', statement: '15s' });
+    expect(await withTransaction(async client => (await client.query(query)).rows[0])).toEqual({ lock: '3s', statement: '15s' });
+    expect(await withTransaction(async client => (await client.query(query)).rows[0], { bootstrap: true })).toEqual({ lock: '30s', statement: '1min' });
+    expect((await pool.query(query)).rows[0]).toEqual({ lock: '3s', statement: '15s' });
+    expect((await recommendationLockPool.query(query)).rows[0].statement).toBe('1s');
+  });
 });
