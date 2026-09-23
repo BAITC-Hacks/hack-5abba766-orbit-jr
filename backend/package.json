@@ -1,0 +1,28 @@
+{
+  "name": "@career-quest/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "bootstrap": "tsx --env-file-if-exists=../.env scripts/bootstrap.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "csv-parse": "^7.0.2",
+    "drizzle-orm": "^0.45.0",
+    "pg": "^8.16.3",
+    "zod": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.16.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11"
+  }
+}

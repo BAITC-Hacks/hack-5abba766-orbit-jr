@@ -1,0 +1,14 @@
+{
+  "name": "career-quest", "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env scripts/serve.mjs dev",
+    "bootstrap": "npm run bootstrap -w backend",
+    "build": "npm run typecheck -w backend && npm run build -w frontend",
+    "start": "node --env-file-if-exists=.env scripts/serve.mjs start",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test -w backend",
+    "test:integration": "node scripts/integration.mjs"
+  },
+  "engines": {"node": ">=24 <25"}
+}

@@ -2,3 +2,10 @@ node_modules/
 .next/
 .env*
 *.tsbuildinfo
+!.env.example
+.DS_Store
+data/source/*
+!data/source/.gitkeep
+coverage/
+test-results/
+playwright-report/

@@ -1,170 +1,665 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  ArrowUpRight,
   ArrowRight,
-  Check,
-  ChevronRight,
-  Compass,
-  Sparkles,
-  Clock,
-  MapPin,
-  Plus,
-  X,
-  Search,
-  SlidersHorizontal,
-  Upload,
   CheckCircle2,
-  Layers,
-  Target,
-  BookOpen,
-  Users,
-  TrendingUp,
-  RotateCcw,
+  Compass,
+  LogOut,
+  RefreshCw,
   ShieldCheck,
+  X,
 } from "lucide-react";
-import { courses, initialSkills, people, type Course } from "@/lib/demo";
+import type {
+  CareerGoal,
+  CatalogView,
+  CompletionRequest,
+  CompletionResult,
+  DomainVersion,
+  EmployeeDirectory,
+  EmployeeView,
+  GoalResult,
+  HrOverview,
+  RecommendationResult,
+  SessionView,
+} from "../../../contracts/backend";
+import {
+  ApiClientError,
+  apiRequest,
+  apiResponse,
+  endpoints,
+  errorMessage,
+} from "@/lib/api";
+import {
+  ActivityCatalog,
+  ActivityDetails,
+  EmployeeOverview,
+  HrDashboard,
+  ParticipationHistory,
+  dateLabel,
+  type ActivitySelection,
+} from "./career-panels";
+import ImportPanel from "./import-panel";
+
 type View = "overview" | "catalog" | "history" | "hr";
+const sameVersion = (a: DomainVersion, b: DomainVersion) =>
+  a.dataset_revision === b.dataset_revision &&
+  a.employee_revision === b.employee_revision;
+
 export default function QuestApp({
   initialView = "overview",
 }: {
   initialView?: View;
 }) {
   const [view, setView] = useState<View>(initialView);
-  const [done, setDone] = useState<string[]>([]);
-  const [started, setStarted] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
-  const [selected, setSelected] = useState<Course | null>(null);
-  const [dialog, setDialog] = useState<"goal" | "import" | "profile" | null>(
-    null,
+  const [session, setSession] = useState<SessionView | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionRefresh, setSessionRefresh] = useState(0);
+  const [username, setUsername] = useState(
+    initialView === "hr" ? "hr" : "employee",
   );
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("Все");
-  const [department, setDepartment] = useState("Все отделы");
+  const [password, setPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogView | null>(null);
+  const [catalogError, setCatalogError] = useState("");
+  const [directory, setDirectory] = useState<EmployeeDirectory | null>(null);
+  const [directorySearch, setDirectorySearch] = useState("");
+  const [directoryOffset, setDirectoryOffset] = useState(0);
+  const [directoryLoading, setDirectoryLoading] = useState(false);
+  const [directoryError, setDirectoryError] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const selectedId = useRef("");
+  const [employee, setEmployee] = useState<EmployeeView | null>(null);
+  const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [employeeError, setEmployeeError] = useState("");
+  const [asOfDate, setAsOfDate] = useState<string | null>(null);
+  const [recommendations, setRecommendations] =
+    useState<RecommendationResult | null>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState("");
+  const [hr, setHr] = useState<HrOverview | null>(null);
+  const [hrLoading, setHrLoading] = useState(false);
+  const [hrError, setHrError] = useState("");
+  const [dataRefresh, setDataRefresh] = useState(0);
+  const [profileRefresh, setProfileRefresh] = useState(0);
+  const [recommendationsRefresh, setRecommendationsRefresh] = useState(0);
+  const [hrRefresh, setHrRefresh] = useState(0);
+  const [selection, setSelection] = useState<ActivitySelection | null>(null);
+  const [dialog, setDialog] = useState<"goal" | "import" | null>(null);
+  const [draftGoal, setDraftGoal] = useState("");
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const mutationLock = useRef(false);
+  const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [importStatus, setImportStatus] = useState("");
-  const [goal, setGoal] = useState("Senior");
-  const [draftGoal, setDraftGoal] = useState("Senior");
   const modalRef = useRef<HTMLDialogElement>(null);
-  const skills = initialSkills.map((s) => ({
-    ...s,
-    level: Math.min(
-      5,
-      s.level +
-        courses
-          .filter((c) => done.includes(c.id) && c.skill === s.id)
-          .reduce((n, c) => n + c.gain, 0),
-    ),
-    required: goal === "Lead" ? Math.min(5, s.required + 1) : s.required,
-  }));
-  const total = skills.reduce((n, s) => n + s.required, 0);
-  const progress = Math.round(
-    (100 * skills.reduce((n, s) => n + Math.min(s.level, s.required), 0)) /
-      total,
+  const recommendationEpoch = useRef(0);
+  const recommendationAbort = useRef<AbortController | null>(null);
+  const employeeEpoch = useRef(0);
+  const pendingCompletions = useRef(
+    new Map<string, { key: string; request: CompletionRequest }>(),
   );
-  const critical = skills.filter((s) => s.critical);
-  const openCourses = courses.filter((c) => !done.includes(c.id));
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("cq-ui-v1") || "null");
-      if (saved) {
-        setDone(
-          courses.filter((c) => saved.done?.includes(c.id)).map((c) => c.id),
-        );
-        setStarted(
-          courses.filter((c) => saved.started?.includes(c.id)).map((c) => c.id),
-        );
-        setGoal(saved.goal === "Lead" ? "Lead" : "Senior");
-      }
-    } catch {}
-    setReady(true);
-  }, []);
-  useEffect(() => {
-    if (ready)
-      localStorage.setItem("cq-ui-v1", JSON.stringify({ done, started, goal }));
-  }, [done, started, goal, ready]);
-  useEffect(() => {
-    if (toast) {
-      const t = setTimeout(() => setToast(""), 4500);
-      return () => clearTimeout(t);
+
+  function onError(cause: unknown) {
+    if (cause instanceof ApiClientError && cause.status === 401) {
+      setSession(null);
+      setEmployee(null);
+      setCatalog(null);
+      selectedId.current = "";
+      setEmployeeId("");
+      setError("Сессия закончилась. Войдите снова.");
+    } else setError(errorMessage(cause));
+  }
+  function invalidateRecommendations() {
+    recommendationEpoch.current += 1;
+    recommendationAbort.current?.abort();
+    setRecommendations(null);
+    setRecommendationsLoading(false);
+    setRecommendationsError("");
+  }
+  function closeDialog() {
+    if (!mutationLock.current) {
+      setSelection(null);
+      setDialog(null);
+      setError("");
     }
-  }, [toast]);
-  useEffect(() => {
-    if (selected || dialog) modalRef.current?.showModal();
-    else modalRef.current?.close();
-  }, [selected, dialog]);
-  function close() {
-    setSelected(null);
+  }
+  function chooseEmployee(id: string, navigate = false) {
+    if (mutationLock.current) return;
+    if (id === selectedId.current) {
+      setProfileRefresh((value) => value + 1);
+      if (navigate) setView("overview");
+      return;
+    }
+    employeeEpoch.current += 1;
+    selectedId.current = id;
+    setEmployeeId(id);
+    setEmployee(null);
+    setEmployeeError("");
+    invalidateRecommendations();
+    setSelection(null);
     setDialog(null);
+    setError("");
+    if (navigate) setView("overview");
   }
-  function navigate(v: View) {
-    setView(v);
-    setQuery("");
-    setFilter("Все");
-  }
-  function complete(c: Course) {
-    if (!done.includes(c.id)) {
-      setDone((d) => [...d, c.id]);
-      setToast("Демо-завершение сохранено. Навыки и прогресс обновлены.");
+  function openActivity(value: ActivitySelection) {
+    if (!employee || mutationLock.current) return;
+    if (
+      value.candidate &&
+      (!recommendations ||
+        !sameVersion(recommendations.version, employee.version))
+    ) {
+      setError("Подбор устарел. Обновите рекомендации.");
+      return;
     }
-    close();
+    setError("");
+    setSelection(value);
   }
-  const filtered = courses.filter(
-    (c) =>
-      (filter === "Все" || c.type === filter) &&
-      `${c.title} ${c.subtitle}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  function courseCard(c: Course) {
-    const completed = done.includes(c.id);
-    return (
-      <article className="course-card" key={c.id}>
-        <button
-          className={`course-art ${c.accent}`}
-          onClick={() => setSelected(c)}
-          aria-label={`Подробнее: ${c.title}`}
-        >
-          <span className="art-label">{c.type}</span>
-          <div className={`sculpture ${c.accent}`} aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
-          <span className="art-arrow">
-            <ArrowUpRight size={19} />
-          </span>
-        </button>
-        <div className="course-body">
-          <div className="course-meta">
-            <span>{c.format}</span>
-            <span>·</span>
-            <span>{c.hours} часов</span>
-            {completed && (
-              <span className="completed-mini">
-                <Check size={12} />
-                Готово
-              </span>
-            )}
-          </div>
-          <h3>{c.title}</h3>
-          <p>{c.subtitle}</p>
-          <div className="course-bottom">
-            <span className="gain">
-              {completed ? "Навык обновлён" : "+1 к навыку"}
-            </span>
-            <button className="text-button" onClick={() => setSelected(c)}>
-              {completed
-                ? "Результат"
-                : started.includes(c.id)
-                  ? "Продолжить"
-                  : "Подробнее"}
-              <ChevronRight size={15} />
-            </button>
-          </div>
-        </div>
-      </article>
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setSessionLoading(true);
+    setError("");
+    apiRequest<SessionView>(endpoints.session, { signal: controller.signal })
+      .then((current) => {
+        if (controller.signal.aborted) return;
+        setSession(current);
+        if (current.role === "employee") {
+          selectedId.current = current.employee_id ?? "";
+          setEmployeeId(current.employee_id ?? "");
+          setView((value) => (value === "hr" ? "overview" : value));
+        }
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setSession(null);
+        if (!(cause instanceof ApiClientError && cause.status === 401))
+          setError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSessionLoading(false);
+      });
+    return () => controller.abort();
+  }, [sessionRefresh]);
+
+  useEffect(() => {
+    if (!session) {
+      setCatalog(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCatalogError("");
+    apiResponse<CatalogView>(endpoints.catalog, { signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted) {
+          setCatalog(response.data);
+          setAsOfDate(response.meta.as_of_date);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) {
+          setCatalogError(errorMessage(cause));
+          if (cause instanceof ApiClientError && cause.status === 401)
+            setSession(null);
+        }
+      });
+    return () => controller.abort();
+  }, [session, dataRefresh]);
+
+  useEffect(() => {
+    if (!session || session.role !== "hr") {
+      setDirectory(null);
+      return;
+    }
+    const controller = new AbortController();
+    setDirectoryLoading(true);
+    setDirectoryError("");
+    const timer = setTimeout(
+      () => {
+        const params = new URLSearchParams({
+          limit: "50",
+          offset: String(directoryOffset),
+          q: directorySearch,
+        });
+        apiRequest<EmployeeDirectory>(`${endpoints.directory}?${params}`, {
+          signal: controller.signal,
+        })
+          .then((response) => {
+            if (controller.signal.aborted) return;
+            setDirectory(response);
+            if (!selectedId.current && response.items.length) {
+              selectedId.current = response.items[0].employee_id;
+              setEmployeeId(response.items[0].employee_id);
+            }
+          })
+          .catch((cause: unknown) => {
+            if (!controller.signal.aborted) {
+              setDirectoryError(errorMessage(cause));
+              if (cause instanceof ApiClientError && cause.status === 401)
+                setSession(null);
+            }
+          })
+          .finally(() => {
+            if (!controller.signal.aborted) setDirectoryLoading(false);
+          });
+      },
+      directorySearch ? 250 : 0,
     );
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [session, directorySearch, directoryOffset, dataRefresh]);
+
+  useEffect(() => {
+    if (!session || !employeeId) {
+      setEmployee(null);
+      return;
+    }
+    const controller = new AbortController();
+    const epoch = ++employeeEpoch.current;
+    selectedId.current = employeeId;
+    setEmployeeLoading(true);
+    setEmployeeError("");
+    setEmployee(null);
+    setSelection(null);
+    invalidateRecommendations();
+    apiResponse<EmployeeView>(endpoints.employee(employeeId), {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (
+          !controller.signal.aborted &&
+          epoch === employeeEpoch.current &&
+          selectedId.current === employeeId
+        ) {
+          setEmployee(response.data);
+          setAsOfDate(response.meta.as_of_date);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted && epoch === employeeEpoch.current) {
+          setEmployeeError(errorMessage(cause));
+          if (cause instanceof ApiClientError && cause.status === 401)
+            setSession(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && epoch === employeeEpoch.current)
+          setEmployeeLoading(false);
+      });
+    return () => controller.abort();
+  }, [session, employeeId, profileRefresh, dataRefresh]);
+
+  useEffect(() => {
+    if (!session || !employee) return;
+    const controller = new AbortController();
+    recommendationAbort.current = controller;
+    const epoch = ++recommendationEpoch.current;
+    const targetId = employee.employee_id;
+    const version = employee.version;
+    setRecommendationsLoading(true);
+    setRecommendationsError("");
+    setRecommendations(null);
+    apiRequest<RecommendationResult>(endpoints.recommendations(targetId), {
+      method: "POST",
+      body: JSON.stringify({ expected_version: version, limit: 3 }),
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (
+          controller.signal.aborted ||
+          epoch !== recommendationEpoch.current ||
+          selectedId.current !== targetId
+        )
+          return;
+        if (!sameVersion(response.version, version)) {
+          setRecommendationsError(
+            "Данные изменились во время подбора. Обновите профиль.",
+          );
+          return;
+        }
+        setRecommendations(response);
+      })
+      .catch((cause: unknown) => {
+        if (
+          controller.signal.aborted ||
+          epoch !== recommendationEpoch.current ||
+          selectedId.current !== targetId
+        )
+          return;
+        if (cause instanceof ApiClientError && cause.status === 401)
+          setSession(null);
+        else setRecommendationsError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && epoch === recommendationEpoch.current)
+          setRecommendationsLoading(false);
+      });
+    return () => controller.abort();
+  }, [session, employee, recommendationsRefresh]);
+
+  useEffect(() => {
+    if (!session || session.role !== "hr") {
+      setHr(null);
+      return;
+    }
+    const controller = new AbortController();
+    setHrLoading(true);
+    setHrError("");
+    apiRequest<HrOverview>(endpoints.hr, { signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted) setHr(response);
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) {
+          setHrError(errorMessage(cause));
+          if (cause instanceof ApiClientError && cause.status === 401)
+            setSession(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setHrLoading(false);
+      });
+    return () => controller.abort();
+  }, [session, hrRefresh, dataRefresh]);
+  useEffect(() => {
+    if (selection || dialog) modalRef.current?.showModal();
+    else modalRef.current?.close();
+  }, [selection, dialog]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 6_000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (loginBusy) return;
+    setLoginBusy(true);
+    setError("");
+    try {
+      const current = await apiRequest<SessionView>(endpoints.login, {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      setSession(current);
+      setPassword("");
+      setDirectorySearch("");
+      setDirectoryOffset(0);
+      if (current.role === "employee") {
+        selectedId.current = current.employee_id ?? "";
+        setEmployeeId(current.employee_id ?? "");
+        setView("overview");
+      } else {
+        selectedId.current = "";
+        setEmployeeId("");
+        setView(initialView === "hr" ? "hr" : "overview");
+      }
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setLoginBusy(false);
+    }
   }
+  async function logout() {
+    if (mutationLock.current) return;
+    mutationLock.current = true;
+    setMutationBusy(true);
+    setError("");
+    try {
+      await apiRequest(endpoints.logout, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      invalidateRecommendations();
+      employeeEpoch.current += 1;
+      setSession(null);
+      setEmployee(null);
+      setCatalog(null);
+      setHr(null);
+      setDirectory(null);
+      selectedId.current = "";
+      setEmployeeId("");
+      setSelection(null);
+      setDialog(null);
+      pendingCompletions.current.clear();
+    } catch (cause) {
+      onError(cause);
+    } finally {
+      mutationLock.current = false;
+      setMutationBusy(false);
+    }
+  }
+  async function saveGoal() {
+    if (!employee || mutationLock.current) return;
+    const id = employee.employee_id;
+    const careerGoal: CareerGoal | null = draftGoal
+      ? (JSON.parse(draftGoal) as CareerGoal)
+      : null;
+    mutationLock.current = true;
+    setMutationBusy(true);
+    setError("");
+    invalidateRecommendations();
+    try {
+      const response = await apiRequest<GoalResult>(endpoints.goal(id), {
+        method: "PUT",
+        body: JSON.stringify({
+          expected_version: employee.version,
+          career_goal: careerGoal,
+        }),
+      });
+      if (selectedId.current === id) {
+        setEmployee(response.employee);
+        setDialog(null);
+        setSelection(null);
+        setToast(
+          response.changed
+            ? "Цель сохранена. Пересчитываем следующие шаги."
+            : "Эта цель уже выбрана.",
+        );
+      }
+      setHrRefresh((value) => value + 1);
+    } catch (cause) {
+      onError(cause);
+      if (cause instanceof ApiClientError && cause.code === "REVISION_CONFLICT")
+        setProfileRefresh((value) => value + 1);
+      else setRecommendationsRefresh((value) => value + 1);
+    } finally {
+      mutationLock.current = false;
+      setMutationBusy(false);
+    }
+  }
+  async function completeSelection() {
+    if (!employee || !selection || mutationLock.current) return;
+    const { candidate, participation } = selection;
+    if (!candidate && !participation?.actionable) return;
+    const id = employee.employee_id;
+    const target: CompletionRequest["target"] = participation
+      ? {
+          kind: "existing_participation",
+          participation_id: participation.participation_id,
+        }
+      : candidate?.action === "continue" && candidate.participation_id
+        ? {
+            kind: "existing_participation",
+            participation_id: candidate.participation_id,
+          }
+        : {
+            kind: "new_participation",
+            event_id: candidate!.event_id,
+            session_date: candidate!.session_date,
+          };
+    const request: CompletionRequest = {
+      expected_version: employee.version,
+      simulation: true,
+      target,
+    };
+    const fingerprint = JSON.stringify([id, request]);
+    let pending = pendingCompletions.current.get(fingerprint);
+    if (!pending) {
+      pending = { key: crypto.randomUUID(), request };
+      pendingCompletions.current.set(fingerprint, pending);
+    }
+    mutationLock.current = true;
+    setMutationBusy(true);
+    setError("");
+    invalidateRecommendations();
+    try {
+      const response = await apiRequest<CompletionResult>(
+        endpoints.completions(id),
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": pending.key },
+          body: JSON.stringify(pending.request),
+        },
+      );
+      pendingCompletions.current.delete(fingerprint);
+      if (selectedId.current === id) {
+        setSelection(null);
+        setToast(
+          `Симуляция сохранена. Изменено навыков: ${response.skill_changes.length}.`,
+        );
+        setProfileRefresh((value) => value + 1);
+      }
+      setHrRefresh((value) => value + 1);
+    } catch (cause) {
+      onError(cause);
+      if (
+        cause instanceof ApiClientError &&
+        cause.status >= 400 &&
+        cause.status < 500
+      ) {
+        pendingCompletions.current.delete(fingerprint);
+        if (
+          [
+            "REVISION_CONFLICT",
+            "ALREADY_COMPLETED",
+            "SESSION_ALREADY_COMPLETED",
+            "INVALID_PARTICIPATION_STATE",
+          ].includes(cause.code)
+        ) {
+          setSelection(null);
+          setProfileRefresh((value) => value + 1);
+        }
+      }
+      // Keep the exact request and key on uncertain network outcomes so retry cannot double-apply.
+    } finally {
+      mutationLock.current = false;
+      setMutationBusy(false);
+    }
+  }
+  function refreshAll() {
+    if (!mutationLock.current) {
+      setError("");
+      setDataRefresh((value) => value + 1);
+    }
+  }
+
+  if (sessionLoading)
+    return (
+      <main className="login-shell">
+        <div className="login-card">
+          <Compass size={36} />
+          <h1>Career Quest</h1>
+          <p role="status">Проверяем сессию…</p>
+        </div>
+      </main>
+    );
+  if (!session)
+    return (
+      <main className="login-shell">
+        <section className="login-card">
+          <span className="brand">
+            <span className="brand-icon">
+              <Compass size={25} />
+            </span>
+            career<span>quest</span>
+          </span>
+          <span className="eyebrow">ВАША КАРЬЕРА. ВАШ МАРШРУТ.</span>
+          <h1>Развитие начинается здесь.</h1>
+          <p>
+            Войдите, чтобы открыть персональную траекторию или обзор команды.
+          </p>
+          <form onSubmit={(event) => void login(event)}>
+            <label className="field-label">
+              Логин
+              <input
+                name="username"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                disabled={loginBusy}
+              />
+            </label>
+            <label className="field-label">
+              Пароль
+              <input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={loginBusy}
+              />
+            </label>
+            {error && (
+              <div role="alert" className="error-panel">
+                {error}
+              </div>
+            )}
+            <button className="primary" type="submit" disabled={loginBusy}>
+              {loginBusy ? "Входим…" : "Войти"}
+              <ArrowRight size={17} />
+            </button>
+          </form>
+          <details className="demo-credentials" open>
+            <summary>Аккаунты локальной демонстрации</summary>
+            <div>
+              <button
+                className="secondary"
+                disabled={loginBusy}
+                onClick={() => {
+                  setUsername("employee");
+                  setPassword("employee-demo-2026");
+                }}
+              >
+                Сотрудник
+              </button>
+              <code>employee / employee-demo-2026</code>
+            </div>
+            <div>
+              <button
+                className="secondary"
+                disabled={loginBusy}
+                onClick={() => {
+                  setUsername("hr");
+                  setPassword("hr-demo-2026");
+                }}
+              >
+                HR
+              </button>
+              <code>hr / hr-demo-2026</code>
+            </div>
+          </details>
+          {error && (
+            <button
+              className="text-button spaced"
+              disabled={loginBusy}
+              onClick={() => setSessionRefresh((value) => value + 1)}
+            >
+              Проверить подключение
+              <RefreshCw size={14} />
+            </button>
+          )}
+        </section>
+      </main>
+    );
+
+  const selectedPerson = directory?.items.find(
+    (person) => person.employee_id === employeeId,
+  );
   return (
     <>
       <header className="global-nav">
@@ -178,37 +673,47 @@ export default function QuestApp({
           </a>
           <nav aria-label="Главная навигация">
             <button
-              className={view === "overview" || view === "history" ? "active" : ""}
-              onClick={() => navigate("overview")}
+              disabled={mutationBusy}
+              className={
+                view === "overview" || view === "history" ? "active" : ""
+              }
+              onClick={() => setView("overview")}
             >
-              Моё развитие
+              {session.role === "hr" ? "Развитие сотрудника" : "Моё развитие"}
             </button>
             <button
+              disabled={mutationBusy}
               className={view === "catalog" ? "active" : ""}
-              onClick={() => navigate("catalog")}
+              onClick={() => setView("catalog")}
             >
               Каталог
             </button>
-            <button
-              className={view === "hr" ? "active" : ""}
-              onClick={() => navigate("hr")}
-            >
-              HR-обзор
-            </button>
+            {session.role === "hr" && (
+              <button
+                disabled={mutationBusy}
+                className={view === "hr" ? "active" : ""}
+                onClick={() => setView("hr")}
+              >
+                HR-обзор
+              </button>
+            )}
           </nav>
           <button
-            className="avatar"
-            aria-label="Открыть профиль"
-            onClick={() => setDialog("profile")}
+            className="logout-button"
+            disabled={mutationBusy}
+            onClick={() => void logout()}
+            title={`Выйти: ${session.display_name}`}
           >
-            АИ
+            <LogOut size={17} />
+            <span>Выйти</span>
           </button>
         </div>
       </header>
       <div className="demo-strip">
         <span className="status-dot" />
-        Интерактивный прототип<span className="strip-divider">/</span>
-        Демонстрационные данные · AI не подключён
+        Локальный сценарий развития<span className="strip-divider">/</span>
+        {session.role === "hr" ? "HR" : "Сотрудник"} · выполнения отмечаются как
+        симуляции
       </div>
       <main>
         <div className="page-top">
@@ -230,15 +735,49 @@ export default function QuestApp({
             <p>
               {view === "hr"
                 ? "Замечайте потребности. Создавайте возможности для развития."
-                : view === "catalog"
-                  ? "Возможности, которые превращают интерес в новый навык."
-                  : view === "history"
-                    ? "Всё, чему вы научились, и то, что ещё впереди."
-                    : "Акмарал, ваше следующее достижение ближе, чем кажется."}
+                : employee
+                  ? `${employee.full_name} · ${employee.department} · ${employee.grade} ${employee.role}`
+                  : "Загружаем профиль и возможности развития."}
             </p>
           </div>
-          <span className="date-chip">1 октября 2026</span>
+          {asOfDate && (
+            <span className="date-chip">Срез: {dateLabel(asOfDate)}</span>
+          )}
         </div>
+        {session.role === "hr" && view !== "hr" && (
+          <div className="employee-switcher">
+            <ShieldCheck size={18} />
+            <label>
+              Профиль сотрудника
+              <select
+                aria-label="Выбрать сотрудника"
+                value={employeeId}
+                disabled={mutationBusy || directoryLoading}
+                onChange={(event) => chooseEmployee(event.target.value)}
+              >
+                {!employeeId && <option value="">Выберите сотрудника</option>}
+                {employeeId && !selectedPerson && (
+                  <option value={employeeId}>
+                    {employee?.full_name ?? employeeId}
+                  </option>
+                )}
+                {directory?.items.map((person) => (
+                  <option key={person.employee_id} value={person.employee_id}>
+                    {person.full_name} · {person.grade} {person.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="text-button"
+              disabled={mutationBusy}
+              onClick={() => setView("hr")}
+            >
+              Поиск по всей команде
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
         {view !== "hr" && (
           <div className="subnav" aria-label="Разделы развития">
             {(
@@ -247,488 +786,165 @@ export default function QuestApp({
                 ["catalog", "Возможности"],
                 ["history", "Моя активность"],
               ] as const
-            ).map(([v, label]) => (
+            ).map(([key, label]) => (
               <button
-                key={v}
-                className={view === v ? "selected" : ""}
-                onClick={() => navigate(v)}
+                disabled={mutationBusy}
+                key={key}
+                className={view === key ? "selected" : ""}
+                onClick={() => setView(key)}
               >
                 {label}
-                {v === "history" && started.length > 0 && (
-                  <span>{started.length}</span>
-                )}
               </button>
             ))}
           </div>
         )}
-        {view === "overview" && (
-          <>
-            <section className="hero">
-              <div className="hero-copy">
-                <span className="pill">
-                  <span className="status-dot" />
-                  Ваша траектория
-                </span>
-                <h2>
-                  Следующая глава.
-                  <br />
-                  <span>{goal} Engineer.</span>
-                </h2>
-                <p>
-                  Ваш опыт уже стал прочной основой.
-                  <br />
-                  Теперь — больше масштаба, влияния и возможностей.
-                </p>
-                <button
-                  className="primary"
-                  onClick={() =>
-                    document
-                      .getElementById("next-steps")
-                      ?.scrollIntoView({ behavior: "smooth" })
-                  }
-                >
-                  К следующим шагам
-                  <ArrowRight size={17} />
-                </button>
-                <button
-                  className="hero-link"
-                  onClick={() => {
-                    setDraftGoal(goal);
-                    setDialog("goal");
-                  }}
-                >
-                  Изменить цель
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div
-                className="orbit-scene"
-                aria-label={`Соответствие цели ${progress}%`}
-              >
-                <div className="orbital orbit-one" />
-                <div className="orbital orbit-two" />
-                <div className="orbital orbit-three" />
-                <div className="planet-glow" />
-                <div className="progress-orb">
-                  <span>ВАШ ПРОГРЕСС</span>
-                  <strong>
-                    {progress}
-                    <small>%</small>
-                  </strong>
-                  <p>на пути к {goal}</p>
-                  <div className="orb-track">
-                    <i style={{ width: `${progress}%` }} />
-                  </div>
-                </div>
-                <div className="float-label float-top">
-                  <Sparkles size={16} />
-                  <span>Потенциал становится опытом</span>
-                </div>
-                <div className="float-label float-bottom">
-                  <span className="small-check">
-                    <Check size={12} />
-                  </span>
-                  Каждый шаг — ближе к цели
-                </div>
-                <span className="orbit-dot dot-one" />
-                <span className="orbit-dot dot-two" />
-              </div>
-              <div className="hero-foot">
-                <span>
-                  Backend Engineer <ChevronRight size={13} />
-                  Middle <ChevronRight size={13} />
-                  <b>{goal}</b>
-                </span>
-                <span>Цель выбрана вами</span>
-              </div>
-            </section>
-            <section className="metrics">
-              <div>
-                <span className="metric-icon">
-                  <Target size={20} />
-                </span>
-                <div>
-                  <strong>
-                    {skills.filter((s) => s.level >= s.required).length}
-                    <small> / {skills.length}</small>
-                  </strong>
-                  <p>навыков соответствуют цели</p>
-                </div>
-              </div>
-              <div>
-                <span className="metric-icon lavender">
-                  <Layers size={20} />
-                </span>
-                <div>
-                  <strong>
-                    {critical.filter((s) => s.level < s.required).length}
-                  </strong>
-                  <p>приоритетных навыка для роста</p>
-                </div>
-              </div>
-              <div>
-                <span className="metric-icon mint">
-                  <CheckCircle2 size={20} />
-                </span>
-                <div>
-                  <strong>{2 + done.length}</strong>
-                  <p>завершённых активностей в демо</p>
-                </div>
-              </div>
-            </section>
-            <section id="next-steps">
-              <div className="section-heading">
-                <div>
-                  <span className="eyebrow">В НУЖНОМ НАПРАВЛЕНИИ</span>
-                  <h2>Маленькие шаги. Большие перемены.</h2>
-                </div>
-                <button
-                  className="text-button"
-                  onClick={() => navigate("catalog")}
-                >
-                  Все возможности
-                  <ArrowUpRight size={16} />
-                </button>
-              </div>
-              <div className="insight">
-                <span className="insight-icon">
-                  <Sparkles size={21} />
-                </span>
-                <div>
-                  <strong>Сначала — то, что приблизит к цели.</strong>
-                  <p>
-                    {openCourses.length
-                      ? "В демо-подборке учтены разрывы в навыках, требования роли и история обучения."
-                      : "Вы завершили все активности демо-подборки. Новые шаги появятся после подключения backend."}
-                  </p>
-                </div>
-                <span className="outline-tag">Демо-подборка</span>
-              </div>
-              <div className="course-grid">
-                {openCourses.length ? (
-                  openCourses.map(courseCard)
-                ) : (
-                  <div className="empty">
-                    <CheckCircle2 />
-                    <h3>Отличный результат.</h3>
-                    <p>Все предложенные шаги завершены.</p>
-                    <button
-                      className="text-button"
-                      onClick={() => navigate("history")}
-                    >
-                      Посмотреть историю
-                      <ArrowRight size={15} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-            <section className="skills-panel">
-              <div className="skills-intro">
-                <span className="eyebrow">ВИДЕТЬ СВОЙ РОСТ</span>
-                <h2>
-                  Ваш опыт.
-                  <br />В новой перспективе.
-                </h2>
-                <p>
-                  Сравните текущие навыки с требованиями цели. Каждый
-                  завершённый шаг меняет картину.
-                </p>
-                <div className="legend">
-                  <span>
-                    <i />
-                    Текущий уровень
-                  </span>
-                  <span>
-                    <i />
-                    До цели
-                  </span>
-                </div>
-                <small>
-                  Расчётное соответствие навыков.
-                  <br />
-                  Не является гарантией повышения.
-                </small>
-              </div>
-              <div className="skill-list">
-                {skills.map((s) => (
-                  <div className="skill-row" key={s.id}>
-                    <div>
-                      <span>
-                        {s.name}
-                        {s.critical && (
-                          <span className="critical">Приоритет</span>
-                        )}
-                      </span>
-                      <b>
-                        {s.level}
-                        <em> / {s.required}</em>
-                        {s.level >= s.required && <Check size={14} />}
-                      </b>
-                    </div>
-                    <div className="skill-segments">
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <span
-                          key={i}
-                          className={
-                            i < s.level
-                              ? "filled"
-                              : i < s.required
-                                ? "needed"
-                                : ""
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
+        {error && !selection && !dialog && (
+          <div role="alert" className="error-panel">
+            {error}
+            <button
+              className="secondary"
+              onClick={refreshAll}
+              disabled={mutationBusy}
+            >
+              Обновить данные
+            </button>
+          </div>
         )}
-        {view === "catalog" && (
+        {catalogError && (
+          <div role="alert" className="error-panel">
+            {catalogError}
+            <button className="secondary" onClick={refreshAll}>
+              Повторить загрузку
+            </button>
+          </div>
+        )}
+        {!catalog && !catalogError && (
+          <div className="loading-panel" role="status">
+            Загружаем каталог и требования к ролям…
+          </div>
+        )}
+        {catalog && view !== "hr" && (
           <>
-            <div className="toolbar">
-              <label className="search">
-                <Search size={18} />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Найти возможность"
-                />
-              </label>
-              <div className="filter-pills">
-                {["Все", "Воркшоп", "Курс", "Программа"].map((t) => (
-                  <button
-                    className={filter === t ? "chosen" : ""}
-                    onClick={() => setFilter(t)}
-                    key={t}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="catalog-count">
-              {filtered.length} возможности в демо-каталоге
-            </div>
-            <div className="course-grid">{filtered.map(courseCard)}</div>
-            {!filtered.length && (
-              <div className="empty">
-                <Search />
-                <h3>Ничего не найдено</h3>
-                <p>Попробуйте другое название или снимите фильтр.</p>
+            {employeeError && (
+              <div role="alert" className="error-panel">
+                {employeeError}
                 <button
-                  className="text-button"
-                  onClick={() => {
-                    setQuery("");
-                    setFilter("Все");
-                  }}
+                  className="secondary"
+                  onClick={() => setProfileRefresh((value) => value + 1)}
                 >
-                  Сбросить поиск
+                  Повторить
                 </button>
               </div>
             )}
-          </>
-        )}
-        {view === "history" && (
-          <section className="history-panel">
-            <div className="section-heading">
-              <h2>Ваш путь в деталях</h2>
-              <span className="outline-tag">Демо-история</span>
-            </div>
-            {courses
-              .filter((c) => started.includes(c.id) || done.includes(c.id))
-              .map((c) => (
-                <div className="history-row" key={c.id}>
-                  <span
-                    className={`history-icon ${done.includes(c.id) ? "finished" : ""}`}
-                  >
-                    {done.includes(c.id) ? (
-                      <Check size={20} />
-                    ) : (
-                      <BookOpen size={20} />
-                    )}
-                  </span>
-                  <div>
-                    <h3>{c.title}</h3>
-                    <p>
-                      {done.includes(c.id)
-                        ? "Симуляция завершения · навык обновлён"
-                        : "В процессе · ваш следующий шаг"}
-                    </p>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => setSelected(c)}
-                  >
-                    {done.includes(c.id) ? "Результат" : "Продолжить"}
-                    <ChevronRight size={15} />
-                  </button>
-                </div>
-              ))}
-            {[
-              "Практика проектирования API",
-              "Командный воркшоп: обратная связь",
-            ].map((title, i) => (
-              <div className="history-row" key={title}>
-                <span className="history-icon finished">
-                  <Check size={20} />
-                </span>
-                <div>
-                  <h3>{title}</h3>
+            {directoryError && !employee && (
+              <div role="alert" className="error-panel">
+                {directoryError}
+                <button className="secondary" onClick={refreshAll}>
+                  Повторить
+                </button>
+              </div>
+            )}
+            {employeeLoading && (
+              <div className="loading-panel" role="status">
+                Загружаем актуальный профиль…
+              </div>
+            )}
+            {!employee &&
+              !employeeLoading &&
+              !employeeError &&
+              !directoryError && (
+                <div className="empty">
+                  <Compass />
+                  <h3>Выберите сотрудника</h3>
                   <p>
-                    {i ? "12 августа" : "18 сентября"} 2026 · завершено в
-                    демо-истории
+                    {session.role === "hr"
+                      ? "Откройте профиль в HR-обзоре, чтобы увидеть его траекторию."
+                      : "Для аккаунта пока не назначен профиль сотрудника."}
                   </p>
                 </div>
-                <span className="muted">Завершено</span>
-              </div>
-            ))}
-          </section>
+              )}
+            {employee && (
+              <>
+                {view === "overview" && (
+                  <EmployeeOverview
+                    employee={employee}
+                    catalog={catalog}
+                    result={recommendations}
+                    recommendationsLoading={recommendationsLoading}
+                    recommendationsError={recommendationsError}
+                    onRetry={() => {
+                      if (!mutationLock.current)
+                        setProfileRefresh((value) => value + 1);
+                    }}
+                    onGoal={() => {
+                      setDraftGoal(
+                        employee.goal.target
+                          ? JSON.stringify(employee.goal.target)
+                          : "",
+                      );
+                      setDialog("goal");
+                      setError("");
+                    }}
+                    onSelect={openActivity}
+                  />
+                )}
+                {view === "catalog" && (
+                  <ActivityCatalog
+                    catalog={catalog}
+                    result={recommendations}
+                    onSelect={openActivity}
+                  />
+                )}
+                {view === "history" && (
+                  <ParticipationHistory
+                    employee={employee}
+                    catalog={catalog}
+                    onSelect={openActivity}
+                  />
+                )}
+              </>
+            )}
+          </>
         )}
-        {view === "hr" && (
+        {catalog && view === "hr" && session.role === "hr" && (
           <>
-            <div className="hr-toolbar">
-              <div className="pill">
-                <ShieldCheck size={16} />
-                Предпросмотр HR · без авторизации
+            {hrError && (
+              <div role="alert" className="error-panel">
+                {hrError}
+                <button
+                  className="secondary"
+                  onClick={() => setHrRefresh((value) => value + 1)}
+                >
+                  Повторить
+                </button>
               </div>
-              <button
-                className="primary"
-                onClick={() => {
-                  setImportStatus("");
+            )}
+            {hrLoading && (
+              <div className="loading-panel" role="status">
+                Обновляем HR-обзор…
+              </div>
+            )}
+            {hr && (
+              <HrDashboard
+                overview={hr}
+                catalog={catalog}
+                directory={directory}
+                search={directorySearch}
+                onSearch={(value) => {
+                  setDirectorySearch(value);
+                  setDirectoryOffset(0);
+                }}
+                directoryLoading={directoryLoading}
+                directoryError={directoryError}
+                offset={directoryOffset}
+                onPage={setDirectoryOffset}
+                onEmployee={(id) => chooseEmployee(id, true)}
+                onImport={() => {
+                  setError("");
                   setDialog("import");
                 }}
-              >
-                <Upload size={16} />
-                Импорт данных
-              </button>
-            </div>
-            <section className="hr-metrics">
-              {[
-                [Users, "5", "сотрудников в выборке"],
-                [TrendingUp, "70%", "среднее соответствие цели"],
-                [Target, "2", "сотрудника требуют внимания"],
-              ].map(([Icon, num, label], i) => {
-                const I = Icon as typeof Users;
-                return (
-                  <div key={i}>
-                    <I size={22} />
-                    <strong>{num as string}</strong>
-                    <p>{label as string}</p>
-                  </div>
-                );
-              })}
-            </section>
-            <div className="hr-grid">
-              <section className="panel">
-                <span className="eyebrow">ТОЧКИ РОСТА</span>
-                <h2>Где нужна поддержка</h2>
-                <p className="muted">
-                  Сотрудники с разрывом до целевого уровня
-                </p>
-                {[
-                  ["System Design", 3],
-                  ["Менторство", 2],
-                  ["Cloud Architecture", 2],
-                  ["Коммуникация", 1],
-                ].map(([label, n]) => (
-                  <div className="hr-bar" key={label}>
-                    <div>
-                      <span>{label}</span>
-                      <b>{n} из 5</b>
-                    </div>
-                    <div>
-                      <i style={{ width: `${Number(n) * 20}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </section>
-              <section className="hr-note">
-                <span className="note-icon">
-                  <Compass size={30} />
-                </span>
-                <h2>
-                  У каждого свой
-                  <br />
-                  темп развития.
-                </h2>
-                <p>
-                  Отсутствие подходящего шага — повод помочь с маршрутом.
-                  Обсудите цель или предложите подготовительную активность.
-                </p>
-                <div>
-                  <span className="status-dot" />
-                  Без публичных рейтингов
-                </div>
-              </section>
-            </div>
-            <section className="people-panel">
-              <div className="section-heading">
-                <h2>Потребности команды</h2>
-                <label className="select-wrap">
-                  <SlidersHorizontal size={15} />
-                  <select
-                    aria-label="Фильтр отдела"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                  >
-                    {["Все отделы", "Разработка", "Аналитика", "Продукт"].map(
-                      (d) => (
-                        <option key={d}>{d}</option>
-                      ),
-                    )}
-                  </select>
-                </label>
-              </div>
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Сотрудник</th>
-                      <th>Отдел</th>
-                      <th>Соответствие цели</th>
-                      <th>Следующий шаг</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {people
-                      .filter(
-                        (p) =>
-                          department === "Все отделы" ||
-                          p.department === department,
-                      )
-                      .map((p) => (
-                        <tr key={p.name}>
-                          <td>
-                            <strong>{p.name}</strong>
-                            <small>{p.role}</small>
-                          </td>
-                          <td>{p.department}</td>
-                          <td>
-                            <div className="table-progress">
-                              <i style={{ width: `${p.progress}%` }} />
-                            </div>
-                            <span>{p.progress}%</span>
-                          </td>
-                          <td>
-                            <span
-                              className={`status-tag ${p.status === "Есть следующий шаг" ? "ok" : "attention"}`}
-                            >
-                              {p.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="table-note">
-                Отдельная демонстрационная выборка. Показатели не являются
-                анализом исходного датасета.
-              </p>
-            </section>
+              />
+            )}
           </>
         )}
         <footer>
@@ -737,237 +953,108 @@ export default function QuestApp({
             career<span>quest</span>
           </a>
           <span>Развитие, в котором есть смысл.</span>
-          <button
-            onClick={() => {
-              setDone([]);
-              setStarted([]);
-              setGoal("Senior");
-              setToast("Демонстрация сброшена");
-            }}
-          >
-            <RotateCcw size={13} />
-            Сбросить демо
+          <button disabled={mutationBusy} onClick={refreshAll}>
+            <RefreshCw size={13} />
+            Обновить данные
           </button>
         </footer>
       </main>
       <dialog
         ref={modalRef}
-        onCancel={close}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) close();
+        onCancel={(event) => {
+          event.preventDefault();
+          closeDialog();
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeDialog();
         }}
       >
-        <button className="close" aria-label="Закрыть окно" onClick={close}>
-          <X size={21} />
+        <button
+          className="close"
+          disabled={mutationBusy}
+          aria-label="Закрыть"
+          onClick={closeDialog}
+        >
+          <X size={18} />
         </button>
-        {selected && (
-          <div className="modal-content">
-            <span className="eyebrow">ВАШ СЛЕДУЮЩИЙ ШАГ</span>
-            <h2>{selected.title}</h2>
-            <div className="modal-meta">
-              <span>
-                <Clock size={16} />
-                {selected.hours} часов
-              </span>
-              <span>
-                <MapPin size={16} />
-                {selected.format}
-              </span>
-              <span>{selected.date}</span>
-            </div>
-            <p className="modal-lead">
-              {done.includes(selected.id)
-                ? "Результат этого занятия уже включён в текущие навыки. Повторное завершение не начисляет прирост."
-                : `Активность развивает ${skills.find((s) => s.id === selected.skill)?.name} и сокращает разрыв до выбранной цели ${goal}. ${selected.format === "В своём темпе" ? "Самостоятельный формат позволяет распределить нагрузку." : "Формат и длительность помогут спланировать следующий шаг."}`}
-            </p>
-            <h3>Почему это подходит вам</h3>
-            <ul className="fact-list">
-              {[
-                `Текущий уровень: ${skills.find((s) => s.id === selected.skill)?.level}; требование цели ${goal}: ${skills.find((s) => s.id === selected.skill)?.required}`,
-                `Формат: ${selected.format.toLowerCase()}; нагрузка: ${selected.hours} часов`,
-                done.includes(selected.id) ? "Завершение уже записано в демонстрационной истории" : started.includes(selected.id) ? "Занятие уже добавлено в ваш план — можно продолжить" : "В демонстрационной истории это занятие ещё не завершено",
-              ].map((f) => (
-                <li key={f}>
-                  <CheckCircle2 size={17} />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <div className="outcome">
-              <span>
-                {initialSkills.find((s) => s.id === selected.skill)?.name}
-              </span>
-              <strong>
-                {skills.find((s) => s.id === selected.skill)?.level}
-                <ArrowRight size={19} />
-                {done.includes(selected.id)
-                  ? "Уже учтено"
-                  : Math.min(
-                      selected.max,
-                      (skills.find((s) => s.id === selected.skill)?.level ||
-                        0) + selected.gain,
-                    )}
-              </strong>
-            </div>
-            <p className="fine-print">
-              Сценарий интерфейса на подготовленных данных. Завершение будущего
-              занятия — симуляция, не подтверждение посещения.
-            </p>
-            {done.includes(selected.id) ? (
-              <div className="success">
-                <CheckCircle2 size={20} />
-                Активность завершена в демо
-              </div>
-            ) : (
-              <div className="modal-actions">
-                <button
-                  className="primary"
-                  onClick={() => {
-                    setStarted((s) =>
-                      s.includes(selected.id) ? s : [...s, selected.id],
-                    );
-                    setToast("Активность добавлена в «Мою активность»");
-                    close();
-                  }}
-                >
-                  {started.includes(selected.id)
-                    ? "Вернуться к обучению"
-                    : "Добавить в мой план"}
-                  <Plus size={16} />
-                </button>
-                <button
-                  className="secondary"
-                  onClick={() => complete(selected)}
-                >
-                  Симулировать завершение
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        {dialog === "goal" && (
-          <div className="modal-content">
-            <span className="eyebrow">ВАШЕ НАПРАВЛЕНИЕ</span>
-            <h2>Куда хотите двигаться?</h2>
-            <p className="modal-lead">
-              Выберите следующий ориентир в Backend Engineering.
-            </p>
-            <label className="field-label">
-              Целевой грейд
-              <select
-                value={draftGoal}
-                onChange={(e) => setDraftGoal(e.target.value)}
-              >
-                <option>Senior</option>
-                <option>Lead</option>
-              </select>
-            </label>
-            <p className="fine-print">
-              В прототипе доступны две демонстрационные траектории. Полный
-              список ролей будет поступать с backend.
-            </p>
-            <button
-              className="primary"
-              onClick={() => {
-                setGoal(draftGoal);
-                close();
-                setToast("Цель обновлена. Требования и прогресс пересчитаны.");
-              }}
-            >
-              Сохранить цель
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        )}
-        {dialog === "profile" && (
-          <div className="modal-content">
-            <div className="large-avatar">АИ</div>
-            <h2>Акмарал Исмаилова</h2>
-            <p className="modal-lead">Backend Engineer · Middle</p>
-            <div className="profile-details">
-              <span>
-                Отдел<b>Разработка</b>
-              </span>
-              <span>
-                Стаж<b>4 года 4 месяца</b>
-              </span>
-              <span>
-                Формат работы<b>Гибридный</b>
-              </span>
-            </div>
-            <p className="fine-print">
-              Подготовленный демонстрационный профиль. Переключение на HR
-              показывает макет интерфейса и не предоставляет реальные права
-              доступа.
-            </p>
-          </div>
-        )}
-        {dialog === "import" && (
-          <div className="modal-content">
-            <span className="eyebrow">ДАННЫЕ ДЛЯ РАЗВИТИЯ</span>
-            <h2>Импорт профилей</h2>
-            <p className="modal-lead">
-              Предварительная проверка файла сотрудников. Данные не отправляются
-              на сервер.
-            </p>
-            <label className="upload-zone">
-              <Upload size={32} />
-              <strong>Выберите JSON-файл</strong>
-              <span>employees.json · до 2 МБ</span>
-              <input
-                type="file"
-                accept=".json,application/json"
-                aria-label="Файл сотрудников"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  if (f.size > 2 * 1024 * 1024) {
-                    setImportStatus("Файл слишком большой. Максимум 2 МБ.");
-                    return;
-                  }
-                  try {
-                    const data = JSON.parse(await f.text());
-                    const list = Array.isArray(data) ? data : data.employees;
-                    if (
-                      !Array.isArray(list) ||
-                      !list.length ||
-                      list.some(
-                        (x: Record<string, unknown>) =>
-                          !x ||
-                          typeof x.employee_id !== "string" ||
-                          typeof x.role !== "string" ||
-                          typeof x.grade !== "string",
-                      )
-                    )
-                      throw Error();
-                    setImportStatus(
-                      `Прочитано профилей: ${list.length}. Базовая структура верна. Полная проверка и сохранение станут доступны после подключения API.`,
-                    );
-                  } catch {
-                    setImportStatus(
-                      "Не удалось проверить файл. Ожидается JSON с employees и полями employee_id, role, grade.",
-                    );
-                  }
-                }}
-              />
-            </label>
-            {importStatus && (
-              <p className="import-result" role="status">
-                {importStatus}
+        <div className="modal-content">
+          {selection && catalog && (
+            <ActivityDetails
+              selection={selection}
+              catalog={catalog}
+              busy={mutationBusy}
+              onComplete={() => void completeSelection()}
+            />
+          )}
+          {dialog === "goal" && employee && catalog && (
+            <>
+              <span className="eyebrow">ВАША ТРАЕКТОРИЯ</span>
+              <h2>Куда хотите двигаться?</h2>
+              <p className="modal-lead">
+                Можно выбрать следующий грейд или другую профессию. Требования
+                берутся из каталога компании.
               </p>
-            )}
-            <p className="fine-print">
-              CSV-история и атомарный импорт будут подключены к POST
-              /api/import. Этот экран пока не изменяет выборку.
-            </p>
-          </div>
-        )}
+              <label className="field-label">
+                Целевая роль и уровень
+                <select
+                  aria-label="Целевая роль и уровень"
+                  value={draftGoal}
+                  disabled={mutationBusy}
+                  onChange={(event) => setDraftGoal(event.target.value)}
+                >
+                  <option value="">Сбросить цель и получить предложение</option>
+                  {catalog.role_profiles.map((profile) => {
+                    const value = JSON.stringify({
+                      target_role: profile.role,
+                      target_grade: profile.grade,
+                    });
+                    return (
+                      <option key={value} value={value}>
+                        {profile.grade} · {profile.role}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <p className="fine-print">
+                Процент покрытия пересчитывается относительно новой цели.
+                Изменение цели само по себе не меняет ваши навыки или должность.
+              </p>
+              <button
+                className="primary"
+                disabled={mutationBusy}
+                onClick={() => void saveGoal()}
+              >
+                {mutationBusy ? "Сохраняем…" : "Сохранить цель"}
+                <ArrowRight size={16} />
+              </button>
+            </>
+          )}
+          {dialog === "import" && catalog && session.role === "hr" && (
+            <ImportPanel
+              datasetRevision={catalog.dataset_revision}
+              onBusyChange={(busy) => {
+                mutationLock.current = busy;
+                setMutationBusy(busy);
+              }}
+              onCommitted={() => {
+                setDataRefresh((value) => value + 1);
+                setToast("Импорт обработан. Обновляем данные команды.");
+              }}
+            />
+          )}
+          {error && (
+            <div role="alert" className="error-panel spaced">
+              {error}
+            </div>
+          )}
+        </div>
       </dialog>
       {toast && (
         <div className="toast" role="status">
           <CheckCircle2 size={19} />
           {toast}
-          <button aria-label="Закрыть уведомление" onClick={() => setToast("")}>
+          <button aria-label="Скрыть уведомление" onClick={() => setToast("")}>
             <X size={16} />
           </button>
         </div>

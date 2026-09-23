@@ -1800,3 +1800,226 @@ dialog::backdrop {
     animation: none !important;
   }
 }
+
+/* Connected states share the original prototype's visual language. */
+button:disabled {
+  opacity: 0.55;
+}
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 40px 20px;
+}
+.login-card {
+  width: min(520px, 100%);
+  padding: 38px;
+  border: 1px solid var(--line);
+  border-radius: 25px;
+  background: white;
+  box-shadow: 0 18px 70px #17243a0a;
+}
+.login-card > .brand {
+  margin-bottom: 32px;
+}
+.login-card h1 {
+  font-size: 34px;
+  line-height: 1.25;
+  letter-spacing: -1.2px;
+  margin: 12px 0 18px;
+}
+.login-card > p {
+  color: #7b8493;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.login-card form {
+  display: grid;
+  gap: 16px;
+  margin: 27px 0;
+}
+.field-label input {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #dfe4ec;
+  border-radius: 10px;
+  margin-top: 9px;
+  background: white;
+  color: #536279;
+}
+.demo-credentials {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  color: #7b8493;
+  font-size: 11px;
+}
+summary {
+  cursor: pointer;
+}
+.demo-credentials > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 13px;
+  flex-wrap: wrap;
+}
+.demo-credentials code {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.error-panel {
+  background: #fff3ef;
+  color: #9b4936;
+  border: 1px solid #f0cbbf;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+}
+.error-details {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  max-height: 220px;
+  overflow: auto;
+}
+.loading-panel {
+  padding: 32px;
+  border: 1px solid #cad7e7;
+  color: #7286a1;
+  background: #f0f5fc;
+  border-radius: 16px;
+  font-size: 12px;
+  text-align: center;
+  margin: 18px 0;
+}
+.employee-switcher {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #eef3fa;
+  border-radius: 13px;
+  padding: 16px 20px;
+  color: #7386a1;
+  margin-bottom: 24px;
+}
+.employee-switcher label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  flex: 1;
+}
+.employee-switcher select {
+  max-width: 440px;
+  min-width: 220px;
+  padding: 10px;
+  background: white;
+  border: 1px solid #d9e2ee;
+  border-radius: 8px;
+  color: #465771;
+}
+.logout-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #7c8899;
+}
+.spaced {
+  margin-top: 22px;
+}
+.block-muted {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  color: #959ca9;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+  font-size: 11px;
+  color: #8390a3;
+}
+.attention-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.attention-list .history-row > div {
+  flex: 1;
+}
+.attention-list .history-row p {
+  max-width: 760px;
+  line-height: 1.8;
+}
+.import-files {
+  display: grid;
+  gap: 12px;
+}
+.issue-error {
+  color: #a54c37;
+}
+.hr-note > div + div {
+  margin-top: 9px;
+}
+.hero h2 > span {
+  overflow-wrap: anywhere;
+}
+.hero-copy {
+  min-width: 0;
+}
+.course-body p {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.course-bottom {
+  gap: 8px;
+}
+.course-bottom .gain {
+  max-width: 65%;
+}
+@media (max-width: 750px) {
+  .employee-switcher {
+    flex-wrap: wrap;
+  }
+  .employee-switcher label {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .employee-switcher select {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    font-size: 11px;
+  }
+  .people-panel .section-heading {
+    flex-wrap: wrap;
+  }
+  .people-panel .search {
+    min-width: 0;
+    width: 100%;
+  }
+  .login-card {
+    padding: 27px;
+  }
+  .login-card h1 {
+    font-size: 29px;
+  }
+  .logout-button span {
+    display: none;
+  }
+  .hero h2 {
+    font-size: 31px;
+  }
+}
