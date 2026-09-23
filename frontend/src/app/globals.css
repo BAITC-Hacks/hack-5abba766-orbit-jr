@@ -1981,3 +1981,383 @@ td,
 .status-tag.attention {
   color: #785321;
 }
+
+/* Usability pass: long content must wrap inside the layout, not get clipped. */
+.connected-main {
+  padding-bottom: 48px;
+}
+.connected-main > section + section {
+  margin-top: 24px;
+}
+.page-top > div,
+.hero > *,
+.course-grid > *,
+.skills-panel > *,
+.skill-row > div > span {
+  min-width: 0;
+}
+.page-top h1,
+.hero h2,
+.course-body h3,
+.history-row h3,
+.modal-content h2 {
+  overflow-wrap: anywhere;
+}
+.hero-copy {
+  padding-bottom: 82px;
+}
+.hero h2 {
+  font-size: clamp(30px, 3.4vw, 44px);
+}
+.hero-foot {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.course-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.skill-row > div:first-child {
+  gap: 12px;
+  align-items: flex-start;
+}
+.skill-row > div > span {
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.skill-row b {
+  flex-shrink: 0;
+}
+.history-row > div {
+  min-width: 0;
+  flex: 1 1 240px;
+  overflow-wrap: anywhere;
+}
+.history-row > button {
+  margin-left: 0;
+}
+.critical {
+  font-size: 10px;
+}
+.connected-main .fine-print,
+.connected-main .course-meta,
+.connected-main .history-row p,
+.connected-main .skills-intro small,
+.connected-main .skill-row > div:first-child,
+.connected-main .skill-row b,
+.connected-main th,
+.connected-main td {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.connected-main .eyebrow {
+  font-size: 10px;
+}
+.connected-main .page-top p,
+.connected-main .course-body > p {
+  font-size: 14px;
+}
+.connected-main .primary,
+.connected-main .secondary,
+.connected-main .text-button,
+.connected-nav button,
+.login-page button {
+  min-height: 44px;
+  font-size: 14px;
+}
+.connected-main .section-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.connected-main .section-heading .text-button {
+  margin-left: 0;
+}
+.connected-main .subnav {
+  gap: 24px;
+}
+.connected-main .subnav button {
+  font-size: 14px;
+  min-height: 48px;
+}
+.connected-main .toolbar {
+  align-items: flex-end;
+}
+.connected-main .toolbar label {
+  flex: 1 1 200px;
+}
+.connected-main .search {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--ink);
+}
+.connected-main .search input {
+  font-size: 16px;
+  background: white;
+}
+input,
+select {
+  max-width: 100%;
+}
+.toolbar input,
+.toolbar select,
+.field-label input,
+.field-label select {
+  min-height: 48px;
+  font-size: 16px;
+  margin-bottom: 0;
+}
+.connected-main .table-scroll {
+  max-width: 100%;
+}
+.connected-main table .text-button {
+  text-align: left;
+}
+.connected-main .hr-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.connected-main .hr-metrics p {
+  font-size: 13px;
+}
+.connected-main .hr-metrics strong {
+  overflow-wrap: anywhere;
+}
+.connected-nav .nav-inner {
+  gap: 20px;
+}
+.account-menu {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+}
+.account-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.connected-nav nav {
+  gap: 0;
+}
+.connected-nav .account-menu button {
+  flex-shrink: 0;
+}
+.connected-nav a[aria-current] {
+  color: #065fc4;
+}
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: 8px;
+  z-index: 100;
+  transform: translateY(-200%);
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+.history-filter {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.history-filter label {
+  min-width: 220px;
+}
+.history-filter p {
+  color: var(--muted);
+  padding-bottom: 12px;
+}
+.skill-filter {
+  display: block;
+  margin-top: 20px;
+  text-align: left;
+}
+.skill-filter[aria-pressed="true"] {
+  color: #075ac0;
+  background: #e8f0fc;
+  border-color: #90b4e4;
+}
+.skill-outcomes {
+  background: #eef4fc;
+  border-radius: 14px;
+  margin: 20px 0;
+  padding: 16px;
+}
+.skill-outcomes p {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-content {
+  padding-top: 54px;
+}
+.modal-content h2 {
+  margin-top: 6px;
+}
+.modal-content .primary,
+.modal-content .secondary,
+.modal-content .text-button {
+  min-height: 44px;
+  font-size: 14px;
+}
+.modal-content > p,
+.modal-content .fine-print {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.modal-content form + .text-button {
+  margin-top: 12px;
+}
+.close {
+  height: 44px;
+  width: 44px;
+  top: 8px;
+  right: 8px;
+  color: #475367;
+}
+.login-page {
+  padding-bottom: 48px;
+}
+.login-page p {
+  line-height: 1.6;
+}
+.login-page form {
+  margin-top: 24px;
+}
+.login-page .field-label {
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+.password-field {
+  position: relative;
+  margin-bottom: 20px;
+}
+.password-field .field-label {
+  margin-bottom: 8px;
+}
+.password-field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 56px 12px 14px;
+  border: 1px solid #a5a8ae;
+  border-radius: 12px;
+  font-size: 16px;
+}
+.password-toggle {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+}
+.login-page form > .primary {
+  width: 100%;
+}
+.login-page .fine-print {
+  font-size: 14px;
+}
+@media (max-width: 900px) {
+  .course-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .account-name {
+    max-width: 150px;
+  }
+}
+@media (max-width: 620px) {
+  .connected-nav .nav-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 10px 18px;
+  }
+  .connected-nav {
+    height: auto;
+  }
+  .connected-nav nav {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    height: auto;
+  }
+  .connected-nav nav a {
+    padding: 8px 0;
+    font-size: 13px;
+  }
+  .account-menu {
+    justify-content: flex-end;
+  }
+  .account-name {
+    display: none;
+  }
+  .hero-copy {
+    padding: 26px 22px 14px;
+  }
+  .hero h2 {
+    font-size: clamp(28px, 8vw, 36px);
+    letter-spacing: -1px;
+  }
+  .course-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .connected-main .hr-metrics {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .connected-main .hr-metrics > div {
+    padding: 20px;
+  }
+  .connected-main .hr-metrics strong {
+    font-size: 32px;
+  }
+  .connected-main .subnav {
+    gap: 20px;
+  }
+  .connected-main .subnav button {
+    font-size: 13px;
+  }
+  .connected-main .toolbar label {
+    flex-basis: auto;
+  }
+  .connected-main .history-row > button {
+    width: 100%;
+  }
+  .modal-content {
+    padding: 54px 22px 26px;
+  }
+  .modal-content .primary {
+    max-width: 100%;
+    width: 100%;
+  }
+  .history-filter label {
+    width: 100%;
+    min-width: 0;
+  }
+}
+.verified-facts,
+.import-panel {
+  overflow-wrap: anywhere;
+}
+.selected-employee {
+  scroll-margin-top: 130px;
+}
+.secondary {
+  color: #4c5d75;
+}
+.feedback ul {
+  padding-left: 20px;
+  margin: 12px 0;
+  line-height: 1.65;
+}
+.feedback details {
+  margin-top: 12px;
+}

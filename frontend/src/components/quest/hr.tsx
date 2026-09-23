@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   CatalogView,
   EmployeeDirectory,
@@ -7,6 +7,7 @@ import type {
 } from "../../../../contracts/backend";
 import { endpoints } from "@/lib/api";
 import { useResource } from "@/hooks/use-resource";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Employee } from "./employee";
 import { HrOverview } from "./hr-overview";
 import { ImportPanel } from "./import-panel";
@@ -18,10 +19,29 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<string>();
   const [revision, setRevision] = useState(0);
+  const profilePanel = useRef<HTMLElement>(null);
+  const profileTrigger = useRef<HTMLElement | null>(null);
+  const settledQ = useDebouncedValue(q);
+  const settledDepartment = useDebouncedValue(department);
+  function openProfile(id: string) {
+    profileTrigger.current = document.activeElement as HTMLElement | null;
+    setSelected(id);
+    if (id === selected) profilePanel.current?.focus();
+  }
+  useEffect(() => {
+    if (!selected || !profilePanel.current) return;
+    profilePanel.current.focus({ preventScroll: true });
+    profilePanel.current.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+      block: "start",
+    });
+  }, [selected]);
   const overview = useResource<Overview>(endpoints.hr, onError);
   const catalog = useResource<CatalogView>(endpoints.catalog, onError);
   const directory = useResource<EmployeeDirectory>(
-    `${endpoints.employees}?${new URLSearchParams({ q, department, role, offset: String(offset), limit: "50" })}`,
+    `${endpoints.employees}?${new URLSearchParams({ ...(settledQ.trim() ? { q: settledQ.trim() } : {}), ...(settledDepartment.trim() ? { department: settledDepartment.trim() } : {}), ...(role ? { role } : {}), offset: String(offset), limit: "50" })}`,
     onError,
   );
   // The overview contract has no filtered HR query: directory filters apply only to the table.
@@ -36,7 +56,15 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
       </div>
       {overview.loading && <Loading>Загрузка HR-сводки…</Loading>}
       <Failure error={overview.error} retry={overview.reload} />
-      {overview.data && <HrOverview data={overview.data} open={setSelected} />}
+      {overview.data && (
+        <HrOverview
+          data={overview.data}
+          open={openProfile}
+          names={Object.fromEntries(
+            catalog.data?.skills.map((s) => [s.skill_id, s.name]) ?? [],
+          )}
+        />
+      )}
       <section className="people-panel">
         <h2>Сотрудники</h2>
         <p>
@@ -103,7 +131,7 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
                       <td>
                         <button
                           className="text-button"
-                          onClick={() => setSelected(p.employee_id)}
+                          onClick={() => openProfile(p.employee_id)}
                         >
                           {p.full_name}
                         </button>
@@ -121,14 +149,16 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
             <div className="modal-actions">
               <button
                 className="secondary"
-                disabled={!offset}
+                disabled={!offset || directory.loading}
                 onClick={() => setOffset((n) => Math.max(0, n - 50))}
               >
                 Назад
               </button>
               <button
                 className="secondary"
-                disabled={offset + 50 >= directory.data.total}
+                disabled={
+                  directory.loading || offset + 50 >= directory.data.total
+                }
                 onClick={() => setOffset((n) => n + 50)}
               >
                 Далее
@@ -138,8 +168,19 @@ export function Hr({ onError }: { onError: (error: unknown) => void }) {
         )}
       </section>
       {selected && (
-        <section className="selected-employee">
-          <button className="secondary" onClick={() => setSelected(undefined)}>
+        <section
+          className="selected-employee"
+          ref={profilePanel}
+          tabIndex={-1}
+          aria-label="Выбранный профиль сотрудника"
+        >
+          <button
+            className="secondary"
+            onClick={() => {
+              setSelected(undefined);
+              profileTrigger.current?.focus();
+            }}
+          >
             Закрыть профиль
           </button>
           <Employee

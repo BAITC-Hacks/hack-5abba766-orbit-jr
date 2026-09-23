@@ -377,11 +377,9 @@ test("import preserves key and files after connection loss and reports server co
   });
   try {
     await act(async () =>
-      root.root
-        .findAllByType("input")[0]
-        .props.onChange({
-          target: { files: [new File(["{}"], "employees.json")] },
-        }),
+      root.root.findAllByType("input")[0].props.onChange({
+        target: { files: [new File(["{}"], "employees.json")] },
+      }),
     );
     await act(async () => root.root.findByType("button").props.onClick());
     assert.equal(root.root.findAllByType("input")[0].props.disabled, true);
@@ -485,4 +483,150 @@ test("connected profile displays missing goal and distinguishes AI, fallback and
       await unmount(root);
     }
   }
+});
+
+test("408 and 429 preserve completion receipts and replay the same key", async () => {
+  for (const status of [408, 429]) {
+    const requests = [];
+    global.fetch = async (url, options) => {
+      if (url.endsWith("/completions")) {
+        requests.push({
+          body: options.body,
+          key: options.headers.get("Idempotency-Key"),
+        });
+        if (requests.length === 1)
+          return Response.json(
+            { error: { code: "HTTP_ERROR", message: "Unknown write outcome" } },
+            { status },
+          );
+        return reply({ skill_changes: [] }, { replayed: true });
+      }
+      return reply(url.endsWith("/recommendations") ? rec() : employee());
+    };
+    const root = await mount();
+    try {
+      await act(async () =>
+        value.complete({
+          kind: "existing_participation",
+          participation_id: "retry-timeout",
+        }),
+      );
+      assert.ok(value.pendingTarget);
+      await act(async () => value.retryCompletion());
+      assert.deepEqual(requests[0], requests[1]);
+      assert.match(value.notice, /Повторный запрос/);
+    } finally {
+      await unmount(root);
+    }
+  }
+});
+
+test("login failure distinguishes invalid credentials from an expired session", async () => {
+  global.fetch = async () =>
+    Response.json({ error: { code: "UNAUTHENTICATED" } }, { status: 401 });
+  await assert.rejects(api.apiRequest(api.endpoints.login), (e) =>
+    /Неверный логин или пароль/.test(e.message),
+  );
+  await assert.rejects(api.apiRequest(api.endpoints.employee("E1")), (e) =>
+    /Сессия истекла/.test(e.message),
+  );
+});
+
+test("null successful payload is rejected before components dereference it", async () => {
+  global.fetch = async () => reply(null);
+  await assert.rejects(
+    api.apiRequest(api.endpoints.session),
+    (e) => e.code === "INVALID_RESPONSE",
+  );
+});
+
+const labels = load("src/lib/labels.ts");
+const { History } = load("src/components/quest/history.tsx");
+test("history status filtering keeps separate participations and their exact action targets", async () => {
+  let root;
+  const targets = [];
+  const rows = [
+    {
+      participation_id: "a",
+      event_id: "EV_036",
+      event_title: "First club",
+      effective_status: "completed",
+      completion_pct: 100,
+      actionable: false,
+    },
+    {
+      participation_id: "b",
+      event_id: "EV_036",
+      event_title: "Second club",
+      effective_status: "in_progress",
+      completion_pct: 20,
+      actionable: true,
+    },
+  ];
+  await act(async () => {
+    root = create(
+      React.createElement(History, {
+        rows,
+        busy: false,
+        complete: (t) => targets.push(t),
+      }),
+    );
+  });
+  try {
+    await act(async () =>
+      root.root
+        .findByType("select")
+        .props.onChange({ target: { value: "in_progress" } }),
+    );
+    assert.doesNotMatch(JSON.stringify(root.toJSON()), /First club/);
+    await act(async () => root.root.findByType("button").props.onClick());
+    assert.deepEqual(targets, [
+      { kind: "existing_participation", participation_id: "b" },
+    ]);
+    await act(async () =>
+      root.root
+        .findByType("select")
+        .props.onChange({ target: { value: "no_show" } }),
+    );
+    assert.match(JSON.stringify(root.toJSON()), /Участий с таким статусом нет/);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("skill filter uses remaining server gaps, keeping above-target levels intact", async () => {
+  const { Skills } = load("src/components/quest/skills.tsx");
+  let root;
+  const profile = {
+    goal: { target: {} },
+    skills: [
+      { skill_id: "above", current_level: 5, required_level: 3, gap: 0 },
+      { skill_id: "gap", current_level: 2, required_level: 4, gap: 2 },
+    ],
+  };
+  await act(async () => {
+    root = create(
+      React.createElement(Skills, {
+        employee: profile,
+        names: { above: "Already covered", gap: "Needs development" },
+      }),
+    );
+  });
+  try {
+    await act(async () => root.root.findByType("button").props.onClick());
+    const content = JSON.stringify(root.toJSON());
+    assert.doesNotMatch(content, /Already covered/);
+    assert.match(content, /Needs development/);
+    await act(async () => root.root.findByType("button").props.onClick());
+    assert.match(JSON.stringify(root.toJSON()), /Already covered/);
+    assert.equal(profile.skills[0].current_level, 5);
+  } finally {
+    await unmount(root);
+  }
+});
+
+test("scheduled activity with no date is never presented as self-paced", () => {
+  assert.equal(labels.activityDate("offline", null), "Дата не указана");
+  assert.equal(labels.activityDate("online", null), "Дата не указана");
+  assert.equal(labels.activityDate("self_paced", null), "В своём темпе");
 });

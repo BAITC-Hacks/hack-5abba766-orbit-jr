@@ -51,7 +51,9 @@ export async function apiRequest<T>(
       response.status,
       error?.code ?? "HTTP_ERROR",
       response.status === 401
-        ? "Сессия истекла. Войдите снова."
+        ? path === endpoints.login
+          ? "Неверный логин или пароль. Проверьте данные и попробуйте снова."
+          : "Сессия истекла. Войдите снова."
         : response.status === 403
           ? "Нет доступа к этому разделу."
           : (error?.message ??
@@ -60,7 +62,13 @@ export async function apiRequest<T>(
       typeof body?.request_id === "string" ? body.request_id : undefined,
     );
   }
-  if (!body || !("data" in body) || !body.meta || typeof body.meta !== "object")
+  if (
+    !body ||
+    body.data == null ||
+    !body.meta ||
+    typeof body.meta !== "object" ||
+    Array.isArray(body.meta)
+  )
     throw new ApiFailure(
       response.status,
       "INVALID_RESPONSE",
@@ -89,3 +97,13 @@ export const endpoints = {
   hr: "/api/hr/overview",
   import: "/api/import",
 };
+// Timeouts and throttling do not establish whether a write committed.
+export function isDefinitiveRejection(error: unknown): error is ApiFailure {
+  return (
+    error instanceof ApiFailure &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408 &&
+    error.status !== 429
+  );
+}

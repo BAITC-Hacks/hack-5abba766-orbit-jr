@@ -32,9 +32,9 @@ export default function QuestApp({
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
-          setError(error);
-          if (error instanceof ApiFailure && error.status === 401)
+          if (error instanceof ApiFailure && error.status === 401) {
             setSession(null);
+          } else setError(error);
         }
       });
     return () => controller.abort();
@@ -62,8 +62,8 @@ export default function QuestApp({
   if (!session)
     return (
       <>
-        <Failure error={error} />
         <Login
+          notice={error}
           onLogin={(value) => {
             setError(undefined);
             setSession(value);
@@ -73,6 +73,9 @@ export default function QuestApp({
     );
   return (
     <>
+      <a className="skip-link" href="#main-content">
+        Перейти к содержимому
+      </a>
       <Navigation
         session={session}
         busy={busy}
@@ -91,7 +94,7 @@ export default function QuestApp({
           }
         }}
       />
-      <main>
+      <main id="main-content" tabIndex={-1} className="connected-main">
         <Failure error={error} />
         {initialView === "hr" && session.role !== "hr" ? (
           <Failure error={new Error("Нет доступа к HR-данным.")} />

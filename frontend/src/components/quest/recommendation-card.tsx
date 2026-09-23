@@ -3,7 +3,7 @@ import type {
   EmployeeView,
   RecommendationCard as Card,
 } from "../../../../contracts/backend";
-import { eventTypes, formats } from "@/lib/labels";
+import { eventTypes, formats, activityDate } from "@/lib/labels";
 export function RecommendationCard({
   card,
   employee,
@@ -38,12 +38,7 @@ export function RecommendationCard({
           {formats[card.format]} · {card.duration_hours} ч.
         </div>
         <h3>{card.title}</h3>
-        <p>
-          {card.session_date ??
-            (card.format === "self_paced"
-              ? "В своём темпе"
-              : "Дата не указана")}
-        </p>
+        <p>{activityDate(card.format, card.session_date)}</p>
         {card.relevance === "prerequisite" && (
           <p>
             Подготовительный шаг. Открывает доступ:{" "}

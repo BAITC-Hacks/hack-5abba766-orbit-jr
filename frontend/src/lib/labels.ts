@@ -39,3 +39,11 @@ export const eventTypes = {
   certification: "Сертификация",
   meetup: "Встреча",
 };
+export function activityDate(
+  format: keyof typeof formats,
+  date: string | null,
+) {
+  return (
+    date ?? (format === "self_paced" ? "В своём темпе" : "Дата не указана")
+  );
+}

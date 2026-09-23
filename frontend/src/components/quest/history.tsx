@@ -1,3 +1,5 @@
+"use client";
+import { useState } from "react";
 import type {
   CompletionRequest,
   ParticipationView,
@@ -12,11 +14,37 @@ export function History({
   busy: boolean;
   complete: (target: CompletionRequest["target"]) => void;
 }) {
+  const [status, setStatus] = useState("all");
+  const visible = rows.filter(
+    (row) => status === "all" || row.effective_status === status,
+  );
   return (
     <section className="history-panel">
       <h2>Ваш путь в деталях</h2>
+      {rows.length > 0 && (
+        <div className="history-filter">
+          <label className="field-label">
+            Статус участия
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="all">Все статусы · {rows.length}</option>
+              {Object.entries(statuses).map(([key, label]) => (
+                <option value={key} key={key}>
+                  {label} ·{" "}
+                  {rows.filter((row) => row.effective_status === key).length}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p role="status">
+            Показано: {visible.length} из {rows.length}
+          </p>
+        </div>
+      )}
       {!rows.length && <p>История участия пока пуста.</p>}
-      {rows.map((row) => (
+      {!!rows.length && !visible.length && (
+        <p className="feedback">Участий с таким статусом нет.</p>
+      )}
+      {visible.map((row) => (
         <div className="history-row" key={row.participation_id}>
           <div>
             <h3>{row.event_title}</h3>

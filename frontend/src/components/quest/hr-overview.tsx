@@ -3,9 +3,11 @@ import { emptyReasons, goalSources, statuses } from "@/lib/labels";
 export function HrOverview({
   data,
   open,
+  names = {},
 }: {
   data: Overview;
   open: (id: string) => void;
+  names?: Record<string, string>;
 }) {
   return (
     <>
@@ -50,7 +52,7 @@ export function HrOverview({
             <tbody>
               {data.skill_gaps.map((g) => (
                 <tr key={`${g.skill_id}-${g.goal_source}`}>
-                  <td>{g.skill_id}</td>
+                  <td>{names[g.skill_id] ?? g.skill_id}</td>
                   <td>{goalSources[g.goal_source]}</td>
                   <td>
                     {g.employees_with_gap} / {g.denominator}
@@ -80,7 +82,11 @@ export function HrOverview({
           </div>
         ))}
         {!data.no_next_step.length && (
-          <p>Для всех сотрудников доступен следующий шаг.</p>
+          <p>
+            {data.employee_count
+              ? "Для всех сотрудников доступен следующий шаг."
+              : "В доступной выборке пока нет сотрудников."}
+          </p>
         )}
       </section>
       <section className="people-panel">

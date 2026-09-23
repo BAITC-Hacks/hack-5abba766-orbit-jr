@@ -1,3 +1,5 @@
+"use client";
+import { useState } from "react";
 import type { EmployeeView } from "../../../../contracts/backend";
 export function Skills({
   employee,
@@ -6,6 +8,8 @@ export function Skills({
   employee: EmployeeView;
   names: Record<string, string>;
 }) {
+  const [onlyGaps, setOnlyGaps] = useState(false);
+  const rows = employee.skills.filter((s) => !onlyGaps || (s.gap ?? 0) > 0);
   return (
     <section className="skills-panel">
       <div className="skills-intro">
@@ -16,10 +20,21 @@ export function Skills({
         </h2>
         <p>Текущий уровень и требования цели по расчёту сервера.</p>
         <small>Соответствие навыков не является гарантией повышения.</small>
+        <button
+          className="secondary skill-filter"
+          aria-pressed={onlyGaps}
+          disabled={!employee.goal.target}
+          onClick={() => setOnlyGaps((v) => !v)}
+        >
+          {onlyGaps ? "Показать все навыки" : "Только навыки с разрывом"}
+        </button>
       </div>
       <div className="skill-list">
         {employee.skills.length === 0 && <p>Нет данных о навыках.</p>}
-        {employee.skills.map((s) => (
+        {onlyGaps && !rows.length && (
+          <p role="status">Нет оставшихся разрывов до цели.</p>
+        )}
+        {rows.map((s) => (
           <div className="skill-row" key={s.skill_id}>
             <div>
               <span>
