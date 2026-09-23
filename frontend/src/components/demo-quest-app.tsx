@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Brand, ActivityArt } from "./quest/visuals";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -127,17 +128,20 @@ export default function QuestApp({
     return (
       <article className="course-card" key={c.id}>
         <button
-          className={`course-art ${c.accent}`}
+          className="course-art branded-art"
           onClick={() => setSelected(c)}
           aria-label={`Подробнее: ${c.title}`}
         >
           <span className="art-label">{c.type}</span>
-          <div className={`sculpture ${c.accent}`} aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
+          <ActivityArt
+            type={
+              c.type === "Воркшоп"
+                ? "workshop"
+                : c.type === "Программа"
+                  ? "mentoring"
+                  : "course"
+            }
+          />
           <span className="art-arrow">
             <ArrowUpRight size={19} />
           </span>
@@ -177,12 +181,8 @@ export default function QuestApp({
     <>
       <header className="global-nav">
         <div className="nav-inner">
-          <a className="brand" href="/demo">
-            <span className="brand-icon">
-              <Compass size={21} />
-            </span>
-            career<span>quest</span>
-            <span className="brand-dot" />
+          <a href="/demo" aria-label="Halyk Career Quest — демо">
+            <Brand />
           </a>
           <nav aria-label="Главная навигация">
             <button
@@ -220,7 +220,7 @@ export default function QuestApp({
         Интерактивный прототип<span className="strip-divider">/</span>
         Демонстрационные данные · AI не подключён
       </div>
-      <main>
+      <main className="connected-main demo-main">
         <div className="page-top">
           <div>
             <div className="eyebrow">
@@ -319,7 +319,10 @@ export default function QuestApp({
                 <div className="orbital orbit-two" />
                 <div className="orbital orbit-three" />
                 <div className="planet-glow" />
-                <div className="progress-orb">
+                <div
+                  className="progress-orb"
+                  style={{ "--coverage": `${progress}%` } as CSSProperties}
+                >
                   <span>ВАШ ПРОГРЕСС</span>
                   <strong>
                     {progress}
@@ -741,10 +744,9 @@ export default function QuestApp({
             </section>
           </>
         )}
-        <footer>
-          <a className="brand" href="/demo">
-            <Compass size={18} />
-            career<span>quest</span>
+        <footer className="app-footer">
+          <a href="/demo">
+            <Brand />
           </a>
           <span>Развитие, в котором есть смысл.</span>
           <button

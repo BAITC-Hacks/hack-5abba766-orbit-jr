@@ -37,9 +37,6 @@ export function History({
         <div>
           <span className="eyebrow">ОБУЧЕНИЕ И РАЗВИТИЕ</span>
           <h2 id="activity-title">Моя активность</h2>
-          <p className="section-description">
-            Продолжайте начатое и следите за своим прогрессом.
-          </p>
         </div>
       </div>
       <div className="activity-stats" aria-label="Статистика участия">
@@ -59,23 +56,15 @@ export function History({
           <span>просрочено</span>
         </div>
       </div>
+      {!!rows.length && <div className="activity-distribution" role="img" aria-label={`Всего ${rows.length}: ${Object.entries(statuses).map(([key, label]) => `${label} ${rows.filter(row => row.effective_status === key).length}`).join(", ")}`}>
+        {Object.keys(statuses).map(key => <span key={key} className={`distribution-${key}`} style={{ flexGrow: rows.filter(row => row.effective_status === key).length }} />)}
+      </div>}
       {!!rows.length && (
         <div className="history-filter">
-          <label className="field-label">
-            Статус участия
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="all">Все статусы · {rows.length}</option>
-              {Object.entries(statuses).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label} ·{" "}
-                  {rows.filter((r) => r.effective_status === key).length}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p role="status">
-            Показано: {visible.length} из {rows.length}
-          </p>
+          <div className="activity-filter-chips" role="group" aria-label="Статус участия">
+            {[["all", "Все"], ...Object.entries(statuses)].map(([key, label]) => <button key={key} aria-pressed={status === key} onClick={() => setStatus(key)}>{label}<span>{key === "all" ? rows.length : rows.filter(row => row.effective_status === key).length}</span></button>)}
+          </div>
+          <span className="sr-only" role="status">Показано: {visible.length} из {rows.length}</span>
         </div>
       )}
       {!rows.length && (
@@ -163,7 +152,7 @@ export function History({
                 </span>
               )}
               <details className="activity-details">
-                <summary>Детали участия</summary>
+                <summary>Детали</summary>
                 <p>Запись: {row.participation_id}</p>
                 {row.superseded_by && (
                   <p>Учтено участием: {row.superseded_by}</p>

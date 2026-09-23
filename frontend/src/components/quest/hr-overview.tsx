@@ -1,4 +1,5 @@
 "use client";
+import { GoalDonut } from "./growth-insights";
 import { useState } from "react";
 import { ArrowUpRight, Target, Users, Sparkles } from "lucide-react";
 import type { HrOverview as Overview } from "../../../../contracts/backend";
@@ -16,6 +17,7 @@ export function HrOverview({
 }) {
   const [reason, setReason] = useState("all");
   const [expanded, setExpanded] = useState(false);
+  const [allPeople, setAllPeople] = useState(false);
   const gaps = Object.values(
     data.skill_gaps.reduce<
       Record<
@@ -143,19 +145,7 @@ export function HrOverview({
           <p className="section-description">
             Откуда взялась цель каждого сотрудника.
           </p>
-          <div className="goal-source-list">
-            {Object.entries(data.goals_by_source).map(([key, count]) => (
-              <div key={key}>
-                <span>{goalSources[key as keyof typeof goalSources]}</span>
-                <strong>{count}</strong>
-                <progress
-                  max={data.employee_count || 1}
-                  value={count}
-                  aria-label={goalSources[key as keyof typeof goalSources]}
-                />
-              </div>
-            ))}
-          </div>
+          <GoalDonut data={data} />
           <div className="hr-tip">
             <Target size={22} aria-hidden="true" />
             <p>
@@ -180,7 +170,13 @@ export function HrOverview({
         {!!data.no_next_step.length && (
           <label className="field-label reason-filter">
             Причина
-            <select value={reason} onChange={(e) => setReason(e.target.value)}>
+            <select
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setAllPeople(false);
+              }}
+            >
               <option value="all">Все причины</option>
               {Object.entries(emptyReasons).map(([key, label]) => (
                 <option value={key} key={key}>
@@ -191,7 +187,7 @@ export function HrOverview({
           </label>
         )}
         <div className="attention-list">
-          {available.map((p) => (
+          {available.slice(0, allPeople ? undefined : 8).map((p) => (
             <button
               className="attention-row"
               key={p.employee_id}
@@ -206,6 +202,16 @@ export function HrOverview({
             </button>
           ))}
         </div>
+        {available.length > 8 && (
+          <button
+            className="secondary attention-expand"
+            onClick={() => setAllPeople((v) => !v)}
+          >
+            {allPeople
+              ? "Показать меньше"
+              : `Показать всех · ${available.length}`}
+          </button>
+        )}
         {!available.length && (
           <p className="empty-state">
             {data.no_next_step.length
