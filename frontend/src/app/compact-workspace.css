@@ -17,7 +17,7 @@ html[data-theme] .activity-section .activity-card-footer { align-items: stretch;
 html[data-theme] .activity-section .activity-card-footer > button { justify-content: center; width: 100%; }
 html[data-theme] .activity-section .activity-details { width: 100%; text-align: left; }
 html[data-theme] .activity-section .compact-meta:empty { display: none; }
-html[data-theme] .catalog-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+html[data-theme] .catalog-grid { --catalog-card-height: 320px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: var(--catalog-card-height); gap: 12px; align-items: stretch; }
 html[data-theme] .catalog-grid .course-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface) !important; }
 html[data-theme] .catalog-grid .course-body { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
 html[data-theme] .catalog-grid .course-body h3 { min-height: 2.8em; font-size: 14px; overflow-wrap: anywhere; }
