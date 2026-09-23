@@ -394,8 +394,13 @@ test("import preserves key and files after connection loss and reports server co
 });
 
 const QuestApp = load("src/components/quest-app.tsx").default;
-test("employee session visiting HR never requests HR data", async () => {
+test("employee session visiting HR replaces the route without requesting HR data", async () => {
   const paths = [];
+  const replacements = [];
+  const previousWindow = global.window;
+  const browser = new EventTarget();
+  browser.location = { pathname: "/hr", replace: (path) => replacements.push(path) };
+  global.window = browser;
   let root;
   global.fetch = async (url) => {
     paths.push(url);
@@ -406,14 +411,17 @@ test("employee session visiting HR never requests HR data", async () => {
       display_name: "Тест",
     });
   };
-  await act(async () => {
-    root = create(React.createElement(QuestApp, { initialView: "hr" }));
-  });
   try {
+    await act(async () => {
+      root = create(React.createElement(QuestApp, { initialView: "hr" }));
+    });
     assert.deepEqual(paths, ["/api/auth/session"]);
-    assert.match(JSON.stringify(root.toJSON()), /Нет доступа к HR/);
+    assert.deepEqual(replacements, ["/employee"]);
+    assert.doesNotMatch(JSON.stringify(root.toJSON()), /Нет доступа к HR/);
   } finally {
     await unmount(root);
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
   }
 });
 test("401 shows login without requesting profiles or recommendations", async () => {
