@@ -1,0 +1,213 @@
+
+> test
+> npm run test -w backend && npm run test:client -w frontend
+
+
+> @career-quest/backend@1.0.0 test
+> vitest run --config vitest.config.ts
+
+
+ RUN  v4.1.11 D:/Projects/baitc_hackathon/orbit-jr/backend
+
+
+ Test Files  24 passed (24)
+      Tests  484 passed (484)
+   Start at  17:29:14
+   Duration  9.04s (transform 6.76s, setup 0ms, import 12.26s, tests 16.84s, environment 4ms)
+
+
+> career-quest-ui@0.1.0 test:client
+> node --test tests/client.test.cjs tests/career-journey.test.cjs tests/learning.test.cjs tests/catalog-gaps.test.cjs tests/session.test.cjs tests/hr-read-only.test.cjs tests/ui-audit.test.cjs tests/hr-workspace.test.cjs tests/skill-catalog.test.cjs
+
+✔ employee profile renders source details and handles a missing goal without invented progress (38.5437ms)
+✔ journey hides stale choices and names prerequisite activities in the current snapshot (7.9221ms)
+✔ prerequisite without unlock targets still explains participation requirements cleanly (4.148ms)
+✔ skill focus prioritizes critical gaps and keeps non-target skills collapsed (5.6676ms)
+✔ recommendation explanation includes only cited facts and the supplied action (4.3224ms)
+✔ completion compares saved skill changes and coverage without inventing an earlier snapshot (7.8273ms)
+✔ an uncovered goal skill shows catalog action, critical count and an employee profile button (12.526ms)
+✔ audience mismatch and level cap receive distinct explanations and actions (2.8211ms)
+✔ an empty diagnostic does not promise an executable route (0.5965ms)
+✔ a large catalog diagnostic keeps later needs available in a disclosure (8.962ms)
+✔ the HR overview includes actionable catalog diagnostics and neutral goal attribution (15.6ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ transport preserves structured 403, conflict details and request id (23.0643ms)
+✔ multipart leaves browser boundary intact and combines timeout with caller cancellation (0.9249ms)
+✔ malformed success is not turned into demo data (0.3344ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ profile renders while recommendations are pending; stale version is rejected (19.5673ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ completion retries use identical body/key and no optimistic skill update; receipt replay refetches current state (8.772ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ late recommendations are discarded after completion and after switching profile (7.3564ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ double completion click sends one request; separate EV_036 sessions have distinct targets (4.3621ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import submits JSON+CSV with revision; atomic conflict is not reported as success (15.905ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import preserves key and files after connection loss and reports server counts on replay (15.6865ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ employee session visiting HR replaces the route without requesting HR data (6.7819ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ 401 shows login without requesting profiles or recommendations (12.8007ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ connected profile displays missing goal and distinguishes AI, fallback and empty results (35.0582ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ 408 and 429 preserve completion receipts and replay the same key (7.2493ms)
+✔ login failure distinguishes invalid credentials from an expired session (0.7041ms)
+✔ null successful payload is rejected before components dereference it (0.2566ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ history status filtering keeps separate participations and their exact action targets (16.8241ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ skill filter uses remaining server gaps, keeping above-target levels intact (9.1014ms)
+✔ scheduled activity with no date is never presented as self-paced (0.5872ms)
+✔ login failure keeps authentication message instead of claiming an expired session (0.7961ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ import preview sends dry_run and never refreshes persisted data (20.7706ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a skill outside an active goal is not labeled as missing career goal (1.8202ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR sections preserve selected import files and keep panels separate (75.1191ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR skill totals retain denominators and distinguish reached goals from missing goals (19.1549ms)
+✔ HR read-only profile names the selected employee and only reads their data (10.2921ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR opens the actual employee profile with read-only permissions (337.6713ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR sees the goal and recommendation evidence, including module cards, without employee actions (363.6811ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR history keeps participation details and filters but cannot resume or complete activities (199.0861ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR can search catalog descriptions and inspect learning summaries without starting modules (152.5255ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ read-only profiles cannot retry a pending completion left in client state (92.8935ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR viewer cannot opt into employee actions with readOnly=undefined (114.827ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR viewer cannot opt into employee actions with readOnly=false (133.7474ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ the new profile entry point lets an employee edit their own goal (136.5144ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an employee can still choose and clear their own goal (149.6024ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an employee retains completion and lesson actions in recommendations and history (111.9997ms)
+✔ an employee can open the recommended module for their own profile (71.0153ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an empty HR cohort has no invented goal coverage or promise of a next step (33.0951ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ skills already meeting every goal are excluded from development demand (19.52ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ goal coverage includes all goal sources and dashboard actions call their real destinations (17.2993ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ no-recommendation reasons stay distinct and filtering resets expanded rows (57.5826ms)
+✔ directory filter chips reset pagination and remove only their own filter (278.8559ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ changing the error callback does not abort an in-flight lesson save or restart the attempt (49.6814ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ resumes the attempt content version and only advances a lesson after the server confirms it (7.4835ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a failed quiz keeps skills unchanged and a later server-confirmed pass supplies the completion (10.8847ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an ambiguous quiz response retries the exact body and key and freezes answer changes (6.1421ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ quiz HTTP 408 keeps the original receipt until the outcome is known (5.2857ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ quiz HTTP 429 keeps the original receipt until the outcome is known (4.2088ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a definite version conflict keeps answers and requires refreshed state with a new submission key (4.5893ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ refreshing a stale profile starts the module again when no attempt was created (3.5859ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a quiz passed after external completion is terminal without a new effect (3.6504ms)
+✔ a resumed passed module explains the existing effect and returns without a fabricated completion (147.7498ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a BFCache restore hides the old employee until the current HR session is checked (55.3251ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an ordinary pageshow does not start a redundant session check (5.0513ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ pagehide removes authenticated content before the document can be restored (5.7959ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ pagehide cancels an in-flight session check and discards its late response (5.2197ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ back/forward popstate checks the server identity before showing a role (4.851ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an older restoration response cannot overwrite a newer account (8.8845ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ restoring an expired session removes the previous employee and shows login (4.777ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ verified employee session replaces /hr with /employee before mounting account data (7.1114ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ verified hr session replaces /employee with /hr before mounting account data (11.6872ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ verified hr session replaces /employee/profile with /hr before mounting account data (4.0312ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ verified employee session replaces / with /employee before mounting account data (3.5972ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ verified hr session replaces / with /hr before mounting account data (5.1462ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ employee profile deep link survives session checks and BFCache restoration (3.9485ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ employee login from /hr opens the account's own workspace (5.9582ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ hr login from /employee opens the account's own workspace (4.653ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ pageshow on a previous HR page sends the current employee to their own workspace (3.6851ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ popstate on a previous HR page sends the current employee to their own workspace (4.9156ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a late session check cannot navigate back to HR after an employee login (9.3758ms)
+✔ an unmounted login cannot publish a late account response (146.4738ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ only outstanding goal skills offer a learning action, using the skill ID (276.7513ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ overview skill action opens the catalog with exact skill matching (344.7751ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ profile skill action opens the catalog with exact skill matching (217.6584ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ opening a skill clears a previous catalog query and activity type (194.4445ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ skill filter combines with description search and activity type, and reset restores all programs (127.1501ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ an uncovered skill has an explicit catalog empty state and no invented course (109.597ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ catalog outcomes respect the course cap and never promise a decrease or levels above five (127.1378ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a matching course still opens its real learning module for the employee (120.9101ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ HR can inspect programs for a missing skill without starting or completing learning (112.968ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ a manually selected skill that already meets the goal never promises to close a gap (17.1036ms)
+✔ scheduled availability uses the supplied snapshot date and lets an active participation continue (6.9944ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ modal restores scroll and trigger focus after unmount (23.2499ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ modal restores scroll and fallback focus after unmount (6.4675ms)
+react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+✔ catalog keyboard navigation selects only on confirmation, exposes active option, and cleans listeners (32.5599ms)
+✔ import rejects absent and empty files locally and allows correcting the selection (88.3845ms)
+ℹ tests 95
+ℹ suites 0
+ℹ pass 95
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2690.6844

@@ -97,4 +97,4 @@
 node --env-file=.env node_modules/tsx/dist/cli.mjs docs/verification/astra-audit/holdout.mts --live --repeat=3 --out=docs/verification/astra-audit/new-run.json
 ```
 
-Публикация и проверки объединения с актуальным main описаны в финальных артефактах. Приватное окружение и официальный датасет в Git не включаются.
+После объединения audit-коммита `db344c2` с актуальным main `dfc0023` получен `df9050e`: сохранён транспорт коллег с одним ограниченным повтором. Новый тест повторного запроса скорректирован с `second` на допустимый `first`, поскольку длительность теперь проверяется runtime guard. После объединения: **484/484 backend unit, 95/95 frontend client, 61 PostgreSQL integration passed + 1 opt-in live skipped; backend TypeScript и production build прошли**. Логи — `merged-tests.log`, `merged-integration.log`, `merged-build.log`, итог — `merged-checks.json`. Полная live-серия выше предшествовала этому объединению и не удостоверяет новый транспорт отдельно. Приватное окружение и официальный датасет в Git не включаются.
