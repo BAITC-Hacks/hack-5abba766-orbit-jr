@@ -4,13 +4,14 @@ import { baselineCards as buildBaselineCards, rankBaseline as orderBaseline, wei
 import { candidate, change, fact, input, skill } from './team-ai/fixtures'
 
 // Fixtures supply explicit zero signals; production must supply computed signals.
-function syntheticSignals(snapshot: ReturnType<typeof input>, supplied?: BaselineSignals): BaselineSignals {
+function syntheticSignals(snapshot: ReturnType<typeof input>, supplied?: Partial<BaselineSignals>): BaselineSignals {
   return {
-    unlockedWeightedGain: new Map(snapshot.candidates.map(c => [c.candidate_id, supplied?.unlockedWeightedGain.get(c.candidate_id) ?? 0])),
-    negativeOutcomes: new Map(snapshot.candidates.map(c => [c.candidate_id, supplied?.negativeOutcomes.get(c.candidate_id) ?? 0])),
+    similarFormatPenalty: new Map(snapshot.candidates.map(c => [c.candidate_id, supplied?.similarFormatPenalty?.get(c.candidate_id) ?? 0])),
+    unlockedWeightedGain: new Map(snapshot.candidates.map(c => [c.candidate_id, supplied?.unlockedWeightedGain?.get(c.candidate_id) ?? 0])),
+    negativeOutcomes: new Map(snapshot.candidates.map(c => [c.candidate_id, supplied?.negativeOutcomes?.get(c.candidate_id) ?? 0])),
   }
 }
-const rankBaseline = (snapshot: ReturnType<typeof input>, signals?: BaselineSignals) => orderBaseline(snapshot, syntheticSignals(snapshot, signals))
+const rankBaseline = (snapshot: ReturnType<typeof input>, signals?: Partial<BaselineSignals>) => orderBaseline(snapshot, syntheticSignals(snapshot, signals))
 const baselineCards = (snapshot: ReturnType<typeof input>) => buildBaselineCards(snapshot, syntheticSignals(snapshot))
 
 const order = (result: { candidate_id: string }[]) => result.map((c) => c.candidate_id)
@@ -51,7 +52,7 @@ describe('rankBaseline', () => {
   })
 
   it('discounts unlocked gain by half rather than treating it as direct', () => {
-    const signals: BaselineSignals = {
+    const signals: Partial<BaselineSignals> = {
       unlockedWeightedGain: new Map([['PREP', 4]]),
       negativeOutcomes: new Map(),
     }
@@ -64,7 +65,7 @@ describe('rankBaseline', () => {
   })
 
   it('prefers fewer negative outcomes on the same event', () => {
-    const signals: BaselineSignals = {
+    const signals: Partial<BaselineSignals> = {
       unlockedWeightedGain: new Map(),
       negativeOutcomes: new Map([['BAD', 2]]),
     }
@@ -156,7 +157,7 @@ describe('baseline integration invariants', () => {
 
   it('never silently substitutes missing domain history or unlock signals', () => {
     const snapshot = input([candidate({ candidate_id: 'C' })])
-    expect(() => orderBaseline(snapshot, { unlockedWeightedGain: new Map(), negativeOutcomes: new Map() })).toThrow('Missing or invalid baseline signal')
+    expect(() => orderBaseline(snapshot, { unlockedWeightedGain: new Map(), negativeOutcomes: new Map(), similarFormatPenalty: new Map() })).toThrow('Missing or invalid baseline signal')
   })
 
   it('breaks ties between actions of one event by candidate ID', () => {

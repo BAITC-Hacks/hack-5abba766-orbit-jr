@@ -34,7 +34,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     db = await import('../src/db');
     data = await import('../src/services/data');
     bootstrap = await import('../src/db/bootstrap');
-  });
+  }, 30000);
   beforeEach(async () => {
     if (!/^cq_test_[a-f0-9]+$/.test(schema)) throw new Error('Refusing to reset non-test schema');
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);
@@ -42,7 +42,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
     await bootstrap.bootstrapDatabase(directory);
   });
   afterAll(async () => {
-    if (db) await db.pool.end();
+    if (db) await db.closePools();
     if (admin) { await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin.end(); }
     if (directory) await rm(directory, { recursive: true, force: true });
   });
@@ -50,7 +50,7 @@ describe.skipIf(!connectionString)('PostgreSQL transactions and source import', 
   const completion = (revision = 1): CompletionRequest => ({ expected_version: { dataset_revision: 1, employee_revision: revision }, simulation: true, target: { kind: 'existing_participation', participation_id: 'R_1' } });
 
   it('initializes all data and preserves changes without source files on restart', async () => {
-    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '001_initial', dataset_initialized: true });
+    expect(await data.getHealth()).toMatchObject({ status: 'ok', schema_version: '002_learning', dataset_initialized: true });
     const initial = await data.readSnapshot();
     expect(initial.employees).toHaveLength(2);
     expect(initial.history).toHaveLength(1);

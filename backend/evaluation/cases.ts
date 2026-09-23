@@ -14,6 +14,10 @@ export type EvaluationCase = {
   input: AiRankingInput
   signals: BaselineSignals
   expectedTopCandidateIds: string[]
+  /** When declared, every returned card must match this order's prefix; 1..limit cards remain valid. */
+  expectedCandidateOrder?: string[]
+  /** Facts that explain the decisive distinction, beyond generic category coverage. */
+  requiredTopFactIds?: string[]
 }
 
 type CandidateSpec = {
@@ -44,6 +48,7 @@ function scenario(
   skills: SkillView[],
   specs: CandidateSpec[],
   expectedTopCandidateIds: string[],
+  requiredTopFactIds?: string[],
 ): EvaluationCase {
   const byId = new Map(skills.map((item) => [item.skill_id, item]))
   const requirements = skills.filter((item) => item.required_level !== null)
@@ -164,8 +169,9 @@ function scenario(
       },
       candidates,
     },
-    signals: { unlockedWeightedGain, negativeOutcomes },
+    signals: { unlockedWeightedGain, negativeOutcomes, similarFormatPenalty: new Map(candidates.map(candidate => [candidate.candidate_id, 0])) },
     expectedTopCandidateIds,
+    requiredTopFactIds,
   }
 }
 
@@ -189,6 +195,7 @@ export const evaluationCases: EvaluationCase[] = [
       { id: 'new-format', title: 'Writing practice in a new format', hours: 5, changes: [{ skillId: 'authored/writing', after: 2 }] },
     ],
     ['new-format'],
+    ['new-format/history'],
   ),
   scenario(
     'ignore-off-goal-gain',
@@ -219,6 +226,7 @@ export const evaluationCases: EvaluationCase[] = [
       { id: 'prepare-design-lab', title: 'Lab tooling prerequisite', hours: 4, relevance: 'prerequisite', changes: [{ skillId: 'authored/lab-tooling', after: 1 }], unlock: { eventId: 'authored-future/advanced-design-lab', skillId: 'authored/system-design', after: 5 } },
     ],
     ['prepare-design-lab'],
+    ['prepare-design-lab/unlock'],
   ),
   scenario(
     'continue-preserves-identity',

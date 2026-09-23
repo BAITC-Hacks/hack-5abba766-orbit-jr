@@ -2,6 +2,7 @@ import { ArrowUpRight, Clock3 } from "lucide-react";
 import { ActivityArt } from "./visuals";
 import type {
   EmployeeView,
+  FactCategory,
   RecommendationCard as Card,
 } from "../../../../contracts/backend";
 import { eventTypes, formats, activityDate } from "@/lib/labels";
@@ -11,12 +12,22 @@ export function RecommendationCard({
   employee,
   names,
   select,
+  eventNames = {},
+  actionLabel = "Подробнее",
 }: {
   card: Card;
   employee: EmployeeView;
   names: Record<string, string>;
   select: () => void;
+  eventNames?: Record<string, string>;
+  actionLabel?: string;
 }) {
+  const explanationGroups: { label: string; categories: FactCategory[] }[] = [
+    { label: "Почему подходит вам", categories: ["grade", "eligibility", "effort"] },
+    { label: "Как приближает к цели", categories: ["skill_gap", "target_requirement"] },
+    { label: "Что учтено из истории", categories: ["history"] },
+  ];
+  const citedFacts = card.facts.filter((fact) => card.reason_fact_ids.includes(fact.fact_id));
   return (
     <article className="course-card learning-row visual-recommendation">
       <div className="recommendation-art">
@@ -38,7 +49,7 @@ export function RecommendationCard({
           <summary>Что даст обучение</summary>
           {card.relevance === "prerequisite" && (
             <p>
-              Подготовительный шаг. Открывает доступ: {card.unlocks_event_ids.join(", ")}
+              Подготовка к: {card.unlocks_event_ids.map(id => eventNames[id] ?? id).join(", ")}. Доступ зависит от условий участия после завершения.
             </p>
           )}
           {!!card.expected_skill_changes.length && (
@@ -51,22 +62,14 @@ export function RecommendationCard({
               ))}
             </ul>
           )}
-          {!!card.facts.filter((f) => card.reason_fact_ids.includes(f.fact_id)).length && (
-            <>
-              <p>Почему вам подходит</p>
-              <ul className="verified-facts">
-                {card.facts
-                  .filter((f) => card.reason_fact_ids.includes(f.fact_id))
-                  .map((f) => (
-                    <li key={f.fact_id}>{f.text}</li>
-                  ))}
-              </ul>
-            </>
-          )}
+          {explanationGroups.map(group => {
+            const facts = citedFacts.filter(fact => group.categories.includes(fact.category));
+            return facts.length ? <div key={group.label}><h4>{group.label}</h4><ul className="verified-facts">{facts.map(fact => <li key={fact.fact_id}>{fact.text}</li>)}</ul></div> : null;
+          })}
         </details>
       </div>
       <button className="text-button learning-row-action" onClick={select}>
-        {card.action === "continue" ? "Продолжить" : "Подробнее"} <ArrowUpRight size={17} aria-hidden="true" />
+        {actionLabel} <ArrowUpRight size={17} aria-hidden="true" />
       </button>
     </article>
   );

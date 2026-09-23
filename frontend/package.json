@@ -8,7 +8,7 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:client",
-    "test:client": "node --test tests/client.test.cjs",
+    "test:client": "node --test tests/client.test.cjs tests/career-journey.test.cjs tests/learning.test.cjs tests/catalog-gaps.test.cjs",
     "start:container": "next start --hostname 0.0.0.0"
   },
   "dependencies": {

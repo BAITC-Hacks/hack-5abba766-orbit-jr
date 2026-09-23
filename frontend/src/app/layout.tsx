@@ -5,6 +5,8 @@ import "./comfort-theme.css";
 import "./apple-workspace.css";
 import "./visual-experience.css";
 import "./profile-workspace.css";
+import "@/components/quest/career-journey.css";
+import "@/components/quest/learning.css";
 import { ThemeControl } from "@/components/quest/theme-control";
 const themeBootstrap = `(function(){try{var t=localStorage.getItem('career-quest-theme');if(t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t!=='light'&&t!=='dark')t='dark';document.documentElement.dataset.theme=t;localStorage.setItem('career-quest-theme',t)}catch(e){if(!document.documentElement.dataset.theme)document.documentElement.dataset.theme='dark'}})()`;
 export const metadata: Metadata = {

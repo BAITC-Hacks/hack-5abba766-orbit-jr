@@ -15,8 +15,13 @@ export type EvaluationScore = {
   /** Fallback copying the baseline must never count as AI agreement. */
   aiBaselineAgreement: boolean | null
   fallback: boolean
+  fallbackReason: RecommendationResult['fallback_reason']
   validCitations: boolean
   validSnapshotVersion: boolean
+  /** Null means the case does not specify decisive evidence. Applies to any mode. */
+  requiredTopEvidencePass: boolean | null
+  /** Null means the case specifies top-choice quality only. Applies to any mode. */
+  expectedCandidateOrderPass: boolean | null
 }
 
 /** Measures authored acceptance choices only, not user benefit or hackathon scores. */
@@ -44,8 +49,16 @@ export function scoreEvaluation(testCase: EvaluationCase, result: Recommendation
     aiExpectedChoicePass: acceptedAi ? topCandidateId !== null && testCase.expectedTopCandidateIds.includes(topCandidateId) : null,
     aiBaselineAgreement: acceptedAi ? topCandidateId === baselineTopCandidateId : null,
     fallback: result.mode === 'rules_fallback',
+    fallbackReason: result.fallback_reason,
     validCitations,
     validSnapshotVersion,
+    requiredTopEvidencePass: testCase.requiredTopFactIds?.length
+      ? testCase.requiredTopFactIds.every((id) => result.recommendations[0]?.reason_fact_ids.includes(id))
+      : null,
+    expectedCandidateOrderPass: testCase.expectedCandidateOrder
+      ? result.recommendations.length > 0 && result.recommendations.every((card, index) =>
+        card.candidate_id === testCase.expectedCandidateOrder![index])
+      : null,
   }
 }
 
@@ -63,16 +76,25 @@ export type EvaluationSummary = {
   aiBaselineAgreementRate: number | null
   /** The deterministic baseline is run independently for every scenario. */
   baselineExpectedChoicePassRate: number | null
+  /** Includes provider/validation failures in the denominator. */
+  aiEndToEndPassRate: number | null
+  /** Only accepted AI cases with explicit decisive-evidence expectations. */
+  aiDecisiveEvidencePassRate: number | null
+  /** Only accepted AI cases with an explicit complete-order expectation. */
+  aiCandidateOrderPassRate: number | null
 }
 
 export function summarizeEvaluations(scores: readonly EvaluationScore[]): EvaluationSummary {
   const accepted = scores.filter((score) => score.acceptedAi)
   const fallbackCases = scores.filter((score) => score.fallback).length
+  const evidenceCases = accepted.filter((score) => score.requiredTopEvidencePass !== null)
+  const orderCases = accepted.filter((score) => score.expectedCandidateOrderPass !== null)
   const rate = (count: number, denominator: number): number | null => denominator ? count / denominator : null
   return {
     totalCases: scores.length,
     acceptedAiCases: accepted.length,
-    invalidAiCases: scores.filter((score) => score.mode === 'ai' && !score.acceptedAi).length,
+    invalidAiCases: scores.filter((score) => (score.mode === 'ai' && !score.acceptedAi)
+      || score.fallbackReason === 'invalid_response').length,
     fallbackCases,
     noCandidatesCases: scores.filter((score) => score.mode === 'no_candidates').length,
     aiAcceptanceRate: rate(accepted.length, scores.length),
@@ -80,5 +102,9 @@ export function summarizeEvaluations(scores: readonly EvaluationScore[]): Evalua
     aiExpectedChoicePassRate: rate(accepted.filter((score) => score.aiExpectedChoicePass).length, accepted.length),
     aiBaselineAgreementRate: rate(accepted.filter((score) => score.aiBaselineAgreement).length, accepted.length),
     baselineExpectedChoicePassRate: rate(scores.filter((score) => score.baselineExpectedChoicePass).length, scores.length),
+    aiEndToEndPassRate: rate(accepted.filter((score) => score.aiExpectedChoicePass
+      && score.requiredTopEvidencePass !== false && score.expectedCandidateOrderPass !== false).length, scores.length),
+    aiDecisiveEvidencePassRate: rate(evidenceCases.filter((score) => score.requiredTopEvidencePass).length, evidenceCases.length),
+    aiCandidateOrderPassRate: rate(orderCases.filter((score) => score.expectedCandidateOrderPass).length, orderCases.length),
   }
 }

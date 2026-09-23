@@ -42,7 +42,7 @@ export async function recommend(
 
   // Validate and prepare the baseline before spending time on a model request.
   const fallback = baselineCards(input, options.signals)
-  const attempt = await rankWithModel(input, options.signal)
+  const attempt = await rankWithModel(input, options.signal, options.signals)
   if (attempt.ok) {
     const checked = validateRanking(attempt.output, input)
     if (checked.ok) {

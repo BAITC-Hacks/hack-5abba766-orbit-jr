@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowUpRight, Target, Users, Sparkles } from "lucide-react";
 import type { HrOverview as Overview } from "../../../../contracts/backend";
 import { emptyReasons, goalSources, statuses } from "@/lib/labels";
+import { CatalogGaps } from "./catalog-gaps";
 export function HrOverview({
   data,
   open,
@@ -155,6 +156,7 @@ export function HrOverview({
           </div>
         </section>
       </div>
+      <CatalogGaps gaps={data.catalog_gaps} names={names} open={open} />
       <section className="hr-surface">
         <div className="section-heading">
           <div>

@@ -16,10 +16,14 @@ export function History({
   rows,
   busy,
   complete,
+  moduleEventIds = [],
+  learn,
 }: {
   rows: ParticipationView[];
   busy: boolean;
   complete: (target: CompletionRequest["target"]) => void;
+  moduleEventIds?: string[];
+  learn?: (row: ParticipationView) => void;
 }) {
   const [status, setStatus] = useState("all");
   const visible = rows.filter(
@@ -104,8 +108,12 @@ export function History({
             <p className="activity-date">
               <CalendarDays size={16} aria-hidden="true" />
               <span>
-                {row.scheduled_session_date ? "Дата занятия" : "Дата записи"} ·{" "}
-                {row.scheduled_session_date ?? row.source_date}
+                {row.completion_origin === "simulation"
+                  ? "Дата демопрохождения"
+                  : row.scheduled_session_date ? "Дата занятия" : "Дата записи"} ·{" "}
+                {(row.completion_origin === "simulation"
+                  ? row.recorded_at?.slice(0, 10)
+                  : row.scheduled_session_date ?? row.source_date) ?? "Не указана"}
               </span>
             </p>
             <div className="activity-progress">
@@ -121,7 +129,7 @@ export function History({
             </div>
             {row.completion_origin === "simulation" && (
               <p className="activity-note">
-                Смоделировано · не подтверждает посещение
+                Результат демопрохождения · не подтверждает посещение
               </p>
             )}
             {row.superseded_by && (
@@ -135,13 +143,17 @@ export function History({
                   className="primary"
                   disabled={busy}
                   onClick={() =>
-                    complete({
+                    learn && moduleEventIds.includes(row.event_id)
+                      ? learn(row)
+                      : complete({
                       kind: "existing_participation",
                       participation_id: row.participation_id,
                     })
                   }
                 >
-                  Симулировать завершение{" "}
+                  {learn && moduleEventIds.includes(row.event_id)
+                    ? "Продолжить уроки"
+                    : "Отметить выполненной"}{" "}
                   <ArrowRight size={16} aria-hidden="true" />
                 </button>
               ) : (
@@ -153,10 +165,9 @@ export function History({
               )}
               <details className="activity-details">
                 <summary>Детали</summary>
-                <p>Запись: {row.participation_id}</p>
-                {row.superseded_by && (
-                  <p>Учтено участием: {row.superseded_by}</p>
-                )}
+                <p>Источник: {row.source_status ? "Загруженная история" : "Демонстрационный сценарий"}</p>
+                {row.source_status && <p>Исходный статус: {statuses[row.source_status]}</p>}
+                {row.applied_as_of && <p>Учтено в расчёте на {row.applied_as_of}</p>}
               </details>
             </div>
           </article>

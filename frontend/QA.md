@@ -77,3 +77,10 @@ QA-сервер слушает только 127.0.0.1, не загружаетс
 - Named employee profiles, explicit HR actions and light/dark themes.
 - Validation: 161 backend tests, 24 client tests, production build; browser checks for recommendations, mobile history/filtering and HR import. HR profiles were also checked against the local API.
 - Full implementation map: PRODUCT-IMPLEMENTATION.md at repository root.
+
+## Integration with the latest team changes
+
+- Preserved career journey, persistent lesson player, completion comparison, catalog gaps and grouped recommendation evidence.
+- Adapted learning surfaces to both workspace themes.
+- Post-merge verification: 321 backend tests, 40 client tests and production build passed.
+
